@@ -1,0 +1,60 @@
+# Bundler
+/.bundle
+/vendor/bundle
+/vendor/cache
+/vendor/ruby
+
+# Rails logs and temp files
+/log/*
+!/log/.keep
+/tmp
+/tmp/cache
+
+# Database
+/db/*.sqlite3
+/db/*.sqlite3-journal
+/db/*.sqlite3-wal
+/db/*.sqlite3-shm
+
+# Assets / storage
+/public/assets
+/public/packs
+/public/packs-test
+/public/system
+/storage
+
+# Node
+/node_modules
+/yarn-error.log
+/.yarn-integrity
+/.pnp.*
+.pnp.*
+
+# Environment
+.env
+.env.*.local
+/.envrc
+
+# OS/editor
+.DS_Store
+.idea/
+*.swp
+*~
+
+# Coverage / tests
+/coverage
+/spec/reports
+/test/tmp
+
+# Byebug
+.byebug_history
+
+# Ruby
+*.gem
+*.rbc
+.ruby-*
+/pkg
+/rdoc
+/.yardoc
+/_yardoc
+doc/
