@@ -24,11 +24,11 @@ class UserApiIntegrationTest < Minitest::Test
                  .to_sql
 
     expected = <<~SQL.strip
-      SELECT * FROM products
-      WHERE "products"."description" &&& 'running shoes'
-        AND "products"."in_stock" = true
-        AND products.price < 100
-        AND "products"."rating" >= 4
+      SELECT products.* FROM products
+      WHERE ("products"."description" &&& 'running shoes')
+        AND ("products"."in_stock" = true)
+        AND (products.price < 100)
+        AND ("products"."rating" >= 4)
     SQL
 
     assert_sql_equal expected, sql
@@ -41,9 +41,9 @@ class UserApiIntegrationTest < Minitest::Test
                  .to_sql
 
     expected = <<~SQL.strip
-      SELECT * FROM products
-      WHERE "products"."description" &&& 'shoes'
-        AND "products"."price" >= 10 AND "products"."price" <= 100
+      SELECT products.* FROM products
+      WHERE ("products"."description" &&& 'shoes')
+        AND ("products"."price" >= 10 AND "products"."price" <= 100)
     SQL
 
     assert_sql_equal expected, sql
@@ -56,9 +56,9 @@ class UserApiIntegrationTest < Minitest::Test
                  .to_sql
 
     expected = <<~SQL.strip
-      SELECT * FROM products
-      WHERE "products"."description" &&& 'shoes'
-        AND "products"."price" >= 10 AND "products"."price" < 100
+      SELECT products.* FROM products
+      WHERE ("products"."description" &&& 'shoes')
+        AND ("products"."price" >= 10 AND "products"."price" < 100)
     SQL
 
     assert_sql_equal expected, sql
@@ -70,8 +70,8 @@ class UserApiIntegrationTest < Minitest::Test
                  .to_sql
 
     expected = <<~SQL.strip
-      SELECT * FROM products
-      WHERE ("products"."description" &&& 'running shoes' AND "products"."category" ### 'Footwear')
+      SELECT products.* FROM products
+      WHERE ("products"."description" &&& 'running shoes') AND ("products"."category" ### 'Footwear')
     SQL
 
     assert_sql_equal expected, sql
@@ -79,7 +79,7 @@ class UserApiIntegrationTest < Minitest::Test
 
   def test_matching_any_or_semantics
     sql = Product.search(:description).matching_any("wireless", "bluetooth").to_sql
-    assert_sql_equal %(SELECT * FROM products WHERE "products"."description" ||| 'wireless bluetooth'), sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ||| 'wireless bluetooth')), sql
   end
 
   def test_excluding_terms
@@ -89,8 +89,8 @@ class UserApiIntegrationTest < Minitest::Test
                  .to_sql
 
     expected = <<~SQL.strip
-      SELECT * FROM products
-      WHERE ("products"."description" &&& 'shoes' AND NOT ("products"."description" &&& 'cheap budget'))
+      SELECT products.* FROM products
+      WHERE ("products"."description" &&& 'shoes') AND (NOT ("products"."description" &&& 'cheap budget'))
     SQL
 
     assert_sql_equal expected, sql
@@ -98,37 +98,37 @@ class UserApiIntegrationTest < Minitest::Test
 
   def test_phrase_with_slop
     sql = Product.search(:description).phrase("running shoes", slop: 2).to_sql
-    assert_sql_equal %(SELECT * FROM products WHERE "products"."description" ### 'running shoes'::pdb.slop(2)), sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ### 'running shoes'::pdb.slop(2))), sql
   end
 
   def test_fuzzy_with_prefix
     sql = Product.search(:description).fuzzy("runn", distance: 1, prefix: true).to_sql
-    assert_sql_equal %(SELECT * FROM products WHERE "products"."description" === 'runn'::pdb.fuzzy(1, "true")), sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" === 'runn'::pdb.fuzzy(1, "true"))), sql
   end
 
   def test_regex
     sql = Product.search(:description).regex("run.*shoes").to_sql
-    assert_sql_equal %(SELECT * FROM products WHERE "products"."description" @@@ pdb.regex('run.*shoes')), sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.regex('run.*shoes'))), sql
   end
 
   def test_term_exact
     sql = Product.search(:description).term("shoes").to_sql
-    assert_sql_equal %(SELECT * FROM products WHERE "products"."description" === 'shoes'), sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" === 'shoes')), sql
   end
 
   def test_near_proximity
     sql = Product.search(:description).near("sleek", "shoes", distance: 1).to_sql
-    assert_sql_equal %(SELECT * FROM products WHERE "products"."description" @@@ ('sleek' ## 1 ## 'shoes')), sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('sleek' ## 1 ## 'shoes'))), sql
   end
 
   def test_phrase_prefix
     sql = Product.search(:description).phrase_prefix("run", "sh").to_sql
-    assert_sql_equal %(SELECT * FROM products WHERE "products"."description" @@@ pdb.phrase_prefix(ARRAY['run', 'sh'])), sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.phrase_prefix(ARRAY['run', 'sh']))), sql
   end
 
   def test_more_like_this
     sql = Product.more_like_this(3, fields: [:description]).to_sql
-    assert_sql_equal %(SELECT * FROM products WHERE "products"."id" @@@ pdb.more_like_this(3, ARRAY['description'])), sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.more_like_this(3, ARRAY['description']))), sql
   end
 
   def test_with_score_and_order
@@ -140,7 +140,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     expected = <<~SQL.strip
       SELECT products.*, pdb.score("products"."id") AS search_score FROM products
-      WHERE "products"."description" &&& 'running shoes'
+      WHERE ("products"."description" &&& 'running shoes')
       ORDER BY search_score DESC
     SQL
 
@@ -155,7 +155,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     expected = <<~SQL.strip
       SELECT products.*, pdb.snippet("products"."description") AS description_snippet FROM products
-      WHERE "products"."description" &&& 'running shoes'
+      WHERE ("products"."description" &&& 'running shoes')
     SQL
 
     assert_sql_equal expected, sql
@@ -169,7 +169,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     expected = <<~SQL.strip
       SELECT products.*, pdb.snippet("products"."description", '<mark>', '</mark>', 100) AS description_snippet FROM products
-      WHERE "products"."description" &&& 'running shoes'
+      WHERE ("products"."description" &&& 'running shoes')
     SQL
 
     assert_sql_equal expected, sql
@@ -182,8 +182,8 @@ class UserApiIntegrationTest < Minitest::Test
     sql = left.or(right).to_sql
 
     expected = <<~SQL.strip
-      SELECT * FROM products
-      WHERE (("products"."description" &&& 'shoes') OR ("products"."category" &&& 'footwear'))
+      SELECT products.* FROM products
+      WHERE ((("products"."description" &&& 'shoes') OR ("products"."category" &&& 'footwear')))
     SQL
 
     assert_sql_equal expected, sql
@@ -214,8 +214,8 @@ class UserApiIntegrationTest < Minitest::Test
                  .to_sql
 
     expected = <<~SQL.strip
-      SELECT *, pdb.agg('{"terms": {"field": "category", "size": 10}}') OVER () AS _category_facet, pdb.agg('{"terms": {"field": "brand", "size": 10}}') OVER () AS _brand_facet FROM products
-      WHERE "products"."description" &&& 'shoes' AND "products"."in_stock" = true
+      SELECT products.*, pdb.agg('{"terms": {"field": "category", "size": 10}}') OVER () AS _category_facet, pdb.agg('{"terms": {"field": "brand", "size": 10}}') OVER () AS _brand_facet FROM products
+      WHERE ("products"."description" &&& 'shoes') AND ("products"."in_stock" = true)
       ORDER BY rating DESC
       LIMIT 10
     SQL

@@ -69,7 +69,7 @@ module ParadeDB
 
     def with_score
       sql = %(pdb.score("#{table}"."#{primary_key}") AS search_score)
-      dup_with(relation: relation.except(:select).select(Arel.sql("#{table}.*"), Arel.sql(sql)))
+      dup_with(relation: relation.except(:select).select(::Arel.sql("#{table}.*"), ::Arel.sql(sql)))
     end
 
     def with_snippet(column, start_tag: nil, end_tag: nil, max_chars: nil)
@@ -82,7 +82,7 @@ module ParadeDB
              else
                %(pdb.snippet("#{table}"."#{column}", #{formatted_args.join(', ')}))
              end
-      dup_with(relation: relation.except(:select).select(Arel.sql("#{table}.*"), Arel.sql("#{call} AS #{column}_snippet")))
+      dup_with(relation: relation.except(:select).select(::Arel.sql("#{table}.*"), ::Arel.sql("#{call} AS #{column}_snippet")))
     end
 
     def facets(*fields, size: 10, order: "-count", missing: nil, agg: nil)
@@ -91,7 +91,7 @@ module ParadeDB
 
     def with_facets(*fields, size: 10, order: nil, missing: nil, agg: nil)
       opts = { size: size, order: order, missing: missing, agg: agg }
-      add_facets(fields, opts)
+      dup_with(facet_fields: fields, facet_opts: opts, with_facet_window: true)
     end
 
     # ---- ActiveRecord-like chaining ----
@@ -109,7 +109,7 @@ module ParadeDB
         else
           clause.to_s
         end
-      dup_with(relation: relation.order(Arel.sql(new_clause)))
+      dup_with(relation: relation.order(::Arel.sql(new_clause)))
     end
 
     def limit(value)
@@ -117,14 +117,14 @@ module ParadeDB
     end
 
     def select(*columns)
-      cols = columns.map { |c| Arel.sql(c.to_s) }
+      cols = columns.map { |c| ::Arel.sql(c.to_s) }
       dup_with(relation: relation.select(*cols))
     end
 
     def or(other)
       combined = "((#{predicates_sql}) OR (#{other.send(:predicates_sql)}))"
       dup_with(
-        relation: base_relation.where(Arel.sql(combined)),
+        relation: base_relation.where(::Arel.sql(combined)),
         predicates: [{ sql: combined, kind: :search }]
       )
     end
@@ -149,7 +149,7 @@ module ParadeDB
           ParadeDB::Arel.to_sql(node_or_string)
         end
 
-      new_relation = relation.where(Arel.sql(pred_sql))
+      new_relation = relation.where(::Arel.sql(pred_sql))
       dup_with(relation: new_relation, predicates: predicates + [{ sql: pred_sql, kind: kind }])
     end
 
@@ -186,7 +186,7 @@ module ParadeDB
       if with_facet_window && facet_fields
         facet_selects = facet_fields.map do |field|
           json = facet_json(field, facet_opts)
-          Arel.sql(%(pdb.agg('#{json}') OVER () AS _#{field}_facet))
+          ::Arel.sql(%(pdb.agg('#{json}') OVER () AS _#{field}_facet))
         end
         new_relation = new_relation.select(*facet_selects)
       end
@@ -203,7 +203,7 @@ module ParadeDB
     end
 
     def base_relation
-      model.unscoped.select(Arel.sql("#{table}.*")).from(Arel.sql(table))
+      model.unscoped.select(::Arel.sql("#{table}.*")).from(::Arel.sql(table))
     end
 
     def table
