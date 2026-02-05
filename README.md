@@ -9,7 +9,7 @@
 
 ## Status
 
-Work in progress. See `design-doc.md` for the current API proposal and scope.
+Work in progress.
 
 ## Requirements & Compatibility
 
@@ -58,10 +58,6 @@ Product.search(:description).matching("running", "shoes")
   .order(search_score: :desc)
 ```
 
-## Arel Layer
-
-The user API is built on top of a dedicated Arel layer. See `AREL_README.md` for Arel node usage and SQL rendering.
-
 ## Query Types (Summary)
 
 - `matching` / `matching(any: [...])`
@@ -73,7 +69,62 @@ The user API is built on top of a dedicated Arel layer. See `AREL_README.md` for
 - `with_score`, `with_snippet`
 - `facets`, `with_facets`
 
-For the full user-facing API, see `design-doc.md`.
+## Arel Layer
+
+The user API is built on top of a dedicated Arel layer that provides an AST and SQL renderer for ParadeDB operators.
+
+### Quickstart
+
+```ruby
+require "parade_db/arel"
+
+arel = ParadeDB::Arel::Builder.new(:products)
+
+predicate = arel.match(:description, "running", "shoes")
+  .and(arel.regex(:description, "run.*"))
+  .and(arel.match(:in_stock, true))
+
+sql = ParadeDB::Arel.to_sql(predicate)
+# => ("products"."description" &&& 'running shoes' AND "products"."description" @@@ pdb.regex('run.*') AND "products"."in_stock" === true)
+```
+
+Render any node with `ParadeDB::Arel.to_sql(node)`. All nodes respond to `.and`, `.or`, and `.not`.
+
+### Builder Methods
+
+| Method | ParadeDB SQL |
+|--------|--------------|
+| `match(column, *terms, boost: nil)` | `column &&& 'a b'::pdb.boost(N)` |
+| `match_any(column, *terms)` | `column \|\|\| 'a b'` |
+| `phrase(column, text, slop: n)` | `column ### 'text'::pdb.slop(n)` |
+| `term(column, term, boost: nil)` | `column === 'term'::pdb.boost(N)` |
+| `fuzzy(column, term, distance:, prefix:, boost:)` | `column === 'term'::pdb.fuzzy(d[, "true"])::pdb.boost(N)` |
+| `regex(column, pattern)` | `column @@@ pdb.regex('pattern')` |
+| `near(column, a, b, distance:)` | `column @@@ ('a' ## d ## 'b')` |
+| `phrase_prefix(column, *terms)` | `column @@@ pdb.phrase_prefix(ARRAY['a','b'])` |
+| `full_text(column, expr)` | `column @@@ expr` (raw right-hand value) |
+| `more_like_this(column, key, fields: [:f1, :f2])` | `column @@@ pdb.more_like_this(key, ARRAY['f1','f2'])` |
+| `score(key_field)` | `pdb.score(key_field)` |
+| `snippet(column, start, finish, max)` | `pdb.snippet(column, start, finish, max)` |
+| `agg(json)` | `pdb.agg(json)` |
+
+`Builder#[]` returns a column node for manual composition: `arel[:description]`.
+
+### Composition
+
+Boolean composition uses the standard helpers:
+
+```ruby
+fast = arel.match(:description, "running").and(arel.term(:rating, 4))
+cheap = arel.match(:description, "budget")
+predicate = fast.or(cheap.not)
+```
+
+`predicate` renders to:
+
+```sql
+(("products"."description" &&& 'running' AND "products"."rating" === 4) OR NOT ("products"."description" &&& 'budget'))
+```
 
 ## License
 
