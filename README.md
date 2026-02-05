@@ -7,6 +7,8 @@
 
 [ParadeDB](https://paradedb.com) — simple, Elastic-quality search for Postgres — integration for ActiveRecord.
 
+For complete ParadeDB documentation, see [docs.paradedb.com](https://docs.paradedb.com/).
+
 ## Status
 
 Work in progress.
