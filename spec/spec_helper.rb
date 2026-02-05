@@ -38,3 +38,11 @@ end
 
 establish_test_connection
 setup_test_schema
+
+def normalize_sql(sql)
+  sql.to_s.strip.gsub(/\s+/, " ")
+end
+
+def assert_sql_equal(expected, actual)
+  assert_equal normalize_sql(expected), normalize_sql(actual)
+end

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+echo "==> Installing dependencies"
+if [[ "${PARADEDB_WITH_PG:-0}" == "1" ]]; then
+  echo "    PARADEDB_WITH_PG=1 (installing pg gem)"
+fi
+
+bundle install
+
+echo ""
+echo "==> Done"
+echo "Run unit tests: scripts/run_unit_tests.sh"
+echo "Run integration tests (requires ParadeDB): PARADEDB_WITH_PG=1 scripts/run_integration_tests.sh"
