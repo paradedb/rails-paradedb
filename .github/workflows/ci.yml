@@ -62,3 +62,15 @@ jobs:
 
       - name: Run integration tests
         run: bundle exec rake test:integration
+
+      - name: Run examples
+        env:
+          DATABASE_URL: ${{ env.PARADEDB_TEST_DSN }}
+        run: |
+          bundle exec ruby examples/quickstart/quickstart.rb
+          bundle exec ruby examples/autocomplete/setup.rb
+          bundle exec ruby examples/autocomplete/autocomplete.rb
+          bundle exec ruby examples/more_like_this/more_like_this.rb
+          bundle exec ruby examples/faceted_search/faceted_search.rb
+          bundle exec ruby examples/hybrid_rrf/setup.rb
+          bundle exec ruby examples/hybrid_rrf/hybrid_rrf.rb

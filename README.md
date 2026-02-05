@@ -66,6 +66,14 @@ Product.search(:description).matching_all("running", "shoes")
   .order(search_score: :desc)
 ```
 
+## Examples
+
+End-to-end runnable examples are available in `examples/` with the same
+structure as the Django package examples (quickstart, facets, autocomplete,
+more-like-this, hybrid RRF, and RAG).
+
+See `examples/README.md` for setup and run commands.
+
 ## Query Types
 
 | Method | Operator | Description |
