@@ -123,6 +123,16 @@ Product.search(:id).match_all
 
 The user API is built on top of a dedicated Arel layer that provides an AST and SQL renderer for ParadeDB operators.
 
+### Starter
+
+```ruby
+builder = ParadeDB::Arel::Builder.new(:products)
+predicate = builder.match(:description, "running", "shoes")
+sql = ParadeDB::Arel.to_sql(predicate, Product.connection)
+
+Product.where(Arel.sql(sql))
+```
+
 ### Quickstart
 
 ```ruby
@@ -139,6 +149,14 @@ sql = ParadeDB::Arel.to_sql(predicate)
 ```
 
 Render any node with `ParadeDB::Arel.to_sql(node)`. All nodes respond to `.and`, `.or`, and `.not`.
+
+### Where To Look
+
+- `lib/parade_db/arel/builder.rb` for available node builders (`match`, `regex`, `phrase_prefix`, `full_text`, `more_like_this`).
+- `lib/parade_db/arel/visitor.rb` for SQL rendering details and operator mapping.
+- `spec/arel_visitor_spec.rb` for precise SQL expectations per node.
+- `spec/arel_integration_spec.rb` for composed predicates and end-to-end rendering checks.
+- `spec/user_api_behavior_integration_spec.rb` for practical usage of the raw `full_text` escape hatch in query execution.
 
 ### Builder Methods
 
