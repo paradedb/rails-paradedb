@@ -23,14 +23,12 @@ module ParadeDB
       dup_with(current_field: column)
     end
 
-    def matching(*terms, any: nil, boost: nil)
-      new_pred =
-        if any
-          builder.match_any(current_field, *any)
-        else
-          builder.match(current_field, *terms, boost: boost)
-        end
-      chain_with(new_pred, kind: :search)
+    def matching_all(*terms, boost: nil)
+      chain_with(builder.match(current_field, *terms, boost: boost), kind: :search)
+    end
+
+    def matching_any(*terms)
+      chain_with(builder.match_any(current_field, *terms), kind: :search)
     end
 
     def excluding(*terms)
@@ -62,7 +60,7 @@ module ParadeDB
       chain_with(builder.phrase_prefix(current_field, *terms), kind: :search)
     end
 
-    def similar_to(key, fields: nil)
+    def more_like_this(key, fields: nil)
       predicate = builder.more_like_this(primary_key_node, key, fields: fields)
       chain_with(predicate, kind: :search)
     end
@@ -163,11 +161,13 @@ module ParadeDB
         conditions.map do |k, v|
           col = %("#{table}"."#{k}")
           if v.is_a?(Range)
-            if v.begin.nil?
-              "#{col} <= #{v.end}"
-            else
-              "#{col} >= #{v.begin}"
+            range_conditions = []
+            range_conditions << "#{col} >= #{literal(v.begin)}" if v.begin
+            if v.end
+              op = v.exclude_end? ? "<" : "<="
+              range_conditions << "#{col} #{op} #{literal(v.end)}"
             end
+            range_conditions.join(" AND ")
           else
             "#{col} = #{literal(v)}"
           end

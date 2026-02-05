@@ -38,13 +38,17 @@ end
 Basic search:
 
 ```ruby
-Product.search(:description).matching("running", "shoes")
+# Match ALL terms (conjunction)
+Product.search(:description).matching_all("running", "shoes")
+
+# Match ANY term (disjunction)
+Product.search(:description).matching_any("wireless", "bluetooth")
 ```
 
 Search with filters:
 
 ```ruby
-Product.search(:description).matching("shoes")
+Product.search(:description).matching_all("shoes")
   .where(in_stock: true)
   .order(price: :asc)
 ```
@@ -52,22 +56,39 @@ Product.search(:description).matching("shoes")
 Scoring and snippets:
 
 ```ruby
-Product.search(:description).matching("running", "shoes")
+Product.search(:description).matching_all("running", "shoes")
   .with_score
   .with_snippet(:description, start_tag: "<b>", end_tag: "</b>")
   .order(search_score: :desc)
 ```
 
-## Query Types (Summary)
+## Query Types
 
-- `matching` / `matching(any: [...])`
-- `phrase` with `slop`
-- `fuzzy` with `distance`, `prefix`, and `boost`
-- `term` for exact term match
-- `regex`, `near`, `phrase_prefix`
-- `similar_to`
-- `with_score`, `with_snippet`
-- `facets`, `with_facets`
+| Method | Operator | Description |
+|--------|----------|-------------|
+| `matching_all("a", "b")` | `&&&` | Match ALL terms (AND) |
+| `matching_any("a", "b")` | `\|\|\|` | Match ANY term (OR) |
+| `phrase("a b", slop: n)` | `###` | Phrase match with optional word distance |
+| `term("value")` | `===` | Exact token match (see below) |
+| `fuzzy("term", distance: n)` | `===` | Fuzzy match with edit distance |
+| `regex("pattern")` | `@@@` | Regex pattern match |
+| `near("a", "b", distance: n)` | `@@@` | Proximity search |
+| `phrase_prefix("a", "b")` | `@@@` | Autocomplete/prefix matching |
+| `more_like_this(id, fields: [...])` | `@@@` | Find similar documents |
+
+### When to use `term` vs `matching_all`
+
+- **`matching_all`** / **`matching_any`**: Standard full-text search. The query string is tokenized and matched against indexed tokens. Use for natural language queries like `"running shoes"`.
+
+- **`term`**: Exact token match without further tokenization. The query is treated as a finalized token. Use when you need precise control, such as matching a specific category value or status field.
+
+```ruby
+# Full-text search - tokenizes "running shoes" into ["running", "shoes"]
+Product.search(:description).matching_all("running shoes")
+
+# Exact term - matches the literal token "active" (case-sensitive to indexed form)
+Product.search(:status).term("active")
+```
 
 ## Arel Layer
 

@@ -18,9 +18,9 @@ module ParadeDB
         Relation.new(self).search(column)
       end
 
-      def similar_to(key, fields: nil)
+      def more_like_this(key, fields: nil)
         ensure_parade_ready!
-        Relation.new(self).similar_to(key, fields: fields)
+        Relation.new(self).more_like_this(key, fields: fields)
       end
 
       def parade_arel

@@ -15,9 +15,9 @@ class Category < ActiveRecord::Base
 end
 
 class UserApiIntegrationTest < Minitest::Test
-  def test_matching_with_filters
+  def test_matching_all_with_filters
     sql = Product.search(:description)
-                 .matching("running", "shoes")
+                 .matching_all("running", "shoes")
                  .where(in_stock: true)
                  .where("products.price < 100")
                  .where(rating: 4..)
@@ -34,8 +34,38 @@ class UserApiIntegrationTest < Minitest::Test
     assert_sql_equal expected, sql
   end
 
+  def test_closed_range_filter
+    sql = Product.search(:description)
+                 .matching_all("shoes")
+                 .where(price: 10..100)
+                 .to_sql
+
+    expected = <<~SQL.strip
+      SELECT * FROM products
+      WHERE "products"."description" &&& 'shoes'
+        AND "products"."price" >= 10 AND "products"."price" <= 100
+    SQL
+
+    assert_sql_equal expected, sql
+  end
+
+  def test_exclusive_end_range_filter
+    sql = Product.search(:description)
+                 .matching_all("shoes")
+                 .where(price: 10...100)
+                 .to_sql
+
+    expected = <<~SQL.strip
+      SELECT * FROM products
+      WHERE "products"."description" &&& 'shoes'
+        AND "products"."price" >= 10 AND "products"."price" < 100
+    SQL
+
+    assert_sql_equal expected, sql
+  end
+
   def test_chain_multiple_search_fields_and
-    sql = Product.search(:description).matching("running", "shoes")
+    sql = Product.search(:description).matching_all("running", "shoes")
                  .search(:category).phrase("Footwear")
                  .to_sql
 
@@ -47,14 +77,14 @@ class UserApiIntegrationTest < Minitest::Test
     assert_sql_equal expected, sql
   end
 
-  def test_match_any_or_semantics
-    sql = Product.search(:description).matching(any: ["wireless", "bluetooth"]).to_sql
+  def test_matching_any_or_semantics
+    sql = Product.search(:description).matching_any("wireless", "bluetooth").to_sql
     assert_sql_equal %(SELECT * FROM products WHERE "products"."description" ||| 'wireless bluetooth'), sql
   end
 
   def test_excluding_terms
     sql = Product.search(:description)
-                 .matching("shoes")
+                 .matching_all("shoes")
                  .excluding("cheap", "budget")
                  .to_sql
 
@@ -96,14 +126,14 @@ class UserApiIntegrationTest < Minitest::Test
     assert_sql_equal %(SELECT * FROM products WHERE "products"."description" @@@ pdb.phrase_prefix(ARRAY['run', 'sh'])), sql
   end
 
-  def test_similar_to
-    sql = Product.similar_to(3, fields: [:description]).to_sql
+  def test_more_like_this
+    sql = Product.more_like_this(3, fields: [:description]).to_sql
     assert_sql_equal %(SELECT * FROM products WHERE "products"."id" @@@ pdb.more_like_this(3, ARRAY['description'])), sql
   end
 
   def test_with_score_and_order
     sql = Product.search(:description)
-                 .matching("running", "shoes")
+                 .matching_all("running", "shoes")
                  .with_score
                  .order(search_score: :desc)
                  .to_sql
@@ -119,7 +149,7 @@ class UserApiIntegrationTest < Minitest::Test
 
   def test_with_snippet_default
     sql = Product.search(:description)
-                 .matching("running shoes")
+                 .matching_all("running shoes")
                  .with_snippet(:description)
                  .to_sql
 
@@ -133,7 +163,7 @@ class UserApiIntegrationTest < Minitest::Test
 
   def test_with_snippet_custom
     sql = Product.search(:description)
-                 .matching("running shoes")
+                 .matching_all("running shoes")
                  .with_snippet(:description, start_tag: '<mark>', end_tag: '</mark>', max_chars: 100)
                  .to_sql
 
@@ -146,8 +176,8 @@ class UserApiIntegrationTest < Minitest::Test
   end
 
   def test_or_across_fields
-    left = Product.search(:description).matching("shoes")
-    right = Product.search(:category).matching("footwear")
+    left = Product.search(:description).matching_all("shoes")
+    right = Product.search(:category).matching_all("footwear")
 
     sql = left.or(right).to_sql
 
@@ -160,7 +190,7 @@ class UserApiIntegrationTest < Minitest::Test
   end
 
   def test_facets_only
-    facet_sql = Product.search(:description).matching("shoes")
+    facet_sql = Product.search(:description).matching_all("shoes")
                        .facets(:category, :brand, size: 10, order: "-count")
                        .sql
 
@@ -176,7 +206,7 @@ class UserApiIntegrationTest < Minitest::Test
   end
 
   def test_with_facets_rows_plus_facets
-    sql = Product.search(:description).matching("shoes")
+    sql = Product.search(:description).matching_all("shoes")
                  .where(in_stock: true)
                  .with_facets(:category, :brand, size: 10)
                  .order(rating: :desc)
