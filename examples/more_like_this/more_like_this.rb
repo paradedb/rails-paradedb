@@ -16,7 +16,7 @@ def demo_similar_to_single_product
   puts "\nSimilar products (by description):"
   similar = MockItem.more_like_this(source_id, fields: [:description])
                     .with_score
-                    .order(Arel.sql("search_score DESC"))
+                    .order(search_score: :desc)
                     .limit(5)
 
   similar.each do |item|
@@ -49,7 +49,7 @@ def demo_similar_to_multiple_products
   similar = combined.where.not(id: browsed_ids)
                     .extending(ParadeDB::SearchMethods)
                     .with_score
-                    .order(Arel.sql("search_score DESC"))
+                    .order(search_score: :desc)
                     .limit(5)
 
   similar.each do |item|
@@ -71,7 +71,7 @@ def demo_combined_with_filters
                     .where(in_stock: true)
                     .where("rating >= ?", 4)
                     .with_score
-                    .order(Arel.sql("search_score DESC"))
+                    .order(search_score: :desc)
                     .limit(5)
 
   results.each do |item|

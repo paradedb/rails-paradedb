@@ -15,7 +15,7 @@ def demo_scored_search
   results = MockItem.search(:description)
                     .matching_all("running")
                     .with_score
-                    .order(Arel.sql("search_score DESC"))
+                    .order(search_score: :desc)
                     .limit(5)
 
   results.each do |item|
@@ -28,7 +28,7 @@ def demo_phrase_search
   results = MockItem.search(:description)
                     .phrase("running shoes")
                     .with_score
-                    .order(Arel.sql("search_score DESC"))
+                    .order(search_score: :desc)
                     .limit(5)
 
   results.each do |item|
@@ -42,7 +42,7 @@ def demo_snippet_highlighting
                     .matching_all("shoes")
                     .with_score
                     .with_snippet(:description, start_tag: "<b>", end_tag: "</b>")
-                    .order(Arel.sql("search_score DESC"))
+                    .order(search_score: :desc)
                     .limit(3)
 
   results.each do |item|
@@ -57,7 +57,7 @@ def demo_filtered_search
                     .where(in_stock: true)
                     .where("rating >= ?", 4)
                     .with_score
-                    .order(Arel.sql("search_score DESC"))
+                    .order(search_score: :desc)
                     .limit(5)
 
   results.each do |item|

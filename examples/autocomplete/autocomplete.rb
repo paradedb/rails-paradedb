@@ -16,7 +16,7 @@ def autocomplete_relation(query)
   AutocompleteItem.search(:description)
                   .parse("description_ngram:#{query}")
                   .with_score
-                  .order(Arel.sql("search_score DESC"))
+                  .order(search_score: :desc)
                   .limit(5)
 end
 

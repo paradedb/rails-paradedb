@@ -1,7 +1,8 @@
 # ParadeDB for Rails: Examples & Cookbook
 
-This directory mirrors the Django examples and shows how to use ParadeDB from
-Ruby/ActiveRecord with the `rails-paradedb` DSL.
+Welcome to the **ParadeDB for Rails** examples. This directory contains
+self-contained scripts that show how to integrate ParadeDB search features into
+your Ruby on Rails / ActiveRecord application.
 
 ## Getting Started
 

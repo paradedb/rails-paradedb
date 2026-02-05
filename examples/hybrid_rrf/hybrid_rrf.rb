@@ -21,7 +21,7 @@ def bm25_search(query, top_k: 20)
   MockItem.search(:description)
           .matching_any(*terms)
           .with_score
-          .order(Arel.sql("search_score DESC"))
+          .order(search_score: :desc)
           .limit(top_k)
           .map { |item| [item.id, item.search_score.to_f] }
 end
@@ -63,7 +63,7 @@ def vector_search(query, top_k: 20)
             :id,
             Arel.sql("embedding <=> #{quoted_vector}::vector AS distance")
           )
-          .order(Arel.sql("distance ASC"))
+          .order(distance: :asc)
           .limit(top_k)
           .map { |item| [item.id, item.distance.to_f] }
 end

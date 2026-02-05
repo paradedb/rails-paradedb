@@ -20,7 +20,7 @@ def retrieve(query, top_k: 5)
   MockItem.search(:description)
           .matching_any(*terms)
           .with_score
-          .order(Arel.sql("search_score DESC"))
+          .order(search_score: :desc)
           .limit(top_k)
           .to_a
 end
