@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "relation"
+require_relative "search_methods"
 require "active_support/concern"
 
 module ParadeDB
@@ -15,12 +15,12 @@ module ParadeDB
     module ClassMethods
       def search(column)
         ensure_parade_ready!
-        Relation.new(self).search(column)
+        all.extending(SearchMethods).search(column)
       end
 
       def more_like_this(key, fields: nil)
         ensure_parade_ready!
-        Relation.new(self).more_like_this(key, fields: fields)
+        all.extending(SearchMethods).more_like_this(key, fields: fields)
       end
 
       def parade_arel

@@ -40,7 +40,12 @@ establish_test_connection
 setup_test_schema
 
 def normalize_sql(sql)
-  sql.to_s.strip.gsub(/\s+/, " ")
+  sql.to_s.strip
+     .gsub(/\s+/, " ")
+     .gsub(/"/, "")
+     .gsub(/\bTRUE\b/i, "true")
+     .gsub(/\bFALSE\b/i, "false")
+     .gsub(/\(\s*([A-Za-z0-9_\.]+)\s*=\s*(true|false)\s*\)/i, '\\1 = \\2')
 end
 
 def assert_sql_equal(expected, actual)

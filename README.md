@@ -20,6 +20,8 @@ Work in progress.
 | ParadeDB   | 0.21.* (tested on 0.21.4)        |
 | PostgreSQL | 17, 18 (with ParadeDB extension) |
 
+**Note**: This gem requires ActiveRecord. Both the user-facing DSL and the Arel layer delegate SQL value quoting to `ActiveRecord::Base.connection.quote` for type safety and proper escaping.
+
 ## Installation
 
 This gem is not published yet. Local development uses the code in this repository directly.

@@ -4,6 +4,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+export PARADEDB_WITH_PG=1
+
+source "${SCRIPT_DIR}/rbenv_bootstrap.sh"
 source "${SCRIPT_DIR}/run_paradedb.sh"
 
 PORT="${PARADEDB_PORT:-5432}"

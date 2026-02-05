@@ -3,7 +3,8 @@
 module ParadeDB
   module Arel
     class Visitor
-      def initialize
+      def initialize(connection = nil)
+        @connection = connection
       end
 
       def accept(node)
@@ -95,24 +96,12 @@ module ParadeDB
       end
 
       def quote(val)
-        case val
-        when Nodes::Node
-          accept(val)
-        when String
-          "'#{val.gsub("'", "''")}'"
-        when Symbol
-          "'#{val}'"
-        when TrueClass
-          "true"
-        when FalseClass
-          "false"
-        when NilClass
-          "NULL"
-        when Array
-          "ARRAY[#{val.map { |v| quote(v) }.join(', ')}]"
-        else
-          val.to_s
-        end
+        return accept(val) if val.is_a?(Nodes::Node)
+        connection.quote(val)
+      end
+
+      def connection
+        @connection || ActiveRecord::Base.connection
       end
     end
   end

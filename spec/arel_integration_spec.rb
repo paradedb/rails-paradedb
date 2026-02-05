@@ -49,6 +49,6 @@ class ArelIntegrationTest < Minitest::Test
 
     combined = base.or(other)
 
-    assert_equal %((("products"."description" &&& 'running' AND NOT ("products"."description" ### 'trail shoes')) OR ("products"."category" ||| 'Footwear' AND "products"."in_stock" === true))), sql(combined)
+    assert_equal %((("products"."description" &&& 'running' AND NOT ("products"."description" ### 'trail shoes')) OR ("products"."category" ||| 'Footwear' AND "products"."in_stock" === TRUE))), sql(combined)
   end
 end

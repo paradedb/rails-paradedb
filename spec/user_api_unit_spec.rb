@@ -22,7 +22,7 @@ class UserApiUnitTest < Minitest::Test
                      .to_sql
 
     assert_sql_equal %(SELECT products.* FROM products
-      WHERE ("products"."description" &&& 'running shoes') AND ("products"."in_stock" = true)), sql
+      WHERE ("products"."description" &&& 'running shoes') AND "products"."in_stock" = TRUE), sql
   end
 
   def test_matching_any
@@ -71,10 +71,11 @@ class UserApiUnitTest < Minitest::Test
   end
 
   def test_or_composition
-    left = UnitProduct.search(:description).matching_all("shoes")
-    right = UnitProduct.search(:category).matching_all("footwear")
+    base = UnitProduct.where(in_stock: true).order(id: :desc).limit(10)
+    left = base.search(:description).matching_all("shoes")
+    right = base.search(:category).matching_all("footwear")
     sql = left.or(right).to_sql
-    assert_sql_equal %(SELECT products.* FROM products WHERE ((("products"."description" &&& 'shoes') OR ("products"."category" &&& 'footwear')))), sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE "products"."in_stock" = TRUE AND ("products"."description" &&& 'shoes' OR "products"."category" &&& 'footwear') ORDER BY "products"."id" DESC LIMIT 10), sql
   end
 
   def test_with_score
@@ -105,7 +106,7 @@ class UserApiUnitTest < Minitest::Test
         pdb.agg('{"terms": {"field": "category", "size": 10, "order": {"_count": "desc"}}}') AS category_facet,
         pdb.agg('{"terms": {"field": "brand", "size": 10, "order": {"_count": "desc"}}}') AS brand_facet
       FROM products
-      WHERE "products"."description" &&& 'shoes'
+      WHERE ("products"."description" &&& 'shoes')
     SQL
 
     assert_sql_equal expected, facet_sql

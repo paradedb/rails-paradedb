@@ -26,9 +26,9 @@ class UserApiIntegrationTest < Minitest::Test
     expected = <<~SQL.strip
       SELECT products.* FROM products
       WHERE ("products"."description" &&& 'running shoes')
-        AND ("products"."in_stock" = true)
+        AND "products"."in_stock" = true
         AND (products.price < 100)
-        AND ("products"."rating" >= 4)
+        AND "products"."rating" >= 4
     SQL
 
     assert_sql_equal expected, sql
@@ -43,7 +43,7 @@ class UserApiIntegrationTest < Minitest::Test
     expected = <<~SQL.strip
       SELECT products.* FROM products
       WHERE ("products"."description" &&& 'shoes')
-        AND ("products"."price" >= 10 AND "products"."price" <= 100)
+        AND "products"."price" BETWEEN 10 AND 100
     SQL
 
     assert_sql_equal expected, sql
@@ -58,7 +58,7 @@ class UserApiIntegrationTest < Minitest::Test
     expected = <<~SQL.strip
       SELECT products.* FROM products
       WHERE ("products"."description" &&& 'shoes')
-        AND ("products"."price" >= 10 AND "products"."price" < 100)
+        AND "products"."price" >= 10 AND "products"."price" < 100
     SQL
 
     assert_sql_equal expected, sql
@@ -176,14 +176,17 @@ class UserApiIntegrationTest < Minitest::Test
   end
 
   def test_or_across_fields
-    left = Product.search(:description).matching_all("shoes")
-    right = Product.search(:category).matching_all("footwear")
+    base = Product.where(in_stock: true).order(id: :desc).limit(10)
+    left = base.search(:description).matching_all("shoes")
+    right = base.search(:category).matching_all("footwear")
 
     sql = left.or(right).to_sql
 
     expected = <<~SQL.strip
       SELECT products.* FROM products
-      WHERE ((("products"."description" &&& 'shoes') OR ("products"."category" &&& 'footwear')))
+      WHERE "products"."in_stock" = TRUE AND ("products"."description" &&& 'shoes' OR "products"."category" &&& 'footwear')
+      ORDER BY "products"."id" DESC
+      LIMIT 10
     SQL
 
     assert_sql_equal expected, sql
@@ -199,7 +202,7 @@ class UserApiIntegrationTest < Minitest::Test
         pdb.agg('{"terms": {"field": "category", "size": 10, "order": {"_count": "desc"}}}') AS category_facet,
         pdb.agg('{"terms": {"field": "brand", "size": 10, "order": {"_count": "desc"}}}') AS brand_facet
       FROM products
-      WHERE "products"."description" &&& 'shoes'
+      WHERE ("products"."description" &&& 'shoes')
     SQL
 
     assert_sql_equal expected, facet_sql
@@ -215,8 +218,8 @@ class UserApiIntegrationTest < Minitest::Test
 
     expected = <<~SQL.strip
       SELECT products.*, pdb.agg('{"terms": {"field": "category", "size": 10}}') OVER () AS _category_facet, pdb.agg('{"terms": {"field": "brand", "size": 10}}') OVER () AS _brand_facet FROM products
-      WHERE ("products"."description" &&& 'shoes') AND ("products"."in_stock" = true)
-      ORDER BY rating DESC
+      WHERE ("products"."description" &&& 'shoes') AND "products"."in_stock" = true
+      ORDER BY "products"."rating" DESC
       LIMIT 10
     SQL
 
