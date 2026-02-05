@@ -13,7 +13,12 @@ Work in progress. See `design-doc.md` for the current API proposal and scope.
 
 ## Requirements & Compatibility
 
-Version details are still being finalized for this repository. ParadeDB and PostgreSQL must be installed and running with the ParadeDB extension enabled.
+| Component  | Version                          |
+|------------|----------------------------------|
+| Ruby       | 4.0+                             |
+| Rails      | 8.1+                             |
+| ParadeDB   | 0.21.* (tested on 0.21.4)        |
+| PostgreSQL | 17, 18 (with ParadeDB extension) |
 
 ## Installation
 
