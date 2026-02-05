@@ -11,7 +11,6 @@ env:
   POSTGRES_USER: postgres
   POSTGRES_PASSWORD: postgres
   POSTGRES_DB: postgres
-  PARADEDB_WITH_PG: "1"
 
 jobs:
   test:
@@ -49,8 +48,6 @@ jobs:
           --health-retries 12
 
     env:
-      PARADEDB_WITH_PG: "1"
-      PARADEDB_INTEGRATION: "1"
       PARADEDB_TEST_DSN: postgresql://postgres@localhost:5432/postgres
       PGPASSWORD: postgres
 
