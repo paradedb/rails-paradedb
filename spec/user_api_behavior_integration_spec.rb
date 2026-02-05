@@ -8,6 +8,10 @@ class BehaviorProduct < ActiveRecord::Base
   self.has_paradedb_index = true
 end
 
+class BehaviorCategory < ActiveRecord::Base
+  self.table_name = :categories
+end
+
 class UserApiBehaviorIntegrationTest < Minitest::Test
   def setup
     skip "Behavior integration tests require PostgreSQL" unless postgresql?
@@ -101,6 +105,129 @@ class UserApiBehaviorIntegrationTest < Minitest::Test
     assert_includes error.message, "ORDER BY and LIMIT"
   end
 
+  def test_facets_with_standard_where_binds_executes
+    facets = BehaviorProduct.where(in_stock: true)
+                            .extending(ParadeDB::SearchMethods)
+                            .facets(:rating)
+
+    assert_kind_of Hash, facets
+    assert_includes facets, "rating"
+  end
+
+  def test_matching_all_with_filters_matches_raw_sql
+    raw_sql = <<~SQL
+      SELECT id
+      FROM products
+      WHERE description &&& 'running shoes'
+        AND price <= 120
+      ORDER BY rating DESC, id ASC
+      LIMIT 2
+    SQL
+
+    relation = BehaviorProduct.search(:description)
+                              .matching_all("running", "shoes")
+                              .where("price <= ?", 120)
+                              .order(rating: :desc, id: :asc)
+                              .limit(2)
+
+    assert_ids_match_sql(raw_sql, relation)
+  end
+
+  def test_search_with_join_matches_raw_sql
+    raw_sql = <<~SQL
+      SELECT products.id
+      FROM products
+      INNER JOIN categories ON categories.name = products.category
+      WHERE products.description &&& 'running'
+        AND categories.name = 'footwear'
+      ORDER BY products.id
+    SQL
+
+    relation = BehaviorProduct.joins("INNER JOIN categories ON categories.name = products.category")
+                              .search(:description)
+                              .matching_all("running")
+                              .where(categories: { name: "footwear" })
+                              .order(:id)
+
+    assert_ids_match_sql(raw_sql, relation)
+  end
+
+  def test_search_with_or_scope_matches_raw_sql
+    raw_sql = <<~SQL
+      SELECT id
+      FROM products
+      WHERE (in_stock = TRUE AND description &&& 'earbuds')
+        OR (rating >= 4 AND description &&& 'boots')
+      ORDER BY id
+    SQL
+
+    left = BehaviorProduct.where(in_stock: true)
+                          .search(:description)
+                          .matching_all("earbuds")
+    right = BehaviorProduct.where("rating >= ?", 4)
+                           .search(:description)
+                           .matching_all("boots")
+
+    relation = left.or(right).order(:id)
+
+    assert_ids_match_sql(raw_sql, relation)
+  end
+
+  def test_search_with_group_and_having_matches_raw_sql
+    raw_sql = <<~SQL
+      SELECT category, COUNT(*)::int AS docs
+      FROM products
+      WHERE description &&& 'running'
+      GROUP BY category
+      HAVING COUNT(*) >= 2
+      ORDER BY category
+    SQL
+
+    actual = BehaviorProduct.search(:description)
+                            .matching_all("running")
+                            .group(:category)
+                            .having("COUNT(*) >= 2")
+                            .order(:category)
+                            .pluck(:category, Arel.sql("COUNT(*)::int"))
+
+    assert_rows_match_sql(raw_sql, actual)
+  end
+
+  def test_search_with_subquery_filter_matches_raw_sql
+    raw_sql = <<~SQL
+      SELECT id
+      FROM products
+      WHERE description &&& 'running'
+        AND price < (SELECT AVG(price) FROM products WHERE category = 'footwear')
+      ORDER BY id
+    SQL
+
+    avg_footwear = BehaviorProduct.where(category: "footwear").select("AVG(price)")
+
+    relation = BehaviorProduct.search(:description)
+                              .matching_all("running")
+                              .where("price < (?)", avg_footwear)
+                              .order(:id)
+
+    assert_ids_match_sql(raw_sql, relation)
+  end
+
+  def test_full_text_escape_hatch_matches_raw_sql
+    raw_sql = <<~SQL
+      SELECT id
+      FROM products
+      WHERE id @@@ pdb.all()
+      ORDER BY id
+      LIMIT 3
+    SQL
+
+    builder = ParadeDB::Arel::Builder.new(:products)
+    predicate_sql = ParadeDB::Arel.to_sql(builder.full_text(:id, "pdb.all()"), BehaviorProduct.connection)
+    relation = BehaviorProduct.where(Arel.sql(predicate_sql)).order(:id).limit(3)
+
+    assert_ids_match_sql(raw_sql, relation)
+  end
+
   private
 
   def postgresql?
@@ -125,6 +252,7 @@ class UserApiBehaviorIntegrationTest < Minitest::Test
   def seed_products!
     conn = ActiveRecord::Base.connection
     conn.execute("TRUNCATE TABLE products RESTART IDENTITY;")
+    conn.execute("TRUNCATE TABLE categories RESTART IDENTITY;")
 
     BehaviorProduct.create!(description: "running shoes lightweight", category: "footwear", rating: 5, in_stock: true, price: 120)
     BehaviorProduct.create!(description: "trail running shoes grip", category: "footwear", rating: 4, in_stock: true, price: 90)
@@ -132,5 +260,26 @@ class UserApiBehaviorIntegrationTest < Minitest::Test
     BehaviorProduct.create!(description: "budget wired earbuds", category: "audio", rating: 3, in_stock: false, price: 20)
     BehaviorProduct.create!(description: "hiking boots waterproof", category: "footwear", rating: 4, in_stock: true, price: 110)
     BehaviorProduct.create!(description: "running socks breathable", category: "apparel", rating: 2, in_stock: true, price: 15)
+
+    BehaviorCategory.create!(name: "footwear")
+    BehaviorCategory.create!(name: "audio")
+    BehaviorCategory.create!(name: "apparel")
+    BehaviorCategory.create!(name: "home")
+  end
+
+  def ids_from_sql(sql)
+    ActiveRecord::Base.connection.exec_query(sql).rows.flatten.map(&:to_i)
+  end
+
+  def rows_from_sql(sql)
+    ActiveRecord::Base.connection.exec_query(sql).rows
+  end
+
+  def assert_ids_match_sql(raw_sql, relation)
+    assert_equal ids_from_sql(raw_sql), relation.pluck(:id)
+  end
+
+  def assert_rows_match_sql(raw_sql, rows)
+    assert_equal rows_from_sql(raw_sql), rows
   end
 end

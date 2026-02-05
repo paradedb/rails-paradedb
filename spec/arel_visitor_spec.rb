@@ -76,6 +76,11 @@ class ArelVisitorTest < Minitest::Test
     assert_equal %("products"."id" @@@ pdb.more_like_this(3, ARRAY['description'])), sql(node)
   end
 
+  def test_full_text_raw_expression
+    node = @builder.full_text(:description, "pdb.all()")
+    assert_equal %("products"."description" @@@ pdb.all()), sql(node)
+  end
+
   def test_score
     node = @builder.score(:id)
     assert_equal %(pdb.score("products"."id")), sql(node)

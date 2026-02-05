@@ -35,7 +35,7 @@ class ArelIntegrationTest < Minitest::Test
     assert_includes rendered, %("products"."description" @@@ ('sleek' ## 1 ## 'shoes'))
     assert_includes rendered, %("products"."description" @@@ pdb.phrase_prefix(ARRAY['run', 'sh']))
     assert_includes rendered, %("products"."id" @@@ pdb.more_like_this(5, ARRAY['description', 'category']))
-    assert_includes rendered, %("products"."description" @@@ 'pdb.all()')
+    assert_includes rendered, %("products"."description" @@@ pdb.all())
   end
 
   def test_boolean_chains

@@ -197,7 +197,34 @@ module ParadeDB
       return "" if where_clause.nil? || where_clause.empty?
       
       # Remove "WHERE " prefix if present
-      where_clause.sub(/^\s*WHERE\s+/i, '')
+      predicate_sql = where_clause.sub(/^\s*WHERE\s+/i, '')
+      literalize_where_binds(predicate_sql)
+    end
+
+    def literalize_where_binds(sql)
+      _, binds, = connection.send(:to_sql_and_binds, arel)
+      return sql if binds.nil? || binds.empty?
+
+      rendered = sql.dup
+      if rendered.include?("$")
+        binds.each_with_index.to_a.reverse_each do |bind, idx|
+          rendered.gsub!(/\$#{idx + 1}\b/, quote_bind_value(bind))
+        end
+      elsif rendered.include?("?")
+        binds.each do |bind|
+          rendered.sub!("?", quote_bind_value(bind))
+        end
+      end
+
+      rendered
+    rescue NoMethodError
+      # Fall back to raw SQL if adapter internals are unavailable.
+      sql
+    end
+
+    def quote_bind_value(bind)
+      value = bind.respond_to?(:value_for_database) ? bind.value_for_database : bind
+      connection.quote(value)
     end
 
     def facet_json(field, opts)

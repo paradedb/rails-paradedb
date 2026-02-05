@@ -144,7 +144,7 @@ class UserApiUnitTest < Minitest::Test
       SELECT
         pdb.agg('{"terms": {"field": "category", "size": 10}}') AS category_facet
       FROM products
-      WHERE "products"."in_stock" = ? AND "products"."id" @@@ pdb.all()
+      WHERE "products"."in_stock" = TRUE AND "products"."id" @@@ pdb.all()
     SQL
 
     assert_sql_equal expected, facet_sql
