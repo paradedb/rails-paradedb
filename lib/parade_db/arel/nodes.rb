@@ -81,12 +81,13 @@ module ParadeDB
       class Phrase < Binary; end                 # left ### right
       class Term < Binary; end                   # left === right (exact term)
       class Fuzzy < Binary
-        attr_reader :distance, :prefix
+        attr_reader :distance, :prefix, :boost
 
-        def initialize(left, right, distance:, prefix: nil)
+        def initialize(left, right, distance:, prefix: nil, boost: nil)
           super(left, right)
           @distance = distance
           @prefix = prefix
+          @boost = boost
         end
       end
       class FullText < Binary; end               # left @@@ right (generic)

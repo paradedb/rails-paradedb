@@ -20,6 +20,7 @@ module ParadeDB
           rhs = "#{quote(node.right)}::pdb.fuzzy(#{node.distance}"
           rhs += %Q(, "true") if !node.prefix.nil? && node.prefix
           rhs += ")"
+          rhs += "::pdb.boost(#{node.boost})" if node.boost
           "#{visit(node.left)} === #{rhs}"
         when Nodes::FullText
           "#{visit(node.left)} @@@ #{quote(node.right)}"

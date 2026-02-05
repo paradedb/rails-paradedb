@@ -82,7 +82,7 @@ arel = ParadeDB::Arel::Builder.new(:products)
 
 predicate = arel.match(:description, "running", "shoes")
   .and(arel.regex(:description, "run.*"))
-  .and(arel.match(:in_stock, true))
+  .and(arel.term(:in_stock, true))
 
 sql = ParadeDB::Arel.to_sql(predicate)
 # => ("products"."description" &&& 'running shoes' AND "products"."description" @@@ pdb.regex('run.*') AND "products"."in_stock" === true)

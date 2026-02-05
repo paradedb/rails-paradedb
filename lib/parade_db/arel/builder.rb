@@ -35,9 +35,7 @@ module ParadeDB
       end
 
       def fuzzy(column, term, distance: 1, prefix: nil, boost: nil)
-        rhs = Nodes::Fuzzy.new(column_node(column), value_node(term), distance: distance, prefix: prefix)
-        rhs = Nodes::Boost.new(rhs, boost) if boost
-        rhs
+        Nodes::Fuzzy.new(column_node(column), value_node(term), distance: distance, prefix: prefix, boost: boost)
       end
 
       def term(column, term, boost: nil)
