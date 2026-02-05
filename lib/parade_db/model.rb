@@ -1,16 +1,18 @@
 # frozen_string_literal: true
 
 require_relative "relation"
+require "active_support/concern"
 
 module ParadeDB
   module Model
+    extend ActiveSupport::Concern
+
     def self.included(base)
       base.extend(ClassMethods)
+      base.class_attribute :has_parade_db_index, default: false
     end
 
     module ClassMethods
-      attr_accessor :table_name, :has_parade_db_index
-
       def search(column)
         ensure_parade_ready!
         Relation.new(self).search(column)

@@ -2,13 +2,13 @@
 
 require "spec_helper"
 
-class UnitProduct
+class UnitProduct < ActiveRecord::Base
   include ParadeDB::Model
   self.table_name = :products
   self.has_parade_db_index = true
 end
 
-class UnitCategory
+class UnitCategory < ActiveRecord::Base
   include ParadeDB::Model
   self.table_name = :categories
   self.has_parade_db_index = true

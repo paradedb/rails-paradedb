@@ -1,21 +1,20 @@
 # frozen_string_literal: true
 
+require "active_record"
+
 module ParadeDB
   class Relation
-    attr_reader :model, :table, :builder, :predicates, :selects, :order_clause, :limit_value, :facet_fields, :facet_opts, :with_facet_window, :current_field
+    attr_reader :model, :relation, :builder, :predicates, :current_field, :facet_fields, :facet_opts, :with_facet_window
 
-    def initialize(model, predicates: [], selects: nil, order_clause: nil, limit_value: nil, facet_fields: nil, facet_opts: {}, with_facet_window: false, current_field: nil)
+    def initialize(model, relation: nil, predicates: [], current_field: nil, facet_fields: nil, facet_opts: {}, with_facet_window: false)
       @model = model
-      @table = model.table_name
+      @relation = relation || base_relation
       @builder = model.parade_arel
-      @predicates = predicates # array of {sql:, kind: :search|:filter}
-      @selects = selects || ["*"]
-      @order_clause = order_clause
-      @limit_value = limit_value
+      @predicates = predicates # array of {sql:, kind:}
+      @current_field = current_field
       @facet_fields = facet_fields
       @facet_opts = facet_opts
       @with_facet_window = with_facet_window
-      @current_field = current_field
     end
 
     # ---- ParadeDB search entrypoints ----
@@ -24,7 +23,6 @@ module ParadeDB
       dup_with(current_field: column)
     end
 
-    # Matching AND terms
     def matching(*terms, any: nil, boost: nil)
       new_pred =
         if any
@@ -32,48 +30,48 @@ module ParadeDB
         else
           builder.match(current_field, *terms, boost: boost)
         end
-      chain_with(new_pred)
+      chain_with(new_pred, kind: :search)
     end
 
-    # Exclusion (NOT)
     def excluding(*terms)
       neg = builder.match(current_field, *terms)
-      chain_with(neg.not)
+      chain_with(neg.not, kind: :search)
     end
 
     def phrase(text, slop: nil)
-      chain_with(builder.phrase(current_field, text, slop: slop))
+      chain_with(builder.phrase(current_field, text, slop: slop), kind: :search)
     end
 
     def fuzzy(term, distance:, prefix: nil, boost: nil)
-      chain_with(builder.fuzzy(current_field, term, distance: distance, prefix: prefix, boost: boost))
+      chain_with(builder.fuzzy(current_field, term, distance: distance, prefix: prefix, boost: boost), kind: :search)
     end
 
     def regex(pattern)
-      chain_with(builder.regex(current_field, pattern))
+      chain_with(builder.regex(current_field, pattern), kind: :search)
     end
 
     def term(value, boost: nil)
-      chain_with(builder.term(current_field, value, boost: boost))
+      chain_with(builder.term(current_field, value, boost: boost), kind: :search)
     end
 
     def near(left_term, right_term, distance: 1)
-      chain_with(builder.near(current_field, left_term, right_term, distance: distance))
+      chain_with(builder.near(current_field, left_term, right_term, distance: distance), kind: :search)
     end
 
     def phrase_prefix(*terms)
-      chain_with(builder.phrase_prefix(current_field, *terms))
+      chain_with(builder.phrase_prefix(current_field, *terms), kind: :search)
     end
 
     def similar_to(key, fields: nil)
       predicate = builder.more_like_this(primary_key_node, key, fields: fields)
-      chain_with(predicate)
+      chain_with(predicate, kind: :search)
     end
 
     # ---- Decorators ----
 
     def with_score
-      dup_with(selects: ["#{table}. *".gsub(" ", ""), %(pdb.score("#{table}"."#{primary_key}") AS search_score)])
+      sql = %(pdb.score("#{table}"."#{primary_key}") AS search_score)
+      dup_with(relation: relation.except(:select).select(Arel.sql("#{table}.*"), Arel.sql(sql)))
     end
 
     def with_snippet(column, start_tag: nil, end_tag: nil, max_chars: nil)
@@ -86,7 +84,7 @@ module ParadeDB
              else
                %(pdb.snippet("#{table}"."#{column}", #{formatted_args.join(', ')}))
              end
-      dup_with(selects: ["#{table}. *".gsub(" ", ""), %(#{call} AS #{column}_snippet)])
+      dup_with(relation: relation.except(:select).select(Arel.sql("#{table}.*"), Arel.sql("#{call} AS #{column}_snippet")))
     end
 
     def facets(*fields, size: 10, order: "-count", missing: nil, agg: nil)
@@ -113,46 +111,39 @@ module ParadeDB
         else
           clause.to_s
         end
-      dup_with(order_clause: new_clause)
+      dup_with(relation: relation.order(Arel.sql(new_clause)))
     end
 
     def limit(value)
-      dup_with(limit_value: value)
+      dup_with(relation: relation.limit(value))
     end
 
     def select(*columns)
-      dup_with(selects: columns)
+      cols = columns.map { |c| Arel.sql(c.to_s) }
+      dup_with(relation: relation.select(*cols))
     end
 
     def or(other)
       combined = "((#{predicates_sql}) OR (#{other.send(:predicates_sql)}))"
-      dup_with(predicates: [{ sql: combined, kind: :search }])
+      dup_with(
+        relation: base_relation.where(Arel.sql(combined)),
+        predicates: [{ sql: combined, kind: :search }]
+      )
     end
 
     # ---- Rendering ----
 
     def to_sql
-      buf = []
-      buf << select_sql
-      buf << where_clause unless predicates.empty?
-      buf << order_sql if order_clause
-      buf << limit_sql if limit_value
-      buf.join("\n")
+      relation.to_sql
     end
 
     def sql
       to_sql
     end
 
-  protected
-
-  def current_field
-      @current_field
-  end
-
     private
 
-    def chain_with(node_or_string, kind: :search)
+    def chain_with(node_or_string, kind:)
       pred_sql =
         case node_or_string
         when String then node_or_string
@@ -160,7 +151,8 @@ module ParadeDB
           ParadeDB::Arel.to_sql(node_or_string)
         end
 
-      dup_with(predicates: predicates + [{ sql: pred_sql, kind: kind }])
+      new_relation = relation.where(Arel.sql(pred_sql))
+      dup_with(relation: new_relation, predicates: predicates + [{ sql: pred_sql, kind: kind }])
     end
 
     def predicate_from_where(conditions)
@@ -189,59 +181,41 @@ module ParadeDB
       predicates.map { |p| p[:sql] }.join(" AND ")
     end
 
-    def only_search_predicates?
-      predicates.all? { |p| p[:kind] == :search }
-    end
-
-    def where_clause
-      sqls = predicates.map { |p| p[:sql] }
-      return "WHERE #{sqls.first}" if sqls.size == 1
-
-      if only_search_predicates?
-        "WHERE (#{sqls.join(' AND ')})"
-      elsif sqls.size <= 2
-        "WHERE #{sqls.join(' AND ')}"
-      else
-        "WHERE #{sqls.join("\n  AND ")}"
-      end
-    end
-
-    def select_sql
-      sel = selects.join(", ")
-      if with_facet_window && !facet_fields.nil?
+    def dup_with(relation: self.relation, predicates: self.predicates, current_field: self.current_field, facet_fields: self.facet_fields, facet_opts: self.facet_opts, with_facet_window: self.with_facet_window)
+      new_relation = relation
+      if with_facet_window && facet_fields
         facet_selects = facet_fields.map do |field|
           json = facet_json(field, facet_opts)
-          %(pdb.agg('#{json}') OVER () AS _#{field}_facet)
+          Arel.sql(%(pdb.agg('#{json}') OVER () AS _#{field}_facet))
         end
-        sel = ([sel] + facet_selects).join(", ")
+        new_relation = new_relation.select(*facet_selects)
       end
-      "SELECT #{sel} FROM #{table}"
-    end
 
-    def order_sql
-      "ORDER BY #{order_clause}"
-    end
-
-    def limit_sql
-      "LIMIT #{limit_value}"
-    end
-
-    def select_add(expr)
-      dup_with(selects: selects + [expr])
-    end
-
-    def dup_with(**attrs)
       self.class.new(
         model,
-        predicates: attrs.fetch(:predicates, predicates),
-        selects: attrs.fetch(:selects, selects),
-        order_clause: attrs.fetch(:order_clause, order_clause),
-        limit_value: attrs.fetch(:limit_value, limit_value),
-        facet_fields: attrs.fetch(:facet_fields, facet_fields),
-        facet_opts: attrs.fetch(:facet_opts, facet_opts),
-        with_facet_window: attrs.fetch(:with_facet_window, with_facet_window),
-        current_field: attrs.fetch(:current_field, current_field)
+        relation: new_relation,
+        predicates: predicates,
+        current_field: current_field,
+        facet_fields: facet_fields,
+        facet_opts: facet_opts,
+        with_facet_window: with_facet_window
       )
+    end
+
+    def base_relation
+      model.unscoped.select(Arel.sql("#{table}.*")).from(Arel.sql(table))
+    end
+
+    def table
+      model.table_name
+    end
+
+    def primary_key
+      :id
+    end
+
+    def primary_key_node
+      builder[:id]
     end
 
     def literal(val)
@@ -255,39 +229,17 @@ module ParadeDB
       end
     end
 
-    def quote_ident(name)
-      %("#{name}")
-    end
-
-    def primary_key
-      :id
-    end
-
-    def primary_key_node
-      builder[:id]
-    end
-
-    def snippet_args(args)
-      return "" if args.empty?
-      ", #{args.join(', ')}"
-    end
-
-    def add_facets(fields, opts)
-      dup_with(facet_fields: fields, facet_opts: opts, with_facet_window: true)
-    end
-
     def facet_json(field, opts)
       size = opts[:size] || 10
       order_opt = opts[:order]
       missing_clause = opts[:missing] ? %("missing": "#{opts[:missing]}", ) : ""
       order_clause =
         case order_opt
-        when "-count" then %("order": {"_count": "desc"}, )
-        when "count" then %("order": {"_count": "asc"}, )
-        when nil then ""
+        when "-count" then ', "order": {"_count": "desc"}'
+        when "count" then ', "order": {"_count": "asc"}'
         else ""
         end
-      %({"terms": {#{missing_clause}#{order_clause}"field": "#{field}", "size": #{size}}})
+      %({"terms": {#{missing_clause}"field": "#{field}", "size": #{size}#{order_clause}}})
     end
 
     # ---- Facet Query helper ----
