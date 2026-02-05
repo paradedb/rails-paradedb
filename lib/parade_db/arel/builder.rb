@@ -25,7 +25,14 @@ module ParadeDB
       end
 
       def full_text(column, expression)
-        Nodes::FullText.new(column_node(column), value_node(expression))
+        rhs =
+          case expression
+          when Nodes::Node
+            expression
+          else
+            Nodes::SqlLiteral.new(expression)
+          end
+        Nodes::FullText.new(column_node(column), rhs)
       end
 
       def phrase(column, text, slop: nil)

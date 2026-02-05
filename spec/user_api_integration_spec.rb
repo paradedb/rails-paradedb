@@ -175,6 +175,36 @@ class UserApiIntegrationTest < Minitest::Test
     assert_sql_equal expected, sql
   end
 
+  def test_with_score_then_with_snippet_keeps_both_projections
+    sql = Product.search(:description)
+                 .matching_all("shoes")
+                 .with_score
+                 .with_snippet(:description)
+                 .to_sql
+
+    expected = <<~SQL.strip
+      SELECT products.*, pdb.score("products"."id") AS search_score, pdb.snippet("products"."description") AS description_snippet FROM products
+      WHERE ("products"."description" &&& 'shoes')
+    SQL
+
+    assert_sql_equal expected, sql
+  end
+
+  def test_with_snippet_then_with_score_keeps_both_projections
+    sql = Product.search(:description)
+                 .matching_all("shoes")
+                 .with_snippet(:description)
+                 .with_score
+                 .to_sql
+
+    expected = <<~SQL.strip
+      SELECT products.*, pdb.snippet("products"."description") AS description_snippet, pdb.score("products"."id") AS search_score FROM products
+      WHERE ("products"."description" &&& 'shoes')
+    SQL
+
+    assert_sql_equal expected, sql
+  end
+
   def test_or_across_fields
     base = Product.where(in_stock: true).order(id: :desc).limit(10)
     left = base.search(:description).matching_all("shoes")

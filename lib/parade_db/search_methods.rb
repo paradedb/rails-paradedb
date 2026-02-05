@@ -103,7 +103,7 @@ module ParadeDB
 
     def with_score
       score_sql = %(pdb.score("#{table_name}"."#{primary_key}") AS search_score)
-      except(:select).select(::Arel.sql("#{table_name}.*"), ::Arel.sql(score_sql))
+      with_projection(score_sql)
     end
 
     def with_snippet(column, start_tag: nil, end_tag: nil, max_chars: nil)
@@ -118,7 +118,7 @@ module ParadeDB
                %(pdb.snippet("#{table_name}"."#{column}", #{formatted_args.join(', ')}))
              end
       
-      except(:select).select(::Arel.sql("#{table_name}.*"), ::Arel.sql("#{call} AS #{column}_snippet"))
+      with_projection("#{call} AS #{column}_snippet")
     end
 
     # ---- Facets ----
@@ -184,6 +184,12 @@ module ParadeDB
 
     private
 
+    def with_projection(sql_fragment)
+      rel = self
+      rel = rel.select(::Arel.sql("#{table_name}.*")) if rel.select_values.empty?
+      rel.select(::Arel.sql(sql_fragment))
+    end
+
     def where_values_as_sql
       # Extract WHERE clause SQL from the relation
       # For facet queries that need the predicate SQL
@@ -191,7 +197,34 @@ module ParadeDB
       return "" if where_clause.nil? || where_clause.empty?
       
       # Remove "WHERE " prefix if present
-      where_clause.sub(/^\s*WHERE\s+/i, '')
+      predicate_sql = where_clause.sub(/^\s*WHERE\s+/i, '')
+      literalize_where_binds(predicate_sql)
+    end
+
+    def literalize_where_binds(sql)
+      _, binds, = connection.send(:to_sql_and_binds, arel)
+      return sql if binds.nil? || binds.empty?
+
+      rendered = sql.dup
+      if rendered.include?("$")
+        binds.each_with_index.to_a.reverse_each do |bind, idx|
+          rendered.gsub!(/\$#{idx + 1}\b/, quote_bind_value(bind))
+        end
+      elsif rendered.include?("?")
+        binds.each do |bind|
+          rendered.sub!("?", quote_bind_value(bind))
+        end
+      end
+
+      rendered
+    rescue NoMethodError
+      # Fall back to raw SQL if adapter internals are unavailable.
+      sql
+    end
+
+    def quote_bind_value(bind)
+      value = bind.respond_to?(:value_for_database) ? bind.value_for_database : bind
+      connection.quote(value)
     end
 
     def facet_json(field, opts)
@@ -282,10 +315,22 @@ module ParadeDB
         row.each do |key, value|
           if key.end_with?("_facet")
             field_name = key.delete_suffix("_facet")
-            facets[field_name] = JSON.parse(value) if value
+            parsed = parse_facet_value(value)
+            facets[field_name] = parsed unless parsed.nil?
           end
         end
         facets
+      end
+
+      def parse_facet_value(value)
+        case value
+        when nil
+          nil
+        when String
+          JSON.parse(value)
+        else
+          value
+        end
       end
     end
 
@@ -293,11 +338,28 @@ module ParadeDB
     module FacetRelation
       attr_accessor :_paradedb_facet_fields, :_paradedb_facet_opts
 
+      def load(*)
+        validate_facet_query_shape!
+        super
+      end
+
       def facets
+        validate_facet_query_shape!
         @_facets_cache ||= extract_facets_from_results
       end
 
       private
+
+      def validate_facet_query_shape!
+        missing = []
+        missing << "ORDER BY" if order_values.empty?
+        missing << "LIMIT" if limit_value.nil?
+        return if missing.empty?
+
+        raise ParadeDB::FacetQueryError,
+              "with_facets requires #{missing.join(' and ')} for ParadeDB TopN pushdown. " \
+              "Use .order(...).limit(...)."
+      end
 
       def extract_facets_from_results
         # Execute query and extract facet columns
@@ -309,10 +371,22 @@ module ParadeDB
           facet_col = "_#{field}_facet"
           if first_row.respond_to?(facet_col)
             value = first_row.public_send(facet_col)
-            facets[field.to_s] = JSON.parse(value) if value
+            parsed = parse_facet_value(value)
+            facets[field.to_s] = parsed unless parsed.nil?
           end
         end
         facets
+      end
+
+      def parse_facet_value(value)
+        case value
+        when nil
+          nil
+        when String
+          JSON.parse(value)
+        else
+          value
+        end
       end
     end
   end
