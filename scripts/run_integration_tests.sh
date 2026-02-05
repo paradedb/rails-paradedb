@@ -7,7 +7,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PARADEDB_WITH_PG=1
 
 source "${SCRIPT_DIR}/rbenv_bootstrap.sh"
-source "${SCRIPT_DIR}/run_paradedb.sh"
+
+# Only start Docker container if not in CI (CI uses services)
+if [[ -z "${CI:-}" ]]; then
+  source "${SCRIPT_DIR}/run_paradedb.sh"
+fi
 
 PORT="${PARADEDB_PORT:-5432}"
 USER="${PARADEDB_USER:-postgres}"

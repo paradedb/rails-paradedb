@@ -5,6 +5,16 @@ set -euo pipefail
 RUBY_VERSION="4.0.0"
 BUNDLER_VERSION="4.0.3"
 
+# Skip rbenv setup if Ruby is already available (e.g., in CI)
+if command -v ruby >/dev/null 2>&1 && ruby --version | grep -q "${RUBY_VERSION}"; then
+  echo "Ruby ${RUBY_VERSION} already available, skipping rbenv setup"
+  if ! gem list -i "bundler" -v "${BUNDLER_VERSION}" >/dev/null 2>&1; then
+    gem install "bundler:${BUNDLER_VERSION}"
+  fi
+  bundle install >/dev/null
+  exit 0
+fi
+
 if ! command -v rbenv >/dev/null 2>&1; then
   echo "rbenv is not installed. Install rbenv and retry." >&2
   exit 1
