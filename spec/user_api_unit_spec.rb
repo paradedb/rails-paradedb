@@ -96,6 +96,28 @@ class UserApiUnitTest < Minitest::Test
       WHERE ("products"."description" &&& 'shoes')), sql
   end
 
+  def test_with_score_then_with_snippet_keeps_both_projections
+    sql = UnitProduct.search(:description)
+                     .matching_all("shoes")
+                     .with_score
+                     .with_snippet(:description)
+                     .to_sql
+
+    assert_sql_equal %(SELECT products.*, pdb.score("products"."id") AS search_score, pdb.snippet("products"."description") AS description_snippet FROM products
+      WHERE ("products"."description" &&& 'shoes')), sql
+  end
+
+  def test_with_snippet_then_with_score_keeps_both_projections
+    sql = UnitProduct.search(:description)
+                     .matching_all("shoes")
+                     .with_snippet(:description)
+                     .with_score
+                     .to_sql
+
+    assert_sql_equal %(SELECT products.*, pdb.snippet("products"."description") AS description_snippet, pdb.score("products"."id") AS search_score FROM products
+      WHERE ("products"."description" &&& 'shoes')), sql
+  end
+
   def test_facets_only
     facet_sql = UnitProduct.search(:description).matching_all("shoes")
                            .build_facet_query(fields: [:category, :brand], size: 10, order: "-count")
@@ -156,6 +178,35 @@ class UserApiUnitTest < Minitest::Test
     SQL
 
     assert_sql_equal expected, sql
+  end
+
+  def test_with_facets_load_requires_order_and_limit
+    rel = UnitProduct.search(:description)
+                     .matching_all("shoes")
+                     .with_facets(:category, size: 10)
+
+    error = assert_raises(ParadeDB::FacetQueryError) { rel.load }
+    assert_includes error.message, "ORDER BY and LIMIT"
+  end
+
+  def test_with_facets_load_requires_limit
+    rel = UnitProduct.search(:description)
+                     .matching_all("shoes")
+                     .with_facets(:category, size: 10)
+                     .order(:id)
+
+    error = assert_raises(ParadeDB::FacetQueryError) { rel.load }
+    assert_includes error.message, "LIMIT"
+  end
+
+  def test_with_facets_load_requires_order
+    rel = UnitProduct.search(:description)
+                     .matching_all("shoes")
+                     .with_facets(:category, size: 10)
+                     .limit(10)
+
+    error = assert_raises(ParadeDB::FacetQueryError) { rel.load }
+    assert_includes error.message, "ORDER BY"
   end
 
   def test_search_on_relation_preserves_where
