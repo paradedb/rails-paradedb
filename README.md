@@ -86,6 +86,8 @@ See `examples/README.md` for setup and run commands.
 | `regex("pattern")` | `@@@` | Regex pattern match |
 | `near("a", "b", distance: n)` | `@@@` | Proximity search |
 | `phrase_prefix("a", "b")` | `@@@` | Autocomplete/prefix matching |
+| `parse("query", lenient: true/false)` | `@@@` | Query-string parser (`pdb.parse`) |
+| `match_all` | `@@@` | Match all documents (`pdb.all()`) |
 | `more_like_this(id, fields: [...])` | `@@@` | Find similar documents |
 
 ### When to use `term` vs `matching_all`
@@ -100,6 +102,19 @@ Product.search(:description).matching_all("running shoes")
 
 # Exact term - matches the literal token "active" (case-sensitive to indexed form)
 Product.search(:status).term("active")
+```
+
+### Convenience Wrappers
+
+`parse` and `match_all` are relation-level wrappers that mirror the common Django
+`Parse` / `All` ergonomics while staying idiomatic to ActiveRecord chaining.
+
+```ruby
+# Query-string parser (ParadeDB syntax)
+Product.search(:description).parse("running AND shoes", lenient: true)
+
+# Match all documents (useful as an explicit ParadeDB predicate)
+Product.search(:id).match_all
 ```
 
 ## Arel Layer

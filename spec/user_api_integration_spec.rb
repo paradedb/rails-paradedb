@@ -126,6 +126,16 @@ class UserApiIntegrationTest < Minitest::Test
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.phrase_prefix(ARRAY['run', 'sh']))), sql
   end
 
+  def test_parse_query
+    sql = Product.search(:description).parse("running AND shoes", lenient: true).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.parse('running AND shoes', lenient => true))), sql
+  end
+
+  def test_match_all_wrapper
+    sql = Product.search(:id).match_all.to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.all())), sql
+  end
+
   def test_more_like_this
     sql = Product.more_like_this(3, fields: [:description]).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.more_like_this(3, ARRAY['description']))), sql

@@ -49,9 +49,6 @@ module ExampleCommon
     MockItem.count
   end
 
-  def quote(value)
-    ActiveRecord::Base.connection.quote(value)
-  end
 end
 
 class MockItem < ActiveRecord::Base

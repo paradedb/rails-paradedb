@@ -48,6 +48,17 @@ class UserApiBehaviorIntegrationTest < Minitest::Test
     assert_equal [1, 2, 5], prefix_ids
   end
 
+  def test_parse_and_match_all_wrappers_execute
+    parse_ids = BehaviorProduct.search(:description)
+                               .parse("running AND shoes", lenient: true)
+                               .order(:id)
+                               .pluck(:id)
+    all_ids = BehaviorProduct.search(:id).match_all.order(:id).limit(3).pluck(:id)
+
+    assert_equal [1, 2], parse_ids
+    assert_equal [1, 2, 3], all_ids
+  end
+
   def test_term_regex_and_fuzzy_execute
     term_ids = BehaviorProduct.search(:category).term("audio").order(:id).pluck(:id)
     regex_ids = BehaviorProduct.search(:description).regex("run.*").order(:id).pluck(:id)

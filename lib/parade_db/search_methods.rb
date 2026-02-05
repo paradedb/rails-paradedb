@@ -92,6 +92,35 @@ module ParadeDB
       where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
     end
 
+    # Parse query-string syntax into ParadeDB query AST (e.g. "running AND shoes").
+    # Mirrors Django's Parse convenience helper using relation-style Ruby DSL.
+    def parse(query, lenient: nil)
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+
+      options_sql = []
+      unless lenient.nil?
+        options_sql << "lenient => #{lenient ? 'true' : 'false'}"
+      end
+
+      expr = if options_sql.empty?
+               "pdb.parse(#{connection.quote(query)})"
+             else
+               "pdb.parse(#{connection.quote(query)}, #{options_sql.join(', ')})"
+             end
+
+      node = builder.full_text(_paradedb_current_field, expr)
+      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+    end
+
+    # Match-all wrapper for APIs that need an explicit ParadeDB predicate.
+    # Use with `.search(:id)` (or any indexed field): `Product.search(:id).match_all`.
+    def match_all
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+
+      node = builder.full_text(_paradedb_current_field, "pdb.all()")
+      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+    end
+
     def more_like_this(key, fields: nil)
       key_value = key.respond_to?(:id) ? key.id : key
       pk_node = builder[primary_key]

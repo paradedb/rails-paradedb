@@ -13,16 +13,8 @@ class AutocompleteItem < ActiveRecord::Base
 end
 
 def autocomplete_relation(query)
-  builder = ParadeDB::Arel::Builder.new(:autocomplete_items)
-  parse_query = "description_ngram:#{query}"
-  parse_expr = "pdb.parse(#{ExampleCommon.quote(parse_query)})"
-  predicate = ParadeDB::Arel.to_sql(
-    builder.full_text(:description, parse_expr),
-    AutocompleteItem.connection
-  )
-
-  AutocompleteItem.where(Arel.sql(predicate))
-                  .extending(ParadeDB::SearchMethods)
+  AutocompleteItem.search(:description)
+                  .parse("description_ngram:#{query}")
                   .with_score
                   .order(Arel.sql("search_score DESC"))
                   .limit(5)
