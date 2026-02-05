@@ -11,6 +11,7 @@ env:
   POSTGRES_USER: postgres
   POSTGRES_PASSWORD: postgres
   POSTGRES_DB: postgres
+  PARADEDB_WITH_PG: "1"
 
 jobs:
   test:
