@@ -52,8 +52,3 @@
 /.yardoc
 /_yardoc
 
-# Internal docs (not published)
-design-doc.md
-design-doc-extra.md
-codex-review.md
-opus-review.md
