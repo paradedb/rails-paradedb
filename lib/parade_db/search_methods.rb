@@ -260,9 +260,9 @@ module ParadeDB
         buf << "FROM #{table}"
         
         # Add WHERE clause
-        if !predicate_sql.empty? && has_parade_predicate
+        if !predicate_sql.empty? && has_paradedb_predicate
           buf << "WHERE #{predicate_sql}"
-        elsif !predicate_sql.empty? && !has_parade_predicate
+        elsif !predicate_sql.empty? && !has_paradedb_predicate
           # Has predicates but no ParadeDB operators - add pdb.all()
           pk_col = "#{connection.quote_table_name(table)}.#{connection.quote_column_name(primary_key)}"
           buf << "WHERE #{predicate_sql} AND #{pk_col} @@@ pdb.all()"
@@ -291,7 +291,7 @@ module ParadeDB
 
     # Module to add .facets accessor to relations
     module FacetRelation
-      attr_accessor :_parade_facet_fields, :_parade_facet_opts
+      attr_accessor :_paradedb_facet_fields, :_paradedb_facet_opts
 
       def facets
         @_facets_cache ||= extract_facets_from_results
@@ -305,7 +305,7 @@ module ParadeDB
         return {} unless first_row
         
         facets = {}
-        _parade_facet_fields.each do |field|
+        _paradedb_facet_fields.each do |field|
           facet_col = "_#{field}_facet"
           if first_row.respond_to?(facet_col)
             value = first_row.public_send(facet_col)

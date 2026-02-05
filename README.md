@@ -33,7 +33,7 @@ Enable ParadeDB on a model:
 ```ruby
 class Product < ApplicationRecord
   include ParadeDB::Model
-  self.has_parade_db_index = true
+  self.has_paradedb_index = true
 end
 ```
 

@@ -5,13 +5,13 @@ require "spec_helper"
 class UnitProduct < ActiveRecord::Base
   include ParadeDB::Model
   self.table_name = :products
-  self.has_parade_db_index = true
+  self.has_paradedb_index = true
 end
 
 class UnitCategory < ActiveRecord::Base
   include ParadeDB::Model
   self.table_name = :categories
-  self.has_parade_db_index = true
+  self.has_paradedb_index = true
 end
 
 class UserApiUnitTest < Minitest::Test
@@ -112,7 +112,7 @@ class UserApiUnitTest < Minitest::Test
     assert_sql_equal expected, facet_sql
   end
 
-  def test_facets_without_parade_predicates
+  def test_facets_without_paradedb_predicates
     facet_sql = UnitProduct.where(in_stock: true)
                            .extending(ParadeDB::SearchMethods)
                            .build_facet_query(fields: [:category], size: 10, order: nil)
@@ -144,7 +144,7 @@ class UserApiUnitTest < Minitest::Test
     assert_sql_equal expected, facet_sql
   end
 
-  def test_with_facets_without_parade_predicates
+  def test_with_facets_without_paradedb_predicates
     sql = UnitProduct.where(in_stock: true)
                      .extending(ParadeDB::SearchMethods)
                      .with_facets(:category, size: 10)
@@ -153,6 +153,40 @@ class UserApiUnitTest < Minitest::Test
     expected = <<~SQL.strip
       SELECT products.*, pdb.agg('{"terms": {"field": "category", "size": 10}}') OVER () AS _category_facet FROM products
       WHERE "products"."in_stock" = TRUE AND ("products"."id" @@@ pdb.all())
+    SQL
+
+    assert_sql_equal expected, sql
+  end
+
+  def test_search_on_relation_preserves_where
+    # Verify .search() works on relations and preserves WHERE clauses
+    sql = UnitProduct.where(in_stock: true)
+                     .search(:description)
+                     .matching_all("shoes")
+                     .to_sql
+
+    expected = <<~SQL.strip
+      SELECT products.* FROM products
+      WHERE "products"."in_stock" = TRUE AND ("products"."description" &&& 'shoes')
+    SQL
+
+    assert_sql_equal expected, sql
+  end
+
+  def test_search_on_relation_preserves_order_and_limit
+    # Verify .search() preserves ORDER BY and LIMIT
+    sql = UnitProduct.where(price: 0..100)
+                     .order(rating: :desc)
+                     .limit(10)
+                     .search(:description)
+                     .matching_all("wireless")
+                     .to_sql
+
+    expected = <<~SQL.strip
+      SELECT products.* FROM products
+      WHERE "products"."price" BETWEEN 0 AND 100 AND ("products"."description" &&& 'wireless')
+      ORDER BY "products"."rating" DESC
+      LIMIT 10
     SQL
 
     assert_sql_equal expected, sql
