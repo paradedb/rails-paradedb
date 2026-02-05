@@ -194,7 +194,7 @@ class UserApiIntegrationTest < Minitest::Test
 
   def test_facets_only
     facet_sql = Product.search(:description).matching_all("shoes")
-                       .facets(:category, :brand, size: 10, order: "-count")
+                       .build_facet_query(fields: [:category, :brand], size: 10, order: "-count")
                        .sql
 
     expected = <<~SQL.strip

@@ -7,12 +7,12 @@ module ParadeDB
   # This module is mixed into relations via .search() to provide chainable query methods.
   module SearchMethods
     # Internal state tracking
-    attr_accessor :_parade_current_field
-    attr_accessor :_parade_facet_fields
-    attr_accessor :_parade_facet_opts
+    attr_accessor :_paradedb_current_field
+    attr_accessor :_paradedb_facet_fields
+    attr_accessor :_paradedb_facet_opts
 
     def builder
-      @_parade_builder ||= ParadeDB::Arel::Builder.new(table_name)
+      @_paradedb_builder ||= ParadeDB::Arel::Builder.new(table_name)
     end
 
     def table_name
@@ -26,69 +26,69 @@ module ParadeDB
     # ---- ParadeDB search entrypoints ----
 
     def search(column)
-      extending(SearchMethods).tap { |rel| rel._parade_current_field = column }
+      extending(SearchMethods).tap { |rel| rel._paradedb_current_field = column }
     end
 
     def matching_all(*terms, boost: nil)
-      raise "No search field set. Call .search(column) first." unless _parade_current_field
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
-      node = builder.match(_parade_current_field, *terms, boost: boost)
+      node = builder.match(_paradedb_current_field, *terms, boost: boost)
       where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
     end
 
     def matching_any(*terms)
-      raise "No search field set. Call .search(column) first." unless _parade_current_field
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
-      node = builder.match_any(_parade_current_field, *terms)
+      node = builder.match_any(_paradedb_current_field, *terms)
       where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
     end
 
     def excluding(*terms)
-      raise "No search field set. Call .search(column) first." unless _parade_current_field
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
-      neg = builder.match(_parade_current_field, *terms)
+      neg = builder.match(_paradedb_current_field, *terms)
       where(::Arel.sql(ParadeDB::Arel.to_sql(neg.not, connection)))
     end
 
     def phrase(text, slop: nil)
-      raise "No search field set. Call .search(column) first." unless _parade_current_field
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
-      node = builder.phrase(_parade_current_field, text, slop: slop)
+      node = builder.phrase(_paradedb_current_field, text, slop: slop)
       where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
     end
 
     def fuzzy(term, distance:, prefix: nil, boost: nil)
-      raise "No search field set. Call .search(column) first." unless _parade_current_field
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
-      node = builder.fuzzy(_parade_current_field, term, distance: distance, prefix: prefix, boost: boost)
+      node = builder.fuzzy(_paradedb_current_field, term, distance: distance, prefix: prefix, boost: boost)
       where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
     end
 
     def regex(pattern)
-      raise "No search field set. Call .search(column) first." unless _parade_current_field
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
-      node = builder.regex(_parade_current_field, pattern)
+      node = builder.regex(_paradedb_current_field, pattern)
       where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
     end
 
     def term(value, boost: nil)
-      raise "No search field set. Call .search(column) first." unless _parade_current_field
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
-      node = builder.term(_parade_current_field, value, boost: boost)
+      node = builder.term(_paradedb_current_field, value, boost: boost)
       where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
     end
 
     def near(left_term, right_term, distance: 1)
-      raise "No search field set. Call .search(column) first." unless _parade_current_field
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
-      node = builder.near(_parade_current_field, left_term, right_term, distance: distance)
+      node = builder.near(_paradedb_current_field, left_term, right_term, distance: distance)
       where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
     end
 
     def phrase_prefix(*terms)
-      raise "No search field set. Call .search(column) first." unless _parade_current_field
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
-      node = builder.phrase_prefix(_parade_current_field, *terms)
+      node = builder.phrase_prefix(_paradedb_current_field, *terms)
       where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
     end
 
@@ -124,9 +124,21 @@ module ParadeDB
     # ---- Facets ----
 
     def facets(*fields, size: 10, order: "-count", missing: nil, agg: nil)
+      build_facet_query(
+        fields: fields,
+        size: size,
+        order: order,
+        missing: missing,
+        agg: agg
+      ).execute
+    end
+
+    # Internal method to build facet query (for testing)
+    def build_facet_query(fields:, size: 10, order: "-count", missing: nil, agg: nil)
       FacetQuery.build(
         table_name,
         where_values_as_sql,
+        primary_key,
         fields: fields,
         size: size,
         order: order,
@@ -140,8 +152,13 @@ module ParadeDB
       opts = { size: size, order: order, missing: missing, agg: agg }
       
       rel = extending(FacetRelation)
-      rel._parade_facet_fields = fields
-      rel._parade_facet_opts = opts
+      rel._paradedb_facet_fields = fields
+      rel._paradedb_facet_opts = opts
+      
+      # Add pdb.all() if no ParadeDB predicates exist (for aggregate pushdown)
+      unless rel.has_paradedb_predicate?
+        rel = rel.ensure_paradedb_predicate
+      end
       
       # Add window aggregates to SELECT
       facet_selects = fields.map do |field|
@@ -151,6 +168,18 @@ module ParadeDB
 
       rel = rel.select(::Arel.sql("#{table_name}.*")) if rel.select_values.empty?
       rel.select(*facet_selects)
+    end
+
+    def has_paradedb_predicate?
+      sql = where_values_as_sql
+      # Check for ParadeDB operators: &&&, |||, ###, @@@
+      sql.match?(/(&&&|\|\|\||###|@@@)/)
+    end
+
+    def ensure_paradedb_predicate
+      # Add pdb.all() sentinel to force aggregate pushdown
+      pk_col = "#{connection.quote_table_name(table_name)}.#{connection.quote_column_name(primary_key)}"
+      where(::Arel.sql("#{pk_col} @@@ pdb.all()"))
     end
 
     private
@@ -182,13 +211,15 @@ module ParadeDB
     class FacetQuery
       attr_reader :sql, :connection
 
-      def self.build(table, predicate_sql, fields:, size:, order:, missing:, agg:, connection:)
-        new(table, predicate_sql, fields, size, order, missing, agg, connection)
+      def self.build(table, predicate_sql, primary_key, fields:, size:, order:, missing:, agg:, connection:)
+        new(table, predicate_sql, primary_key, fields, size, order, missing, agg, connection)
       end
 
-      def initialize(table, predicate_sql, fields, size, order, missing, agg, connection)
+      def initialize(table, predicate_sql, primary_key, fields, size, order, missing, agg, connection)
         @connection = connection
-        @sql = build_sql(table, predicate_sql, fields, size, order, missing, agg)
+        @table = table
+        @primary_key = primary_key
+        @sql = build_sql(table, predicate_sql, primary_key, fields, size, order, missing, agg, connection)
       end
 
       def execute
@@ -199,7 +230,10 @@ module ParadeDB
 
       private
 
-      def build_sql(table, predicate_sql, fields, size, order, missing, agg)
+      def build_sql(table, predicate_sql, primary_key, fields, size, order, missing, agg, connection)
+        # Check if predicate contains ParadeDB operators
+        has_paradedb_predicate = predicate_sql.match?(/(&&&|\|\|\||###|@@@)/)
+        
         if agg
           agg_json = agg
         else
@@ -224,7 +258,20 @@ module ParadeDB
         buf << "SELECT"
         buf << "  #{selects.join(",\n  ")}"
         buf << "FROM #{table}"
-        buf << "WHERE #{predicate_sql}" unless predicate_sql.empty?
+        
+        # Add WHERE clause
+        if !predicate_sql.empty? && has_parade_predicate
+          buf << "WHERE #{predicate_sql}"
+        elsif !predicate_sql.empty? && !has_parade_predicate
+          # Has predicates but no ParadeDB operators - add pdb.all()
+          pk_col = "#{connection.quote_table_name(table)}.#{connection.quote_column_name(primary_key)}"
+          buf << "WHERE #{predicate_sql} AND #{pk_col} @@@ pdb.all()"
+        elsif predicate_sql.empty?
+          # No predicates at all - add pdb.all() sentinel
+          pk_col = "#{connection.quote_table_name(table)}.#{connection.quote_column_name(primary_key)}"
+          buf << "WHERE #{pk_col} @@@ pdb.all()"
+        end
+        
         buf.join("\n")
       end
 

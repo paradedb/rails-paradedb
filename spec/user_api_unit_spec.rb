@@ -98,7 +98,7 @@ class UserApiUnitTest < Minitest::Test
 
   def test_facets_only
     facet_sql = UnitProduct.search(:description).matching_all("shoes")
-                           .facets(:category, :brand, size: 10, order: "-count")
+                           .build_facet_query(fields: [:category, :brand], size: 10, order: "-count")
                            .sql
 
     expected = <<~SQL.strip
@@ -110,5 +110,51 @@ class UserApiUnitTest < Minitest::Test
     SQL
 
     assert_sql_equal expected, facet_sql
+  end
+
+  def test_facets_without_parade_predicates
+    facet_sql = UnitProduct.where(in_stock: true)
+                           .extending(ParadeDB::SearchMethods)
+                           .build_facet_query(fields: [:category], size: 10, order: nil)
+                           .sql
+
+    expected = <<~SQL.strip
+      SELECT
+        pdb.agg('{"terms": {"field": "category", "size": 10}}') AS category_facet
+      FROM products
+      WHERE "products"."in_stock" = ? AND "products"."id" @@@ pdb.all()
+    SQL
+
+    assert_sql_equal expected, facet_sql
+  end
+
+  def test_facets_with_no_predicates
+    facet_sql = UnitProduct.all
+                           .extending(ParadeDB::SearchMethods)
+                           .build_facet_query(fields: [:category], size: 5, order: nil)
+                           .sql
+
+    expected = <<~SQL.strip
+      SELECT
+        pdb.agg('{"terms": {"field": "category", "size": 5}}') AS category_facet
+      FROM products
+      WHERE "products"."id" @@@ pdb.all()
+    SQL
+
+    assert_sql_equal expected, facet_sql
+  end
+
+  def test_with_facets_without_parade_predicates
+    sql = UnitProduct.where(in_stock: true)
+                     .extending(ParadeDB::SearchMethods)
+                     .with_facets(:category, size: 10)
+                     .to_sql
+
+    expected = <<~SQL.strip
+      SELECT products.*, pdb.agg('{"terms": {"field": "category", "size": 10}}') OVER () AS _category_facet FROM products
+      WHERE "products"."in_stock" = TRUE AND ("products"."id" @@@ pdb.all())
+    SQL
+
+    assert_sql_equal expected, sql
   end
 end
