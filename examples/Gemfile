@@ -1,0 +1,6 @@
+source "https://rubygems.org"
+
+eval_gemfile "../Gemfile"
+
+# Example-only dependency used by hybrid vector search demo.
+gem "neighbor"

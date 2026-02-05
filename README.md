@@ -68,9 +68,11 @@ Product.search(:description).matching_all("running", "shoes")
 
 ## Examples
 
-End-to-end runnable examples are available in `examples/` with the same
-structure as the Django package examples (quickstart, facets, autocomplete,
-more-like-this, hybrid RRF, and RAG).
+End-to-end runnable examples are available in `examples/` (quickstart, facets,
+autocomplete, more-like-this, hybrid RRF, and RAG).
+
+Examples use an isolated bundle (`examples/Gemfile`) so example-only gems do
+not become dependencies of the core library.
 
 See `examples/README.md` for setup and run commands.
 

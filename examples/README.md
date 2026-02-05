@@ -9,7 +9,7 @@ your Ruby on Rails / ActiveRecord application.
 ### 1. Install dependencies
 
 ```bash
-bundle install
+BUNDLE_GEMFILE=examples/Gemfile bundle install
 ```
 
 ### 2. Start ParadeDB
@@ -23,7 +23,7 @@ This starts the local ParadeDB Docker container and exports `DATABASE_URL`.
 ### 3. Run examples
 
 ```bash
-bundle exec ruby examples/quickstart/quickstart.rb
+BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/quickstart/quickstart.rb
 ```
 
 ## Examples
@@ -40,7 +40,7 @@ Core search operations:
 - search + ActiveRecord filters
 
 ```bash
-bundle exec ruby examples/quickstart/quickstart.rb
+BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/quickstart/quickstart.rb
 ```
 
 2. Faceted Search (`faceted_search/faceted_search.rb`)
@@ -48,7 +48,7 @@ bundle exec ruby examples/quickstart/quickstart.rb
 Top-N rows plus facet buckets in one flow.
 
 ```bash
-bundle exec ruby examples/faceted_search/faceted_search.rb
+BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/faceted_search/faceted_search.rb
 ```
 
 ### Smart Features
@@ -58,8 +58,8 @@ bundle exec ruby examples/faceted_search/faceted_search.rb
 Creates an ngram index and runs as-you-type queries.
 
 ```bash
-bundle exec ruby examples/autocomplete/setup.rb
-bundle exec ruby examples/autocomplete/autocomplete.rb
+BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/autocomplete/setup.rb
+BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/autocomplete/autocomplete.rb
 ```
 
 4. More Like This (`more_like_this/more_like_this.rb`)
@@ -67,7 +67,7 @@ bundle exec ruby examples/autocomplete/autocomplete.rb
 Recommendation-style search based on document similarity.
 
 ```bash
-bundle exec ruby examples/more_like_this/more_like_this.rb
+BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/more_like_this/more_like_this.rb
 ```
 
 ### AI & Vectors
@@ -77,8 +77,8 @@ bundle exec ruby examples/more_like_this/more_like_this.rb
 Combines BM25 + vector ranking with Reciprocal Rank Fusion.
 
 ```bash
-bundle exec ruby examples/hybrid_rrf/setup.rb
-bundle exec ruby examples/hybrid_rrf/hybrid_rrf.rb
+BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/hybrid_rrf/setup.rb
+BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/hybrid_rrf/hybrid_rrf.rb
 ```
 
 6. RAG (`rag/rag.rb`)
@@ -87,7 +87,7 @@ Retrieves products with ParadeDB and sends context to OpenRouter.
 
 ```bash
 export OPENROUTER_API_KEY=sk-...
-bundle exec ruby examples/rag/rag.rb
+BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/rag/rag.rb
 ```
 
 ## Shared Helpers

@@ -1,8 +1,18 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+begin
+  require "neighbor"
+rescue LoadError
+  abort "neighbor gem is required for this example. Install with: BUNDLE_GEMFILE=examples/Gemfile bundle install"
+end
+
 require_relative "../common"
 require_relative "setup"
+
+class MockItem < ActiveRecord::Base
+  has_neighbors :embedding
+end
 
 QUERY_SEED_TEXT = {
   "running shoes" => "Sleek running shoes",
@@ -26,46 +36,40 @@ def bm25_search(query, top_k: 20)
           .map { |item| [item.id, item.search_score.to_f] }
 end
 
-def query_embedding_text(query)
+def query_seed_item(query)
   terms = tokenize(query)
   normalized_query = query.to_s.downcase.strip
 
   seed_text = QUERY_SEED_TEXT[normalized_query]
+  seed_scope = MockItem.where.not(embedding: nil)
   seed_id = if seed_text
-              MockItem.where("description ILIKE ?", "%#{seed_text}%")
-                      .where.not(embedding: nil)
-                      .limit(1)
-                      .pick(:id)
+              seed_scope.where("description ILIKE ?", "%#{seed_text}%")
+                        .limit(1)
+                        .pick(:id)
             end
 
   seed_id ||= if terms.empty?
               nil
             else
-              MockItem.search(:description)
+              seed_scope.search(:description)
                       .matching_any(*terms)
-                      .where.not(embedding: nil)
                       .limit(1)
                       .pick(:id)
             end
 
-  seed_id ||= MockItem.where.not(embedding: nil).limit(1).pick(:id)
+  seed_id ||= seed_scope.limit(1).pick(:id)
   raise "No embeddings available. Run setup first." unless seed_id
 
-  MockItem.connection.select_value("SELECT embedding::text FROM mock_items WHERE id = #{seed_id.to_i}")
+  seed_scope.find(seed_id)
 end
 
 def vector_search(query, top_k: 20)
-  embedding_literal = query_embedding_text(query)
-  quoted_vector = MockItem.connection.quote(embedding_literal)
+  seed_item = query_seed_item(query)
 
-  MockItem.where.not(embedding: nil)
-          .select(
-            :id,
-            Arel.sql("embedding <=> #{quoted_vector}::vector AS distance")
-          )
-          .order(distance: :asc)
-          .limit(top_k)
-          .map { |item| [item.id, item.distance.to_f] }
+  seed_item.nearest_neighbors(:embedding, distance: "cosine")
+          .where.not(embedding: nil)
+          .first(top_k)
+          .map { |item| [item.id, item.neighbor_distance.to_f] }
 end
 
 def reciprocal_rank_fusion(bm25_results, vector_results, k: 60)
