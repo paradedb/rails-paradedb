@@ -5,9 +5,10 @@ set -euo pipefail
 RUBY_VERSION="4.0.0"
 BUNDLER_VERSION="4.0.3"
 
-# Skip rbenv setup if Ruby is already available (e.g., in CI)
-if command -v ruby >/dev/null 2>&1 && ruby --version | grep -q "${RUBY_VERSION}"; then
-  echo "Ruby ${RUBY_VERSION} already available, skipping rbenv setup"
+# Skip rbenv setup if Ruby 4.0+ is already available (e.g., in CI)
+if command -v ruby >/dev/null 2>&1 && ruby --version | grep -qE "ruby 4\.(0|1)"; then
+  CURRENT_RUBY=$(ruby --version | grep -oE "ruby [0-9]+\.[0-9]+\.[0-9]+" | cut -d' ' -f2)
+  echo "Ruby ${CURRENT_RUBY} already available, skipping rbenv setup"
   if ! gem list -i "bundler" -v "${BUNDLER_VERSION}" >/dev/null 2>&1; then
     gem install "bundler:${BUNDLER_VERSION}"
   fi
