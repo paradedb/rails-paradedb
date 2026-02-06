@@ -134,14 +134,6 @@ def display_results(query, bm25_results, vector_results, rrf_results)
   end
 end
 
-def demo(query)
-  bm25_results = bm25_search(query, top_k: 20)
-  vector_results = vector_search(query, top_k: 20)
-  rrf_results = reciprocal_rank_fusion(bm25_results, vector_results)
-
-  display_results(query, bm25_results, vector_results, rrf_results)
-end
-
 if $PROGRAM_NAME == __FILE__
   puts "=" * 80
   puts "Hybrid Search with Reciprocal Rank Fusion (RRF)"
@@ -152,9 +144,13 @@ if $PROGRAM_NAME == __FILE__
   HybridRrfSetup.setup!
   MockItem.reset_column_information
 
-  demo("running shoes")
-  demo("footwear for exercise")
-  demo("wireless earbuds")
+  ["running shoes", "footwear for exercise", "wireless earbuds"].each do |query|
+    bm25_results = bm25_search(query, top_k: 20)
+    vector_results = vector_search(query, top_k: 20)
+    rrf_results = reciprocal_rank_fusion(bm25_results, vector_results)
+
+    display_results(query, bm25_results, vector_results, rrf_results)
+  end
 
   puts "\n" + "=" * 80
   puts "Done!"

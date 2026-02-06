@@ -12,14 +12,6 @@ class AutocompleteItem < ActiveRecord::Base
   self.has_paradedb_index = true
 end
 
-def autocomplete_relation(query)
-  AutocompleteItem.search(:description)
-                  .parse("description_ngram:#{query}")
-                  .with_score
-                  .order(search_score: :desc)
-                  .limit(5)
-end
-
 def demo_autocomplete
   puts "\n" + "=" * 60
   puts "Autocomplete"
@@ -30,7 +22,11 @@ def demo_autocomplete
   queries.each do |query|
     puts "\nUser types: '#{query}' ->"
 
-    results = autocomplete_relation(query)
+    results = AutocompleteItem.search(:description)
+                              .parse("description_ngram:#{query}")
+                              .with_score
+                              .order(search_score: :desc)
+                              .limit(5)
 
     if results.empty?
       puts "  (no results)"

@@ -3,11 +3,20 @@
 
 require_relative "../common"
 
-def demo_facets_with_rows(query)
-  puts "\n--- Facets + Rows (Top-N) ---"
+if $PROGRAM_NAME == __FILE__
+  puts "=" * 60
+  puts "rails-paradedb Faceted Search Example"
+  puts "=" * 60
 
+  count = ExampleCommon.setup_mock_items!
+  puts "Loaded #{count} mock items"
+
+  search_query = "shoes"
+  puts "\nQuery: '#{search_query}'"
+
+  puts "\n--- Facets + Rows (Top-N) ---"
   relation = MockItem.search(:description)
-                     .matching_all(query)
+                     .matching_all(search_query)
                      .with_facets(:category, :rating, :metadata_color)
                      .order(rating: :desc)
                      .limit(5)
@@ -31,20 +40,6 @@ def demo_facets_with_rows(query)
       puts "  - #{bucket["key"]}: #{bucket["doc_count"]}"
     end
   end
-end
-
-if $PROGRAM_NAME == __FILE__
-  puts "=" * 60
-  puts "rails-paradedb Faceted Search Example"
-  puts "=" * 60
-
-  count = ExampleCommon.setup_mock_items!
-  puts "Loaded #{count} mock items"
-
-  search_query = "shoes"
-  puts "\nQuery: '#{search_query}'"
-
-  demo_facets_with_rows(search_query)
 
   puts "\n" + "=" * 60
   puts "Done!"

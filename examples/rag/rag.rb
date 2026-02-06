@@ -13,18 +13,6 @@ def tokenize(text)
   text.to_s.downcase.scan(/[[:alnum:]]+/)
 end
 
-def retrieve(query, top_k: 5)
-  terms = tokenize(query)
-  return [] if terms.empty?
-
-  MockItem.search(:description)
-          .matching_any(*terms)
-          .with_score
-          .order(search_score: :desc)
-          .limit(top_k)
-          .to_a
-end
-
 def format_context(items)
   return "No products found." if items.empty?
 
@@ -75,23 +63,6 @@ rescue StandardError => error
   "(OpenRouter error: #{error})"
 end
 
-def rag(query)
-  puts "\n#{'=' * 60}"
-  puts "Question: #{query}"
-  puts "=" * 60
-
-  items = retrieve(query)
-  puts "\nRetrieved #{items.length} products:"
-  items.each do |item|
-    puts format("  - %-60s (score: %.2f)", item.description, item.search_score.to_f)
-  end
-
-  context = format_context(items)
-  puts "\nAnswer:"
-  puts "-" * 40
-  puts generate(query, context)
-end
-
 if $PROGRAM_NAME == __FILE__
   puts "=" * 60
   puts "RAG with rails-paradedb + OpenRouter"
@@ -102,9 +73,37 @@ if $PROGRAM_NAME == __FILE__
   count = ExampleCommon.setup_mock_items!
   puts "Loaded #{count} products"
 
-  rag("What running shoes do you have?")
-  rag("I need comfortable shoes for everyday use")
-  rag("Do you have any wireless audio products?")
+  [
+    "What running shoes do you have?",
+    "I need comfortable shoes for everyday use",
+    "Do you have any wireless audio products?"
+  ].each do |query|
+    puts "\n#{'=' * 60}"
+    puts "Question: #{query}"
+    puts "=" * 60
+
+    terms = tokenize(query)
+    items = if terms.empty?
+              []
+            else
+              MockItem.search(:description)
+                      .matching_any(*terms)
+                      .with_score
+                      .order(search_score: :desc)
+                      .limit(5)
+                      .to_a
+            end
+
+    puts "\nRetrieved #{items.length} products:"
+    items.each do |item|
+      puts format("  - %-60s (score: %.2f)", item.description, item.search_score.to_f)
+    end
+
+    context = format_context(items)
+    puts "\nAnswer:"
+    puts "-" * 40
+    puts generate(query, context)
+  end
 
   puts "\n" + "=" * 60
   puts "Done!"
