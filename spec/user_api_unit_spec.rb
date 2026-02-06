@@ -60,6 +60,26 @@ class UserApiUnitTest < Minitest::Test
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.phrase_prefix(ARRAY['run', 'sh']))), sql
   end
 
+  def test_parse_query_with_lenient
+    sql = UnitProduct.search(:description).parse("running AND shoes", lenient: true).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.parse('running AND shoes', lenient => true))), sql
+  end
+
+  def test_parse_query_without_options
+    sql = UnitProduct.search(:description).parse("running AND shoes").to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.parse('running AND shoes'))), sql
+  end
+
+  def test_parse_query_with_lenient_false
+    sql = UnitProduct.search(:description).parse("running AND shoes", lenient: false).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.parse('running AND shoes', lenient => false))), sql
+  end
+
+  def test_match_all_wrapper
+    sql = UnitProduct.search(:id).match_all.to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.all())), sql
+  end
+
   def test_more_like_this
     sql = UnitProduct.more_like_this(5, fields: [:description]).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.more_like_this(5, ARRAY['description']))), sql

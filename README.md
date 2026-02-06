@@ -66,6 +66,19 @@ Product.search(:description).matching_all("running", "shoes")
   .order(search_score: :desc)
 ```
 
+## Examples
+
+End-to-end runnable examples are available in `examples/` (quickstart, facets,
+autocomplete, more-like-this, hybrid RRF, and RAG).
+
+Examples use an isolated bundle (`examples/Gemfile`) so example-only gems do
+not become dependencies of the core library.
+
+See `examples/README.md` for setup and run commands.
+The hybrid RRF example follows the single-query CTE pattern from ParadeDB's
+hybrid search guidance, translated into ActiveRecord relations with ParadeDB and
+neighbor DSL pieces.
+
 ## Query Types
 
 | Method | Operator | Description |
@@ -78,6 +91,8 @@ Product.search(:description).matching_all("running", "shoes")
 | `regex("pattern")` | `@@@` | Regex pattern match |
 | `near("a", "b", distance: n)` | `@@@` | Proximity search |
 | `phrase_prefix("a", "b")` | `@@@` | Autocomplete/prefix matching |
+| `parse("query", lenient: true/false)` | `@@@` | Query-string parser (`pdb.parse`) |
+| `match_all` | `@@@` | Match all documents (`pdb.all()`) |
 | `more_like_this(id, fields: [...])` | `@@@` | Find similar documents |
 
 ### When to use `term` vs `matching_all`
@@ -94,9 +109,32 @@ Product.search(:description).matching_all("running shoes")
 Product.search(:status).term("active")
 ```
 
+### Convenience Wrappers
+
+`parse` and `match_all` are relation-level wrappers that mirror the common Django
+`Parse` / `All` ergonomics while staying idiomatic to ActiveRecord chaining.
+
+```ruby
+# Query-string parser (ParadeDB syntax)
+Product.search(:description).parse("running AND shoes", lenient: true)
+
+# Match all documents (useful as an explicit ParadeDB predicate)
+Product.search(:id).match_all
+```
+
 ## Arel Layer
 
 The user API is built on top of a dedicated Arel layer that provides an AST and SQL renderer for ParadeDB operators.
+
+### Starter
+
+```ruby
+builder = ParadeDB::Arel::Builder.new(:products)
+predicate = builder.match(:description, "running", "shoes")
+sql = ParadeDB::Arel.to_sql(predicate, Product.connection)
+
+Product.where(Arel.sql(sql))
+```
 
 ### Quickstart
 
@@ -114,6 +152,14 @@ sql = ParadeDB::Arel.to_sql(predicate)
 ```
 
 Render any node with `ParadeDB::Arel.to_sql(node)`. All nodes respond to `.and`, `.or`, and `.not`.
+
+### Where To Look
+
+- `lib/parade_db/arel/builder.rb` for available node builders (`match`, `regex`, `phrase_prefix`, `full_text`, `more_like_this`).
+- `lib/parade_db/arel/visitor.rb` for SQL rendering details and operator mapping.
+- `spec/arel_visitor_spec.rb` for precise SQL expectations per node.
+- `spec/arel_integration_spec.rb` for composed predicates and end-to-end rendering checks.
+- `spec/user_api_behavior_integration_spec.rb` for practical usage of the raw `full_text` escape hatch in query execution.
 
 ### Builder Methods
 

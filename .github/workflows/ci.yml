@@ -62,3 +62,18 @@ jobs:
 
       - name: Run integration tests
         run: bundle exec rake test:integration
+
+      - name: Install example dependencies
+        run: BUNDLE_GEMFILE=examples/Gemfile bundle install
+
+      - name: Run examples
+        env:
+          DATABASE_URL: ${{ env.PARADEDB_TEST_DSN }}
+        run: |
+          BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/quickstart/quickstart.rb
+          BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/autocomplete/setup.rb
+          BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/autocomplete/autocomplete.rb
+          BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/more_like_this/more_like_this.rb
+          BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/faceted_search/faceted_search.rb
+          BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/hybrid_rrf/setup.rb
+          BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/hybrid_rrf/hybrid_rrf.rb
