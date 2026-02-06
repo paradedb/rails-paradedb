@@ -28,10 +28,11 @@ def demo_autocomplete
                               .order(search_score: :desc)
                               .limit(5)
 
-    results.each do |item|
-      puts format("  - %-50s (score: %.2f)", item.description.truncate(50), item.search_score)
+    if results.empty?
+      puts "  (no results)"
+    else
+      puts results.map { |item| "  - #{item.description.truncate(50)} (score: #{item.search_score.round(2)})" }
     end
-    puts "  (no results)" if results.empty?
   end
 end
 

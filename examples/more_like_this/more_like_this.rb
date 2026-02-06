@@ -4,7 +4,7 @@
 require_relative "../common"
 
 def demo_similar_to_single_product
-  puts "\n" + "=" * 60
+  puts "\n#{"=" * 60}"
   puts "Demo 1: Similar to a single product"
   puts "=" * 60
 
@@ -19,14 +19,14 @@ def demo_similar_to_single_product
                     .order(search_score: :desc)
                     .limit(5)
 
-  similar.each do |item|
+  puts similar.map { |item|
     marker = item.id == source_id ? " (source)" : ""
-    puts "  #{item.id}: #{item.description.truncate(50)} [#{item.category}]#{marker}"
-  end
+    "  #{item.id}: #{item.description.truncate(50)} [#{item.category}]#{marker}"
+  }
 end
 
 def demo_similar_to_multiple_products
-  puts "\n" + "=" * 60
+  puts "\n#{"=" * 60}"
   puts "Demo 2: Similar to multiple products (browsing history)"
   puts "=" * 60
 
@@ -50,7 +50,7 @@ def demo_similar_to_multiple_products
 end
 
 def demo_combined_with_filters
-  puts "\n" + "=" * 60
+  puts "\n#{"=" * 60}"
   puts "Demo 3: MoreLikeThis + Filters (in_stock=true, rating >= 4)"
   puts "=" * 60
 
@@ -67,7 +67,7 @@ def demo_combined_with_filters
 end
 
 def demo_multifield_similarity
-  puts "\n" + "=" * 60
+  puts "\n#{"=" * 60}"
   puts "Demo 4: Multi-field similarity"
   puts "=" * 60
 
@@ -98,6 +98,6 @@ if $PROGRAM_NAME == __FILE__
   demo_combined_with_filters
   demo_multifield_similarity
 
-  puts "\n" + "=" * 60
+  puts "\n#{"=" * 60}"
   puts "Done!"
 end

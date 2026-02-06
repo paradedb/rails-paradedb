@@ -95,9 +95,7 @@ if $PROGRAM_NAME == __FILE__
             end
 
     puts "\nRetrieved #{items.length} products:"
-    items.each do |item|
-      puts format("  - %-60s (score: %.2f)", item.description, item.search_score.to_f)
-    end
+    puts items.map { |item| "  - #{item.description} (score: #{item.search_score.round(2)})" }
 
     context = format_context(items)
     puts "\nAnswer:"
@@ -105,6 +103,6 @@ if $PROGRAM_NAME == __FILE__
     puts generate(query, context)
   end
 
-  puts "\n" + "=" * 60
+  puts "\n#{"=" * 60}"
   puts "Done!"
 end
