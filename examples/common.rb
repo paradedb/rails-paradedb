@@ -1,5 +1,11 @@
 # frozen_string_literal: true
 
+begin
+  require "neighbor"
+rescue LoadError
+  abort "Examples require neighbor. Run with `BUNDLE_GEMFILE=examples/Gemfile bundle exec ...`."
+end
+
 require "active_record"
 require_relative "../lib/parade_db"
 

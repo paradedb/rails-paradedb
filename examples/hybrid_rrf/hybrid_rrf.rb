@@ -29,8 +29,8 @@ def fulltext_ranked_cte(query, top_k:)
                             .limit(top_k)
 
   MockItem.from(fulltext_source, :fulltext_source)
-          .select("fulltext_source.id")
-          .select("ROW_NUMBER() OVER (ORDER BY fulltext_source.search_score DESC) AS rank_position")
+          .select("fulltext_source.id",
+                  "ROW_NUMBER() OVER (ORDER BY fulltext_source.search_score DESC) AS rank_position")
 end
 
 def semantic_ranked_cte(query_embedding, top_k:)
@@ -39,8 +39,8 @@ def semantic_ranked_cte(query_embedding, top_k:)
                             .limit(top_k)
 
   MockItem.from(semantic_source, :semantic_source)
-          .select("semantic_source.id")
-          .select("ROW_NUMBER() OVER (ORDER BY semantic_source.neighbor_distance ASC) AS rank_position")
+          .select("semantic_source.id",
+                  "ROW_NUMBER() OVER (ORDER BY semantic_source.neighbor_distance ASC) AS rank_position")
 end
 
 def bm25_contribution_cte(weight:, rrf_k:)
@@ -84,7 +84,7 @@ def combined_scores_cte
           .group("contributions.id")
 end
 
-def hybrid_relation(query, top_k: 20, limit: 5, rrf_k: 60, bm25_weight: 1.0, semantic_weight: 1.0)
+def hybrid_search(query, top_k: 20, limit: 5, rrf_k: 60, bm25_weight: 1.0, semantic_weight: 1.0)
   query_embedding = HybridRrfSetup.query_embedding_for(query)
   fulltext_cte = fulltext_ranked_cte(query, top_k: top_k)
   semantic_cte = semantic_ranked_cte(query_embedding, top_k: top_k)
@@ -113,17 +113,6 @@ def hybrid_relation(query, top_k: 20, limit: 5, rrf_k: 60, bm25_weight: 1.0, sem
           .limit(limit)
 end
 
-def hybrid_search(query, top_k: 20, limit: 5, rrf_k: 60, bm25_weight: 1.0, semantic_weight: 1.0)
-  hybrid_relation(
-    query,
-    top_k: top_k,
-    limit: limit,
-    rrf_k: rrf_k,
-    bm25_weight: bm25_weight,
-    semantic_weight: semantic_weight
-  ).to_a
-end
-
 def display_results(query, rows)
   puts "\n#{'=' * 80}"
   puts "Query: '#{query}'"
@@ -135,14 +124,14 @@ def display_results(query, rows)
   end
 
   rows.each_with_index do |row, index|
-    bm25_rank = row.bm25_rank ? row.bm25_rank.to_i : nil
-    semantic_rank = row.semantic_rank ? row.semantic_rank.to_i : nil
+    bm25_rank = row.bm25_rank&.to_i
+    semantic_rank = row.semantic_rank&.to_i
 
     puts format(
       "  %<rank>d. %<desc>-60s hybrid=%<hybrid>.4f bm25_rank=%<bm25>s semantic_rank=%<semantic>s",
       rank: index + 1,
-      desc: "#{row.description[0, 60]}...",
-      hybrid: row.hybrid_score.to_f,
+      desc: row.description.truncate(60),
+      hybrid: row.hybrid_score,
       bm25: bm25_rank || "--",
       semantic: semantic_rank || "--"
     )
@@ -159,10 +148,10 @@ if $PROGRAM_NAME == __FILE__
   MockItem.reset_column_information
 
   ["running shoes", "footwear for exercise", "wireless earbuds"].each do |query|
-    results = hybrid_search(query, top_k: 20, limit: 5)
+    results = hybrid_search(query, top_k: 20, limit: 5).to_a
     display_results(query, results)
   end
 
-  puts "\n" + "=" * 80
+  puts "\n#{"=" * 80}"
   puts "Done!"
 end

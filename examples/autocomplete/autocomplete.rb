@@ -13,7 +13,7 @@ class AutocompleteItem < ActiveRecord::Base
 end
 
 def demo_autocomplete
-  puts "\n" + "=" * 60
+  puts "\n#{"=" * 60}"
   puts "Autocomplete"
   puts "=" * 60
 
@@ -28,14 +28,10 @@ def demo_autocomplete
                               .order(search_score: :desc)
                               .limit(5)
 
-    if results.empty?
-      puts "  (no results)"
-      next
-    end
-
     results.each do |item|
-      puts format("  - %-50s (score: %.2f)", "#{item.description[0, 50]}...", item.search_score.to_f)
+      puts format("  - %-50s (score: %.2f)", item.description.truncate(50), item.search_score)
     end
+    puts "  (no results)" if results.empty?
   end
 end
 
