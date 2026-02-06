@@ -72,12 +72,7 @@ def semantic_contribution_cte(weight:, rrf_k:)
 end
 
 def combined_scores_cte
-  bm25 = MockItem.from("bm25_contrib").select("*")
-  semantic = MockItem.from("semantic_contrib").select("*")
-  
-  union_relation = bm25.union_all(semantic)
-  
-  MockItem.from(Arel.sql("(#{union_relation.to_sql}) AS contributions"))
+  MockItem.from("contributions")
           .select(
             "contributions.id",
             "MAX(contributions.bm25_rank) AS bm25_rank",
@@ -100,8 +95,7 @@ def hybrid_relation(query, top_k: 20, limit: 5, rrf_k: 60, bm25_weight: 1.0, sem
   MockItem.with(
             fulltext: fulltext_cte,
             semantic: semantic_cte,
-            bm25_contrib: bm25_contrib_cte,
-            semantic_contrib: semantic_contrib_cte,
+            contributions: [bm25_contrib_cte, semantic_contrib_cte],
             hybrid_scores: scores_cte
           )
           .from("hybrid_scores")
