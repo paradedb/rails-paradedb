@@ -69,10 +69,46 @@ class UserApiBehaviorIntegrationTest < Minitest::Test
     assert_equal [1, 2], fuzzy_ids
   end
 
-  def test_more_like_this_executes_and_returns_similar_rows
+  def test_more_like_this_with_id_executes_and_returns_similar_rows
     ids = BehaviorProduct.more_like_this(3, fields: [:description]).limit(5).pluck(:id)
 
     assert_includes ids, 4
+  end
+
+  def test_more_like_this_with_json_single_field_executes
+    json_doc = { description: "running shoes" }.to_json
+    ids = BehaviorProduct.more_like_this(json_doc).order(:id).pluck(:id)
+
+    assert_includes ids, 1
+    assert_includes ids, 2
+  end
+
+  def test_more_like_this_with_json_multiple_fields_executes
+    json_doc = { description: "running shoes", category: "footwear" }.to_json
+    ids = BehaviorProduct.more_like_this(json_doc).order(:id).pluck(:id)
+
+    assert_includes ids, 1
+    assert_includes ids, 2
+  end
+
+  def test_more_like_this_with_json_category_only_executes
+    json_doc = { category: "audio" }.to_json
+    ids = BehaviorProduct.more_like_this(json_doc).order(:id).pluck(:id)
+
+    assert_includes ids, 3
+    assert_includes ids, 4
+  end
+
+  def test_more_like_this_with_json_combined_with_filters_executes
+    json_doc = { description: "running" }.to_json
+    ids = BehaviorProduct.more_like_this(json_doc)
+                          .where(in_stock: true)
+                          .where("rating >= ?", 4)
+                          .order(:id)
+                          .pluck(:id)
+
+    assert_includes ids, 1
+    assert_includes ids, 2
   end
 
   def test_with_score_and_with_snippet_materialize_columns

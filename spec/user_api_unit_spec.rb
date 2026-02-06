@@ -80,9 +80,25 @@ class UserApiUnitTest < Minitest::Test
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.all())), sql
   end
 
-  def test_more_like_this
+  def test_more_like_this_with_id
     sql = UnitProduct.more_like_this(5, fields: [:description]).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.more_like_this(5, ARRAY['description']))), sql
+  end
+
+  def test_more_like_this_with_json_string
+    sql = UnitProduct.more_like_this('{"description": "running shoes"}').to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.more_like_this('{"description": "running shoes"}'))), sql
+  end
+
+  def test_more_like_this_with_json_and_fields
+    sql = UnitProduct.more_like_this('{"description": "running shoes", "category": "footwear"}', fields: [:description, :category]).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.more_like_this('{"description": "running shoes", "category": "footwear"}', ARRAY['description', 'category']))), sql
+  end
+
+  def test_more_like_this_with_json_hash
+    json_doc = { description: "running shoes", category: "footwear" }.to_json
+    sql = UnitProduct.more_like_this(json_doc).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.more_like_this('{"description":"running shoes","category":"footwear"}'))), sql
   end
 
   def test_excluding

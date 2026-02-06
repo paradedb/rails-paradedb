@@ -25,22 +25,18 @@ if $PROGRAM_NAME == __FILE__
   facets = relation.facets
 
   puts "Top results:"
-  rows.each do |item|
+  puts rows.map { |item|
     color = item.metadata&.fetch("color", nil) || "N/A"
-    stock = item.in_stock ? "In Stock" : "Out of Stock"
-    puts "  - #{item.description[0, 50]}... [#{item.category}] " \
-         "(rating: #{item.rating}, #{stock}, color: #{color})"
-  end
+    "  - #{item.description.truncate(50)} [#{item.category}] (rating: #{item.rating}, color: #{color})"
+  }
 
   puts "\nFacet buckets:"
   facets.each do |key, data|
     buckets = data.is_a?(Hash) ? Array(data["buckets"]) : []
     puts "#{key} (#{buckets.length} buckets)"
-    buckets.each do |bucket|
-      puts "  - #{bucket["key"]}: #{bucket["doc_count"]}"
-    end
+    puts buckets.map { |bucket| "  - #{bucket["key"]}: #{bucket["doc_count"]}" }
   end
 
-  puts "\n" + "=" * 60
+  puts "\n#{"=" * 60}"
   puts "Done!"
 end
