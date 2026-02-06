@@ -5,9 +5,8 @@ require_relative "../common"
 
 def demo_basic_search
   puts "\n--- Basic Search: 'shoes' ---"
-  MockItem.search(:description).matching_all("shoes").limit(5).each do |item|
-    puts "  - #{item.description[0, 60]}..."
-  end
+  results = MockItem.search(:description).matching_all("shoes").limit(5)
+  puts results.map { |item| "  - #{item.description.truncate(60)}" }
 end
 
 def demo_scored_search
@@ -18,9 +17,7 @@ def demo_scored_search
                     .order(search_score: :desc)
                     .limit(5)
 
-  results.each do |item|
-    puts format("  - %-50s (score: %.2f)", "#{item.description[0, 50]}...", item.search_score.to_f)
-  end
+  puts results.map { |item| "  - #{item.description.truncate(50)} (score: #{item.search_score.round(2)})" }
 end
 
 def demo_phrase_search
@@ -31,9 +28,7 @@ def demo_phrase_search
                     .order(search_score: :desc)
                     .limit(5)
 
-  results.each do |item|
-    puts format("  - %-50s (score: %.2f)", "#{item.description[0, 50]}...", item.search_score.to_f)
-  end
+  puts results.map { |item| "  - #{item.description.truncate(50)} (score: #{item.search_score.round(2)})" }
 end
 
 def demo_snippet_highlighting
@@ -45,9 +40,7 @@ def demo_snippet_highlighting
                     .order(search_score: :desc)
                     .limit(3)
 
-  results.each do |item|
-    puts "  - #{item.description_snippet}"
-  end
+  puts results.map { |item| "  - #{item.description_snippet}" }
 end
 
 def demo_filtered_search
@@ -60,9 +53,7 @@ def demo_filtered_search
                     .order(search_score: :desc)
                     .limit(5)
 
-  results.each do |item|
-    puts "  - #{item.description[0, 40]}... (rating: #{item.rating})"
-  end
+  puts results.map { |item| "  - #{item.description.truncate(40)} (rating: #{item.rating})" }
 end
 
 if $PROGRAM_NAME == __FILE__
