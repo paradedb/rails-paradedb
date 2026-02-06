@@ -21,11 +21,7 @@ def demo_similar_to_single_product
 
   similar.each do |item|
     marker = item.id == source_id ? " (source)" : ""
-    puts format("  %<id>d: %<desc>s... [%<category>s]%<marker>s",
-                id: item.id,
-                desc: item.description[0, 50],
-                category: item.category,
-                marker: marker)
+    puts "  #{item.id}: #{item.description.truncate(50)} [#{item.category}]#{marker}"
   end
 end
 
@@ -38,35 +34,28 @@ def demo_similar_to_multiple_products
   browsed = MockItem.where(id: browsed_ids)
 
   puts "\nUser's browsing history:"
-  browsed.each do |item|
-    puts "  #{item.id}: #{item.description[0, 50]}... [#{item.category}]"
-  end
+  puts browsed.map { |item| "  #{item.id}: #{item.description.truncate(50)} [#{item.category}]" }
 
-  relations = browsed_ids.map { |id| MockItem.more_like_this(id, fields: [:description]) }
-  combined = relations.reduce { |memo, relation| memo.or(relation) }
+  combined_description = browsed.pluck(:description).join(" ")
+  json_doc = { description: combined_description }.to_json
 
-  puts "\nRecommended products (similar to any browsed item):"
-  similar = combined.where.not(id: browsed_ids)
-                    .extending(ParadeDB::SearchMethods)
+  puts "\nRecommended products (similar to browsing history):"
+  similar = MockItem.more_like_this(json_doc)
+                    .where.not(id: browsed_ids)
                     .with_score
                     .order(search_score: :desc)
                     .limit(5)
 
-  similar.each do |item|
-    puts "  #{item.id}: #{item.description[0, 50]}... [#{item.category}]"
-  end
+  puts similar.map { |item| "  #{item.id}: #{item.description.truncate(50)} [#{item.category}]" }
 end
 
 def demo_combined_with_filters
   puts "\n" + "=" * 60
-  puts "Demo 3: MoreLikeThis + ActiveRecord filters"
+  puts "Demo 3: MoreLikeThis + Filters (in_stock=true, rating >= 4)"
   puts "=" * 60
 
   source_id = 15
-  source = MockItem.find(source_id)
-  puts "\nSource: '#{source.description}' (rating: #{source.rating})"
 
-  puts "\nSimilar products (in_stock=true, rating >= 4):"
   results = MockItem.more_like_this(source_id, fields: [:description])
                     .where(in_stock: true)
                     .where("rating >= ?", 4)
@@ -74,10 +63,7 @@ def demo_combined_with_filters
                     .order(search_score: :desc)
                     .limit(5)
 
-  results.each do |item|
-    stock = item.in_stock ? "In Stock" : "Out of Stock"
-    puts "  #{item.id}: #{item.description[0, 40]}... (rating: #{item.rating}, #{stock})"
-  end
+  puts results.map { |item| "  #{item.id}: #{item.description.truncate(40)} (rating: #{item.rating})" }
 end
 
 def demo_multifield_similarity
@@ -91,17 +77,11 @@ def demo_multifield_similarity
 
   puts "\nSimilar by DESCRIPTION only:"
   by_description = MockItem.more_like_this(source_id, fields: [:description]).where.not(id: source_id).limit(3)
-  by_description.each do |item|
-    puts "  #{item.id}: #{item.description[0, 40]}... [#{item.category}]"
-  end
+  puts by_description.map { |item| "  #{item.id}: #{item.description.truncate(40)} [#{item.category}]" }
 
   puts "\nSimilar by DESCRIPTION + CATEGORY:"
   by_both = MockItem.more_like_this(source_id, fields: [:description, :category]).where.not(id: source_id).limit(3)
-  by_both.each do |item|
-    puts "  #{item.id}: #{item.description[0, 40]}... [#{item.category}]"
-  end
-rescue ActiveRecord::StatementInvalid => error
-  puts "  (Skipped: #{error.message})"
+  puts by_both.map { |item| "  #{item.id}: #{item.description.truncate(40)} [#{item.category}]" }
 end
 
 if $PROGRAM_NAME == __FILE__
