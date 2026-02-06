@@ -1,11 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-begin
-  require "neighbor"
-rescue LoadError
-  abort "neighbor gem is required for this example. Install with: BUNDLE_GEMFILE=examples/Gemfile bundle install"
-end
+require "neighbor"
 
 require_relative "../common"
 require_relative "setup"
@@ -14,142 +10,163 @@ class MockItem < ActiveRecord::Base
   has_neighbors :embedding
 end
 
-QUERY_SEED_TEXT = {
-  "running shoes" => "Sleek running shoes",
-  "footwear for exercise" => "Sleek running shoes",
-  "wireless earbuds" => "Innovative wireless earbuds"
-}.freeze
+# Only keep helpers for SQL that Rails DSL genuinely cannot express
+module RrfHelpers
+  module_function
 
-def tokenize(text)
-  text.to_s.downcase.scan(/[[:alnum:]]+/)
-end
-
-def bm25_search(query, top_k: 20)
-  terms = tokenize(query)
-  return [] if terms.empty?
-
-  MockItem.search(:description)
-          .matching_any(*terms)
-          .with_score
-          .order(search_score: :desc)
-          .limit(top_k)
-          .map { |item| [item.id, item.search_score.to_f] }
-end
-
-def query_seed_item(query)
-  terms = tokenize(query)
-  normalized_query = query.to_s.downcase.strip
-
-  seed_text = QUERY_SEED_TEXT[normalized_query]
-  seed_scope = MockItem.where.not(embedding: nil)
-  seed_id = if seed_text
-              seed_scope.where("description ILIKE ?", "%#{seed_text}%")
-                        .limit(1)
-                        .pick(:id)
-            end
-
-  seed_id ||= if terms.empty?
-              nil
-            else
-              seed_scope.search(:description)
-                      .matching_any(*terms)
-                      .limit(1)
-                      .pick(:id)
-            end
-
-  seed_id ||= seed_scope.limit(1).pick(:id)
-  raise "No embeddings available. Run setup first." unless seed_id
-
-  seed_scope.find(seed_id)
-end
-
-def vector_search(query, top_k: 20)
-  seed_item = query_seed_item(query)
-
-  seed_item.nearest_neighbors(:embedding, distance: "cosine")
-          .where.not(embedding: nil)
-          .first(top_k)
-          .map { |item| [item.id, item.neighbor_distance.to_f] }
-end
-
-def reciprocal_rank_fusion(bm25_results, vector_results, k: 60)
-  scores = Hash.new(0.0)
-
-  bm25_results.each_with_index do |(item_id, _score), rank|
-    scores[item_id] += 1.0 / (k + rank + 1)
+  # RRF score formula - the core calculation that repeats
+  def rrf_score(weight:, rrf_k:, rank_column:)
+    "#{weight.to_f}::float8 / (#{rrf_k.to_f}::float8 + #{rank_column}.rank_position)"
   end
-
-  vector_results.each_with_index do |(item_id, _distance), rank|
-    scores[item_id] += 1.0 / (k + rank + 1)
-  end
-
-  scores.sort_by { |_item_id, score| -score }
 end
 
-def display_results(query, bm25_results, vector_results, rrf_results)
+def fulltext_ranked_cte(query, top_k:)
+  # ParadeDB DSL branch: parse + score + rank.
+  fulltext_source = MockItem.search(:description)
+                            .parse(query, lenient: true)
+                            .with_score
+                            .order(search_score: :desc)
+                            .limit(top_k)
+
+  MockItem.from(fulltext_source, :fulltext_source)
+          .select("fulltext_source.id")
+          .select("ROW_NUMBER() OVER (ORDER BY fulltext_source.search_score DESC) AS rank_position")
+end
+
+def semantic_ranked_cte(query_embedding, top_k:)
+  # Neighbor DSL branch: nearest neighbors + rank by neighbor_distance.
+  semantic_source = MockItem.nearest_neighbors(:embedding, query_embedding, distance: "cosine")
+                            .limit(top_k)
+
+  MockItem.from(semantic_source, :semantic_source)
+          .select("semantic_source.id")
+          .select("ROW_NUMBER() OVER (ORDER BY semantic_source.neighbor_distance ASC) AS rank_position")
+end
+
+def bm25_contribution_cte(weight:, rrf_k:)
+  contribution = RrfHelpers.rrf_score(weight: weight, rrf_k: rrf_k, rank_column: "fulltext")
+
+  MockItem.from("fulltext")
+          .select(
+            "fulltext.id",
+            "fulltext.rank_position AS bm25_rank",
+            "NULL::integer AS semantic_rank",
+            "#{contribution} AS bm25_rrf",
+            "0.0::float8 AS semantic_rrf",
+            "#{contribution} AS hybrid_rrf"
+          )
+end
+
+def semantic_contribution_cte(weight:, rrf_k:)
+  contribution = RrfHelpers.rrf_score(weight: weight, rrf_k: rrf_k, rank_column: "semantic")
+
+  MockItem.from("semantic")
+          .select(
+            "semantic.id",
+            "NULL::integer AS bm25_rank",
+            "semantic.rank_position AS semantic_rank",
+            "0.0::float8 AS bm25_rrf",
+            "#{contribution} AS semantic_rrf",
+            "#{contribution} AS hybrid_rrf"
+          )
+end
+
+def combined_scores_cte
+  bm25 = MockItem.from("bm25_contrib").select("*")
+  semantic = MockItem.from("semantic_contrib").select("*")
+  
+  union_relation = bm25.union_all(semantic)
+  
+  MockItem.from(Arel.sql("(#{union_relation.to_sql}) AS contributions"))
+          .select(
+            "contributions.id",
+            "MAX(contributions.bm25_rank) AS bm25_rank",
+            "MAX(contributions.semantic_rank) AS semantic_rank",
+            "SUM(contributions.bm25_rrf) AS bm25_rrf",
+            "SUM(contributions.semantic_rrf) AS semantic_rrf",
+            "SUM(contributions.hybrid_rrf) AS hybrid_score"
+          )
+          .group("contributions.id")
+end
+
+def hybrid_relation(query, top_k: 20, limit: 5, rrf_k: 60, bm25_weight: 1.0, semantic_weight: 1.0)
+  query_embedding = HybridRrfSetup.query_embedding_for(query)
+  fulltext_cte = fulltext_ranked_cte(query, top_k: top_k)
+  semantic_cte = semantic_ranked_cte(query_embedding, top_k: top_k)
+  bm25_contrib_cte = bm25_contribution_cte(weight: bm25_weight, rrf_k: rrf_k)
+  semantic_contrib_cte = semantic_contribution_cte(weight: semantic_weight, rrf_k: rrf_k)
+  scores_cte = combined_scores_cte
+
+  MockItem.with(
+            fulltext: fulltext_cte,
+            semantic: semantic_cte,
+            bm25_contrib: bm25_contrib_cte,
+            semantic_contrib: semantic_contrib_cte,
+            hybrid_scores: scores_cte
+          )
+          .from("hybrid_scores")
+          .joins("JOIN mock_items ON mock_items.id = hybrid_scores.id")
+          .select(
+            "mock_items.id",
+            "mock_items.description",
+            "hybrid_scores.bm25_rank",
+            "hybrid_scores.semantic_rank",
+            "hybrid_scores.bm25_rrf",
+            "hybrid_scores.semantic_rrf",
+            "hybrid_scores.hybrid_score"
+          )
+          .order("hybrid_scores.hybrid_score DESC, mock_items.id ASC")
+          .limit(limit)
+end
+
+def hybrid_search(query, top_k: 20, limit: 5, rrf_k: 60, bm25_weight: 1.0, semantic_weight: 1.0)
+  hybrid_relation(
+    query,
+    top_k: top_k,
+    limit: limit,
+    rrf_k: rrf_k,
+    bm25_weight: bm25_weight,
+    semantic_weight: semantic_weight
+  ).to_a
+end
+
+def display_results(query, rows)
   puts "\n#{'=' * 80}"
   puts "Query: '#{query}'"
   puts "=" * 80
 
-  ids = (bm25_results.first(5) + vector_results.first(5) + rrf_results.first(5)).map(&:first).uniq
-  items = MockItem.where(id: ids).index_by(&:id)
-
-  puts "\nBM25 Results (keyword):"
-  bm25_results.first(5).each_with_index do |(item_id, score), index|
-    item = items[item_id]
-    next unless item
-
-    puts format(
-      "  %<rank>d. %<desc>-60s (score: %<score>.2f)",
-      rank: index + 1,
-      desc: "#{item.description[0, 60]}...",
-      score: score
-    )
+  if rows.empty?
+    puts "  No results."
+    return
   end
 
-  puts "\nVector Results (semantic):"
-  vector_results.first(5).each_with_index do |(item_id, distance), index|
-    item = items[item_id]
-    next unless item
+  rows.each_with_index do |row, index|
+    bm25_rank = row.bm25_rank ? row.bm25_rank.to_i : nil
+    semantic_rank = row.semantic_rank ? row.semantic_rank.to_i : nil
 
     puts format(
-      "  %<rank>d. %<desc>-60s (dist: %<distance>.3f)",
+      "  %<rank>d. %<desc>-60s hybrid=%<hybrid>.4f bm25_rank=%<bm25>s semantic_rank=%<semantic>s",
       rank: index + 1,
-      desc: "#{item.description[0, 60]}...",
-      distance: distance
-    )
-  end
-
-  puts "\nHybrid RRF Results (combined):"
-  rrf_results.first(5).each_with_index do |(item_id, score), index|
-    item = items[item_id]
-    next unless item
-
-    puts format(
-      "  %<rank>d. %<desc>-60s (RRF: %<score>.4f)",
-      rank: index + 1,
-      desc: "#{item.description[0, 60]}...",
-      score: score
+      desc: "#{row.description[0, 60]}...",
+      hybrid: row.hybrid_score.to_f,
+      bm25: bm25_rank || "--",
+      semantic: semantic_rank || "--"
     )
   end
 end
 
 if $PROGRAM_NAME == __FILE__
   puts "=" * 80
-  puts "Hybrid Search with Reciprocal Rank Fusion (RRF)"
+  puts "Hybrid Search with Reciprocal Rank Fusion (single SQL query)"
   puts "=" * 80
-  puts "\nCombining BM25 (keyword) + vector distance search"
-  puts "RRF formula: score = sum(1 / (k + rank_i)) across all rankings"
+  puts "\nCombining ParadeDB DSL + Neighbor DSL in one CTE-based query"
 
   HybridRrfSetup.setup!
   MockItem.reset_column_information
 
   ["running shoes", "footwear for exercise", "wireless earbuds"].each do |query|
-    bm25_results = bm25_search(query, top_k: 20)
-    vector_results = vector_search(query, top_k: 20)
-    rrf_results = reciprocal_rank_fusion(bm25_results, vector_results)
-
-    display_results(query, bm25_results, vector_results, rrf_results)
+    results = hybrid_search(query, top_k: 20, limit: 5)
+    display_results(query, results)
   end
 
   puts "\n" + "=" * 80

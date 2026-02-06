@@ -74,7 +74,8 @@ BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/more_like_this/more_li
 
 5. Hybrid Search with RRF (`hybrid_rrf/`)
 
-Combines BM25 + vector ranking with Reciprocal Rank Fusion.
+Combines BM25 + vector ranking with Reciprocal Rank Fusion in a single SQL query
+using CTEs, built from ParadeDB and neighbor ActiveRecord relations.
 
 ```bash
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/hybrid_rrf/setup.rb

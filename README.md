@@ -75,6 +75,9 @@ Examples use an isolated bundle (`examples/Gemfile`) so example-only gems do
 not become dependencies of the core library.
 
 See `examples/README.md` for setup and run commands.
+The hybrid RRF example follows the single-query CTE pattern from ParadeDB's
+hybrid search guidance, translated into ActiveRecord relations with ParadeDB and
+neighbor DSL pieces.
 
 ## Query Types
 

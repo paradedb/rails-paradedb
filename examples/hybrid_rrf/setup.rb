@@ -1,10 +1,18 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+require "json"
+
 require_relative "../common"
 
 module HybridRrfSetup
   module_function
+
+  QUERY_SEED_TEXT = {
+    "running shoes" => "Sleek running shoes",
+    "footwear for exercise" => "Sleek running shoes",
+    "wireless earbuds" => "Innovative wireless earbuds"
+  }.freeze
 
   def embeddings_csv_path
     File.expand_path("mock_items_embeddings.csv", __dir__)
@@ -82,6 +90,36 @@ module HybridRrfSetup
 
     puts "+ Loaded #{total} embeddings"
     count
+  end
+
+  # Resolve a demo query to a stable seed document embedding.
+  # Returns an Array<Float> for neighbor's nearest_neighbors API.
+  def query_embedding_for(query)
+    seed_text = QUERY_SEED_TEXT[query.to_s.downcase.strip]
+    raise "No query embedding seed configured for '#{query}'" unless seed_text
+
+    ExampleCommon.connect!
+    embedding = MockItem.where.not(embedding: nil)
+                        .where("description ILIKE ?", "%#{seed_text}%")
+                        .limit(1)
+                        .pick(:embedding)
+    raise "No embedding found for seed '#{seed_text}'" if embedding.nil?
+
+    normalize_embedding(embedding)
+  end
+
+  def normalize_embedding(value)
+    return value if value.is_a?(Array)
+    return JSON.parse(value) if value.is_a?(String)
+
+    if value.respond_to?(:to_a)
+      as_array = value.to_a
+      return as_array if as_array.is_a?(Array)
+    end
+
+    raise "Unsupported embedding value type: #{value.class}"
+  rescue JSON::ParserError => e
+    raise "Invalid embedding payload for query seed: #{e.message}"
   end
 end
 
