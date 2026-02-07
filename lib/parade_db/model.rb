@@ -41,10 +41,6 @@ module ParadeDB
       private
 
       def ensure_postgres!
-        unless has_paradedb_index
-          raise "ParadeDB is not enabled for #{name} (set self.has_paradedb_index = true)"
-        end
-
         ParadeDB.ensure_postgresql_adapter!(connection, context: "ParadeDB")
       end
     end

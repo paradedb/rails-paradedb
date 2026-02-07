@@ -13,93 +13,118 @@ module ParadeDB
         column_node(column)
       end
 
-      # Binary operators
       def match(column, *terms, boost: nil)
-        right = join_terms(terms)
-        build_predicate(Nodes::Match, column, right, boost: boost)
+        rhs = quoted_value(join_terms(terms))
+        rhs = Nodes::BoostCast.new(rhs, quoted_value(boost)) unless boost.nil?
+        infix("&&&", column_node(column), rhs)
       end
 
       def match_any(column, *terms)
-        right = join_terms(terms)
-        Nodes::MatchAny.new(column_node(column), value_node(right))
+        infix("|||", column_node(column), quoted_value(join_terms(terms)))
       end
 
       def full_text(column, expression)
-        rhs =
-          case expression
-          when Nodes::Node
-            expression
-          else
-            Nodes::SqlLiteral.new(expression)
-          end
-        Nodes::FullText.new(column_node(column), rhs)
+        rhs = expression.is_a?(::Arel::Nodes::Node) ? expression : ::Arel.sql(expression.to_s)
+        infix("@@@", column_node(column), rhs)
       end
 
       def phrase(column, text, slop: nil)
-        rhs = value_node(text)
-        rhs = Nodes::Slop.new(rhs, slop) if slop
-        Nodes::Phrase.new(column_node(column), rhs)
+        rhs = quoted_value(text)
+        rhs = Nodes::SlopCast.new(rhs, quoted_value(slop)) unless slop.nil?
+        infix("###", column_node(column), rhs)
       end
 
       def fuzzy(column, term, distance: 1, prefix: nil, boost: nil)
-        Nodes::Fuzzy.new(column_node(column), value_node(term), distance: distance, prefix: prefix, boost: boost)
+        rhs = Nodes::FuzzyCast.new(quoted_value(term), quoted_value(distance), prefix: prefix)
+        rhs = Nodes::BoostCast.new(rhs, quoted_value(boost)) unless boost.nil?
+        infix("===", column_node(column), rhs)
       end
 
       def term(column, term, boost: nil)
-        build_predicate(Nodes::Term, column, term, boost: boost)
+        rhs = quoted_value(term)
+        rhs = Nodes::BoostCast.new(rhs, quoted_value(boost)) unless boost.nil?
+        infix("===", column_node(column), rhs)
       end
 
       def regex(column, pattern)
-        Nodes::Regex.new(column_node(column), value_node(pattern))
+        rhs = ::Arel::Nodes::NamedFunction.new("pdb.regex", [quoted_value(pattern)])
+        infix("@@@", column_node(column), rhs)
       end
 
       def near(column, left_term, right_term, distance: 1)
-        Nodes::Near.new(column_node(column), terms: [left_term, right_term], distance: distance)
+        near_chain = infix("##", infix("##", quoted_value(left_term), quoted_value(distance)), quoted_value(right_term))
+        infix("@@@", column_node(column), ::Arel::Nodes::Grouping.new(near_chain))
       end
 
       def phrase_prefix(column, *terms)
-        Nodes::PhrasePrefix.new(column_node(column), terms.flatten)
+        array = Nodes::ArrayLiteral.new(terms.flatten.compact.map { |term| quoted_value(term) })
+        rhs = ::Arel::Nodes::NamedFunction.new("pdb.phrase_prefix", [array])
+        infix("@@@", column_node(column), rhs)
+      end
+
+      def parse(column, query, lenient: nil)
+        rhs = Nodes::ParseNode.new(quoted_value(query), lenient: lenient)
+        infix("@@@", column_node(column), rhs)
+      end
+
+      def match_all(column)
+        rhs = ::Arel::Nodes::NamedFunction.new("pdb.all", [])
+        infix("@@@", column_node(column), rhs)
       end
 
       def more_like_this(column, key, fields: nil)
-        Nodes::MoreLikeThis.new(column_node(column), value_node(key), fields: fields&.map { |f| value_node(f) })
+        args = [quoted_value(key)]
+        unless fields.nil?
+          field_values = fields.map { |field| quoted_value(field) }
+          args << Nodes::ArrayLiteral.new(field_values)
+        end
+
+        rhs = ::Arel::Nodes::NamedFunction.new("pdb.more_like_this", args)
+        infix("@@@", column_node(column), rhs)
       end
 
-      # Functions
       def score(key)
-        Nodes::Score.new("score", column_node(key))
+        ::Arel::Nodes::NamedFunction.new("pdb.score", [column_node(key)])
       end
 
       def snippet(column, *args)
-        Nodes::Snippet.new("snippet", column_node(column), *args)
+        call_args = [column_node(column)] + args.map { |arg| quoted_value(arg) }
+        ::Arel::Nodes::NamedFunction.new("pdb.snippet", call_args)
       end
 
       def agg(json)
-        Nodes::Agg.new("agg", json)
+        ::Arel::Nodes::NamedFunction.new("pdb.agg", [quoted_value(json)])
       end
 
       private
 
-      def build_predicate(klass, column, value, boost: nil)
-        rhs = value_node(value)
-        rhs = Nodes::Boost.new(rhs, boost) if boost
-        klass.new(column_node(column), rhs)
+      def infix(operator, left, right)
+        ::Arel::Nodes::InfixOperation.new(operator, left, right)
       end
 
       def column_node(column)
         case column
-        when Nodes::Attribute then column
+        when ::Arel::Attributes::Attribute, ::Arel::Nodes::Node
+          column
         else
-          Nodes::Attribute.new(column, table: table)
+          if arel_table
+            arel_table[column.to_sym]
+          else
+            ::Arel::Nodes::SqlLiteral.new(::ActiveRecord::Base.connection.quote_column_name(column.to_s))
+          end
         end
       end
 
-      def value_node(val)
-        val.is_a?(Nodes::Node) ? val : Nodes::Value.new(val)
+      def quoted_value(value)
+        ::Arel::Nodes.build_quoted(value)
       end
 
       def join_terms(terms)
         terms.flatten.compact.map(&:to_s).join(" ")
+      end
+
+      def arel_table
+        @arel_table ||= table ? ::Arel::Table.new(table.to_s) : nil
       end
     end
   end

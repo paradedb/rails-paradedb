@@ -35,83 +35,71 @@ module ParadeDB
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
       node = builder.match(_paradedb_current_field, *terms, boost: boost)
-      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+      where(grouped(node))
     end
 
     def matching_any(*terms)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
       node = builder.match_any(_paradedb_current_field, *terms)
-      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+      where(grouped(node))
     end
 
     def excluding(*terms)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
       neg = builder.match(_paradedb_current_field, *terms)
-      where(::Arel.sql(ParadeDB::Arel.to_sql(neg.not, connection)))
+      where(grouped(neg.not))
     end
 
     def phrase(text, slop: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
       node = builder.phrase(_paradedb_current_field, text, slop: slop)
-      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+      where(grouped(node))
     end
 
     def fuzzy(term, distance:, prefix: nil, boost: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
       node = builder.fuzzy(_paradedb_current_field, term, distance: distance, prefix: prefix, boost: boost)
-      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+      where(grouped(node))
     end
 
     def regex(pattern)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
       node = builder.regex(_paradedb_current_field, pattern)
-      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+      where(grouped(node))
     end
 
     def term(value, boost: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
       node = builder.term(_paradedb_current_field, value, boost: boost)
-      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+      where(grouped(node))
     end
 
     def near(left_term, right_term, distance: 1)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
       node = builder.near(_paradedb_current_field, left_term, right_term, distance: distance)
-      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+      where(grouped(node))
     end
 
     def phrase_prefix(*terms)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
       node = builder.phrase_prefix(_paradedb_current_field, *terms)
-      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+      where(grouped(node))
     end
 
     # Parse query-string syntax into ParadeDB query AST (e.g. "running AND shoes").
     # Mirrors Django's Parse convenience helper using relation-style Ruby DSL.
     def parse(query, lenient: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
-
-      options_sql = []
-      unless lenient.nil?
-        options_sql << "lenient => #{lenient ? 'true' : 'false'}"
-      end
-
-      expr = if options_sql.empty?
-               "pdb.parse(#{connection.quote(query)})"
-             else
-               "pdb.parse(#{connection.quote(query)}, #{options_sql.join(', ')})"
-             end
-
-      node = builder.full_text(_paradedb_current_field, expr)
-      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+      node = builder.parse(_paradedb_current_field, query, lenient: lenient)
+      where(grouped(node))
     end
 
     # Match-all wrapper for APIs that need an explicit ParadeDB predicate.
@@ -119,8 +107,7 @@ module ParadeDB
     def match_all
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      node = builder.full_text(_paradedb_current_field, "pdb.all()")
-      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+      where(grouped(builder.match_all(_paradedb_current_field)))
     end
 
     def more_like_this(key, fields: nil)
@@ -128,31 +115,29 @@ module ParadeDB
       key_value = key.respond_to?(:id) ? key.id : key
       pk_node = builder[primary_key]
       node = builder.more_like_this(pk_node, key_value, fields: fields)
-      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+      where(grouped(node))
     end
 
     # ---- Decorators ----
 
     def with_score
-      score_sql = "pdb.score(#{quoted_table_column(primary_key)}) AS #{connection.quote_column_name("search_score")}"
-      with_projection(score_sql)
+      with_projection(builder.score(primary_key).as("search_score"))
     end
 
     def with_snippet(column, start_tag: nil, end_tag: nil, max_chars: nil)
       formatted_args = []
-      formatted_args << connection.quote(start_tag) unless start_tag.nil?
-      formatted_args << connection.quote(end_tag) unless end_tag.nil?
-      formatted_args << Integer(max_chars).to_s unless max_chars.nil?
+      formatted_args << start_tag unless start_tag.nil?
+      formatted_args << end_tag unless end_tag.nil?
+      formatted_args << Integer(max_chars) unless max_chars.nil?
 
-      column_sql = quoted_table_column(column)
-      call = if formatted_args.empty?
-               "pdb.snippet(#{column_sql})"
-             else
-               "pdb.snippet(#{column_sql}, #{formatted_args.join(', ')})"
-             end
+      snippet =
+        if formatted_args.empty?
+          builder.snippet(column)
+        else
+          builder.snippet(column, *formatted_args)
+        end
 
-      snippet_alias = connection.quote_column_name("#{column}_snippet")
-      with_projection("#{call} AS #{snippet_alias}")
+      with_projection(snippet.as("#{column}_snippet"))
     end
 
     # ---- Facets ----
@@ -216,20 +201,24 @@ module ParadeDB
 
     def ensure_paradedb_predicate
       # Add pdb.all() sentinel to force aggregate pushdown
-      pk_col = "#{connection.quote_table_name(table_name)}.#{connection.quote_column_name(primary_key)}"
-      where(::Arel.sql("#{pk_col} @@@ pdb.all()"))
+      where(grouped(builder.match_all(primary_key)))
     end
 
     private
 
     def ensure_paradedb_runtime!
       ParadeDB.ensure_postgresql_adapter!(connection, context: "ParadeDB search")
+      ParadeDB::Arel::Visitor.install!
     end
 
-    def with_projection(sql_fragment)
+    def grouped(node)
+      ::Arel::Nodes::Grouping.new(node)
+    end
+
+    def with_projection(projection)
       rel = self
-      rel = rel.select(::Arel.sql("#{connection.quote_table_name(table_name)}.*")) if rel.select_values.empty?
-      rel.select(::Arel.sql(sql_fragment))
+      rel = rel.select(klass.arel_table[::Arel.star]) if rel.select_values.empty?
+      rel.select(projection)
     end
 
     def where_values_as_sql
@@ -283,10 +272,6 @@ module ParadeDB
       terms << %("missing": #{JSON.generate(opts[:missing].to_s)}) unless opts[:missing].nil?
       terms << %("order": {"_count": #{JSON.generate(order_direction)}}) if order_direction
       %({"terms": {#{terms.join(", ")}}})
-    end
-
-    def quoted_table_column(column)
-      "#{connection.quote_table_name(table_name)}.#{connection.quote_column_name(column)}"
     end
 
     # ---- Facet Query helper ----

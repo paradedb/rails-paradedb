@@ -2,110 +2,59 @@
 
 module ParadeDB
   module Arel
-    class Visitor
-      def initialize(connection = nil)
-        @connection = connection
-      end
+    module Visitor
+      module PostgreSQLExtensions
+        def visit_ParadeDB_Arel_Nodes_BoostCast(o, collector)
+          collector = visit(o.expr, collector)
+          collector << "::pdb.boost("
+          collector = visit(o.factor, collector)
+          collector << ")"
+        end
 
-      def accept(node)
-        case node
-        when Nodes::Match
-          "#{visit(node.left)} &&& #{quote(node.right)}"
-        when Nodes::MatchAny
-          "#{visit(node.left)} ||| #{quote(node.right)}"
-        when Nodes::Phrase
-          "#{visit(node.left)} ### #{quote(node.right)}"
-        when Nodes::Term
-          "#{visit(node.left)} === #{quote(node.right)}"
-        when Nodes::Fuzzy
-          rhs = "#{quote(node.right)}::pdb.fuzzy(#{node.distance}"
-          rhs += %Q(, "true") if !node.prefix.nil? && node.prefix
-          rhs += ")"
-          rhs += "::pdb.boost(#{node.boost})" if node.boost
-          "#{visit(node.left)} === #{rhs}"
-        when Nodes::FullText
-          "#{visit(node.left)} @@@ #{quote(node.right)}"
-        when Nodes::Regex
-          "#{visit(node.left)} @@@ pdb.regex(#{quote(node.right)})"
-        when Nodes::Near
-          left_term, right_term = node.right
-          proximity = "(#{quote(left_term)} ## #{node.distance} ## #{quote(right_term)})"
-          "#{visit(node.left)} @@@ #{proximity}"
-        when Nodes::PhrasePrefix
-          terms = Array(node.right).map { |t| quote(t) }.join(", ")
-          "#{visit(node.left)} @@@ pdb.phrase_prefix(ARRAY[#{terms}])"
-        when Nodes::MoreLikeThis
-          fields_sql = node.fields ? ", ARRAY[#{Array(node.fields).map { |f| quote(f) }.join(", ")}]" : ""
-          "#{visit(node.left)} @@@ pdb.more_like_this(#{quote(node.right)}#{fields_sql})"
-        when Nodes::Boost
-          "#{visit(node.expr)}::pdb.boost(#{quote(node.factor)})"
-        when Nodes::Slop
-          "#{visit(node.expr)}::pdb.slop(#{quote(node.distance)})"
-        when Nodes::Score
-          "pdb.score(#{visit_args(node.args)})"
-        when Nodes::Snippet
-          "pdb.snippet(#{visit_args(node.args)})"
-        when Nodes::Agg
-          "pdb.agg(#{visit_args(node.args)})"
-        when Nodes::And
-          "(#{accept(node.left)} AND #{accept(node.right)})"
-        when Nodes::Or
-          "(#{accept(node.left)} OR #{accept(node.right)})"
-        when Nodes::Not
-          "NOT (#{accept(node.expr)})"
-        when Nodes::Attribute
-          visit_attribute(node)
-        when Nodes::SqlLiteral
-          node.value.to_s
-        when Nodes::Value
-          quote(node.value)
-        else
-          raise ArgumentError, "Unsupported node: #{node.inspect}"
+        def visit_ParadeDB_Arel_Nodes_SlopCast(o, collector)
+          collector = visit(o.expr, collector)
+          collector << "::pdb.slop("
+          collector = visit(o.distance, collector)
+          collector << ")"
+        end
+
+        def visit_ParadeDB_Arel_Nodes_FuzzyCast(o, collector)
+          collector = visit(o.expr, collector)
+          collector << "::pdb.fuzzy("
+          collector = visit(o.distance, collector)
+          collector << ', "true"' if o.prefix
+          collector << ")"
+        end
+
+        def visit_ParadeDB_Arel_Nodes_ArrayLiteral(o, collector)
+          collector << "ARRAY["
+          o.values.each_with_index do |value, idx|
+            collector << ", " if idx.positive?
+            collector = visit(value, collector)
+          end
+          collector << "]"
+        end
+
+        def visit_ParadeDB_Arel_Nodes_ParseNode(o, collector)
+          collector << "pdb.parse("
+          collector = visit(o.query, collector)
+
+          unless o.lenient.nil?
+            collector << ", lenient => "
+            collector << (o.lenient ? "true" : "false")
+          end
+
+          collector << ")"
         end
       end
 
-      private
+      module_function
 
-      def visit(node)
-        accept(node)
-      end
+      def install!
+        klass = ::Arel::Visitors::PostgreSQL
+        return if klass.ancestors.include?(PostgreSQLExtensions)
 
-      def visit_attribute(node)
-        if node.table
-          "#{quote_table(node.table)}.#{quote_column(node.name)}"
-        else
-          quote_column(node.name)
-        end
-      end
-
-      def visit_args(args)
-        args.map { |a| accept_valueish(a) }.join(", ")
-      end
-
-      def accept_valueish(val)
-        case val
-        when Nodes::Node
-          accept(val)
-        else
-          quote(val)
-        end
-      end
-
-      def quote_table(name)
-        connection.quote_table_name(name.to_s)
-      end
-
-      def quote_column(name)
-        connection.quote_column_name(name.to_s)
-      end
-
-      def quote(val)
-        return accept(val) if val.is_a?(Nodes::Node)
-        connection.quote(val)
-      end
-
-      def connection
-        @connection || ActiveRecord::Base.connection
+        klass.prepend(PostgreSQLExtensions)
       end
     end
   end

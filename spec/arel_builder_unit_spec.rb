@@ -24,16 +24,15 @@ class ArelBuilderUnitTest < Minitest::Test
 
   def test_bracket_accessor_returns_attribute
     attr = @builder[:description]
-    assert_instance_of ParadeDB::Arel::Nodes::Attribute, attr
-    assert_equal :description, attr.name
-    assert_equal :products, attr.table
+    assert_instance_of Arel::Attributes::Attribute, attr
+    assert_equal "description", attr.name
+    assert_equal "products", attr.relation.name
   end
 
   def test_bracket_accessor_without_table
     attr = @no_table_builder[:description]
-    assert_instance_of ParadeDB::Arel::Nodes::Attribute, attr
-    assert_equal :description, attr.name
-    assert_nil attr.table
+    assert_instance_of Arel::Nodes::SqlLiteral, attr
+    assert_equal %("description"), sql(attr)
   end
 
   def test_attribute_without_table_renders_column_only
@@ -273,14 +272,16 @@ class ArelBuilderUnitTest < Minitest::Test
     a = @builder.match(:description, "shoes")
     b = @builder.match(:category, "footwear")
     combined = a.and(b)
-    assert_equal %(("products"."description" &&& 'shoes' AND "products"."category" &&& 'footwear')), sql(combined)
+    expected = %("products"."description" &&& 'shoes' AND "products"."category" &&& 'footwear')
+    assert_sql_equal expected, sql(combined)
   end
 
   def test_or_composition
     a = @builder.match(:description, "shoes")
     b = @builder.match(:description, "boots")
     combined = a.or(b)
-    assert_equal %(("products"."description" &&& 'shoes' OR "products"."description" &&& 'boots')), sql(combined)
+    expected = %(("products"."description" &&& 'shoes' OR "products"."description" &&& 'boots'))
+    assert_sql_equal expected, sql(combined)
   end
 
   def test_not_composition
@@ -325,63 +326,30 @@ class ArelBuilderUnitTest < Minitest::Test
     assert_equal 2, rendered.scan("AND").size
   end
 
-  # ---- Node.to_sql convenience ----
+  # ---- to_sql helper and quoting primitives ----
 
-  def test_node_to_sql_method
-    node = @builder.match(:description, "shoes")
-    assert_equal sql(node), node.to_sql
-  end
-
-  def test_node_to_sql_with_connection
-    node = @builder.match(:description, "shoes")
-    result = node.to_sql(ActiveRecord::Base.connection)
-    assert_includes result, "&&&"
-    assert_includes result, "shoes"
-  end
-
-  # ---- SqlLiteral node ----
-
-  def test_sql_literal_renders_raw
-    literal = ParadeDB::Arel::Nodes::SqlLiteral.new("pdb.all()")
-    assert_equal "pdb.all()", sql(literal)
-  end
-
-  def test_sql_literal_in_full_text
-    literal = ParadeDB::Arel::Nodes::SqlLiteral.new("pdb.regex('run.*')")
-    node = ParadeDB::Arel::Nodes::FullText.new(@builder[:description], literal)
-    assert_equal %("products"."description" @@@ pdb.regex('run.*')), sql(node)
-  end
-
-  # ---- Value node ----
-
-  def test_value_node_string
-    val = ParadeDB::Arel::Nodes::Value.new("hello")
-    assert_equal "'hello'", sql(val)
-  end
-
-  def test_value_node_integer
-    val = ParadeDB::Arel::Nodes::Value.new(42)
-    assert_equal "42", sql(val)
-  end
-
-  def test_value_node_boolean
-    val = ParadeDB::Arel::Nodes::Value.new(true)
-    assert_equal "TRUE", sql(val)
-  end
-
-  # ---- Visitor error handling ----
-
-  def test_visitor_rejects_unknown_node
+  def test_to_sql_rejects_unknown_node
     unknown = Object.new
-    visitor = ParadeDB::Arel::Visitor.new
-    assert_raises(ArgumentError) { visitor.accept(unknown) }
+    assert_raises(TypeError) { ParadeDB::Arel.to_sql(unknown) }
+  end
+
+  def test_build_quoted_string
+    assert_equal "'hello'", sql(Arel::Nodes.build_quoted("hello"))
+  end
+
+  def test_build_quoted_integer
+    assert_equal "42", sql(Arel::Nodes.build_quoted(42))
+  end
+
+  def test_build_quoted_boolean
+    assert_equal "TRUE", sql(Arel::Nodes.build_quoted(true))
   end
 
   # ---- ParadeDB::Arel.sql helper ----
 
   def test_arel_sql_helper
     literal = ParadeDB::Arel.sql("pdb.all()")
-    assert_instance_of ParadeDB::Arel::Nodes::SqlLiteral, literal
+    assert_instance_of Arel::Nodes::SqlLiteral, literal
     assert_equal "pdb.all()", sql(literal)
   end
 

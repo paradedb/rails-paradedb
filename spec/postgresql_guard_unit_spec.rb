@@ -5,7 +5,6 @@ require "spec_helper"
 class GuardProduct < ActiveRecord::Base
   include ParadeDB::Model
   self.table_name = :products
-  self.has_paradedb_index = true
 
   class << self
     attr_accessor :_mock_adapter_name
@@ -58,4 +57,5 @@ class PostgreSQLGuardUnitTest < Minitest::Test
     error = assert_raises(ParadeDB::UnsupportedAdapterError) { relation.search(:description) }
     assert_includes error.message, "PostgreSQL"
   end
+
 end
