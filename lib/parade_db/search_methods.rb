@@ -182,14 +182,12 @@ module ParadeDB
         rel = rel.ensure_paradedb_predicate
       end
 
-      # Add window aggregates to SELECT
+      # Add window aggregates to SELECT using native Arel nodes.
       facet_selects = fields.map do |field|
-        json_sql = connection.quote(facet_json(field, opts))
-        facet_alias = connection.quote_column_name("_#{field}_facet")
-        ::Arel.sql("pdb.agg(#{json_sql}) OVER () AS #{facet_alias}")
+        builder.agg(facet_json(field, opts)).over.as("_#{field}_facet")
       end
 
-      rel = rel.select(::Arel.sql("#{connection.quote_table_name(table_name)}.*")) if rel.select_values.empty?
+      rel = rel.select(klass.arel_table[::Arel.star]) if rel.select_values.empty?
       rel.select(*facet_selects)
     end
 
