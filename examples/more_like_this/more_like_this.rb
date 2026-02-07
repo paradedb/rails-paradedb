@@ -84,6 +84,43 @@ def demo_multifield_similarity
   puts by_both.map { |item| "  #{item.id}: #{item.description.truncate(40)} [#{item.category}]" }
 end
 
+def demo_advanced_mlt_options
+  puts "\n#{"=" * 60}"
+  puts "Demo 5: Advanced MoreLikeThis options"
+  puts "=" * 60
+
+  source_id = 3
+  puts "\nSource id: #{source_id}"
+
+  relation = MockItem.more_like_this(
+    source_id,
+    fields: [:description],
+    min_term_freq: 1,
+    max_query_terms: 12,
+    min_doc_freq: 1,
+    max_term_freq: 100,
+    max_doc_freq: 10_000,
+    min_word_length: 3,
+    max_word_length: 20,
+    stopwords: %w[the a and]
+  ).where.not(id: source_id)
+   .with_score
+   .order(search_score: :desc)
+   .limit(5)
+
+  puts "\nGenerated SQL (showing advanced MLT args):"
+  puts relation.to_sql
+
+  begin
+    puts "\nResults:"
+    puts relation.map { |item| "  #{item.id}: #{item.description.truncate(50)} [#{item.category}]" }
+  rescue ActiveRecord::StatementInvalid => e
+    puts "\nAdvanced MLT options are not supported by this ParadeDB server build."
+    puts "Error: #{e.message.lines.first.strip}"
+    puts "Tip: run the query above on a server version that supports named MLT options."
+  end
+end
+
 if $PROGRAM_NAME == __FILE__
   puts "=" * 60
   puts "rails-paradedb MoreLikeThis Example"
@@ -97,6 +134,7 @@ if $PROGRAM_NAME == __FILE__
   demo_similar_to_multiple_products
   demo_combined_with_filters
   demo_multifield_similarity
+  demo_advanced_mlt_options
 
   puts "\n#{"=" * 60}"
   puts "Done!"
