@@ -34,6 +34,7 @@ module ParadeDB
       end
 
       def paradedb_arel
+        ensure_paradedb_ready!
         @paradedb_arel ||= ParadeDB::Arel::Builder.new(table_name)
       end
 
@@ -43,6 +44,8 @@ module ParadeDB
         unless has_paradedb_index
           raise "ParadeDB is not enabled for #{name} (set self.has_paradedb_index = true)"
         end
+
+        ParadeDB.ensure_postgresql_adapter!(connection, context: "ParadeDB")
       end
     end
   end

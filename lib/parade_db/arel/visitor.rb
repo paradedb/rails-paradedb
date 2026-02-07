@@ -72,9 +72,9 @@ module ParadeDB
 
       def visit_attribute(node)
         if node.table
-          %{#{quote_identifier(node.table)}.#{quote_identifier(node.name)}}
+          "#{quote_table(node.table)}.#{quote_column(node.name)}"
         else
-          quote_identifier(node.name)
+          quote_column(node.name)
         end
       end
 
@@ -91,8 +91,12 @@ module ParadeDB
         end
       end
 
-      def quote_identifier(name)
-        %("#{name}")
+      def quote_table(name)
+        connection.quote_table_name(name.to_s)
+      end
+
+      def quote_column(name)
+        connection.quote_column_name(name.to_s)
       end
 
       def quote(val)
