@@ -9,7 +9,6 @@ module ParadeDB
     # Internal state tracking
     attr_accessor :_paradedb_current_field
     attr_accessor :_paradedb_facet_fields
-    attr_accessor :_paradedb_facet_opts
 
     module PredicateInspector
       PARADEDB_INFIX_OPERATORS = %w[&&& ||| ### @@@ === ##].freeze
@@ -212,7 +211,6 @@ module ParadeDB
 
       rel = extending(FacetRelation)
       rel._paradedb_facet_fields = fields
-      rel._paradedb_facet_opts = opts
 
       # Add pdb.all() if no ParadeDB predicates exist (for aggregate pushdown)
       unless rel.has_paradedb_predicate?
@@ -381,7 +379,7 @@ module ParadeDB
 
     # Module to add .facets accessor to relations
     module FacetRelation
-      attr_accessor :_paradedb_facet_fields, :_paradedb_facet_opts
+      attr_accessor :_paradedb_facet_fields
 
       def load(*)
         validate_facet_query_shape!

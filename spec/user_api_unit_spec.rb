@@ -186,6 +186,38 @@ class UserApiUnitTest < Minitest::Test
     assert_sql_equal expected, facet_sql
   end
 
+  def test_facets_with_raw_paradedb_sql_predicate_does_not_append_match_all
+    facet_sql = UnitProduct.where(Arel.sql(%("products"."description" @@@ pdb.regex('run.*'))))
+                           .extending(ParadeDB::SearchMethods)
+                           .build_facet_query(fields: [:category], size: 10, order: nil)
+                           .sql
+
+    assert_includes facet_sql, %("products"."description" @@@ pdb.regex('run.*'))
+    refute_includes facet_sql, %("products"."id" @@@ pdb.all())
+  end
+
+  def test_facets_with_non_paradedb_sql_predicate_appends_match_all
+    facet_sql = UnitProduct.where(Arel.sql(%("products"."price" > 50)))
+                           .extending(ParadeDB::SearchMethods)
+                           .build_facet_query(fields: [:category], size: 10, order: nil)
+                           .sql
+
+    assert_includes facet_sql, %("products"."price" > 50)
+    assert_includes facet_sql, %("products"."id" @@@ pdb.all())
+  end
+
+  def test_facets_with_mixed_paradedb_and_standard_predicates_keeps_existing_paradedb_predicate
+    facet_sql = UnitProduct.where(in_stock: true)
+                           .search(:description)
+                           .matching_all("shoes")
+                           .build_facet_query(fields: [:category], size: 10, order: nil)
+                           .sql
+
+    assert_includes facet_sql, %("products"."in_stock" = TRUE)
+    assert_includes facet_sql, %("products"."description" &&& 'shoes')
+    refute_includes facet_sql, %("products"."id" @@@ pdb.all())
+  end
+
   def test_with_facets_without_paradedb_predicates
     sql = UnitProduct.where(in_stock: true)
                      .extending(ParadeDB::SearchMethods)

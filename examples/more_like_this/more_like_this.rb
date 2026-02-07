@@ -58,7 +58,7 @@ def demo_combined_with_filters
 
   results = MockItem.more_like_this(source_id, fields: [:description])
                     .where(in_stock: true)
-                    .where("rating >= ?", 4)
+                    .where(MockItem.arel_table[:rating].gteq(4))
                     .with_score
                     .order(search_score: :desc)
                     .limit(5)
