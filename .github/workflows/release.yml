@@ -1,0 +1,131 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (semver, e.g., 0.1.0). Must match ParadeDB::VERSION."
+        type: string
+        required: true
+      beta:
+        description: "Mark this as a prerelease"
+        type: boolean
+        default: false
+      confirmation:
+        description: "I confirm version bump, changelog update, and green CI."
+        type: boolean
+        required: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release:
+    name: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Validate confirmation
+        if: ${{ github.event.inputs.confirmation != 'true' }}
+        run: |
+          echo "Please confirm the release checklist first."
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: .ruby-version
+          bundler-cache: true
+
+      - name: Validate version and release state
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          VERSION="${{ github.event.inputs.version }}"
+
+          if ! [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid version: ${VERSION}"
+            exit 1
+          fi
+
+          FILE_VERSION="$(ruby -e 'require_relative "lib/parade_db/version"; print ParadeDB::VERSION')"
+          if [[ "${VERSION}" != "${FILE_VERSION}" ]]; then
+            echo "Version mismatch: workflow input=${VERSION}, file=${FILE_VERSION}"
+            exit 1
+          fi
+
+          if git ls-remote --tags origin "refs/tags/v${VERSION}" | grep -q "refs/tags/v${VERSION}$"; then
+            echo "Tag v${VERSION} already exists."
+            exit 1
+          fi
+
+          if gh release view "v${VERSION}" > /dev/null 2>&1; then
+            echo "GitHub release v${VERSION} already exists."
+            exit 1
+          fi
+
+          echo "VERSION=${VERSION}" >> "${GITHUB_ENV}"
+          echo "Version validation passed for ${VERSION}"
+
+      - name: Build gem
+        run: |
+          set -euo pipefail
+          gem build rails-paradedb.gemspec
+          ls -l rails-paradedb-"${VERSION}".gem
+
+      - name: Create and push tag
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "v${VERSION}" "${GITHUB_SHA}"
+          git push origin "v${VERSION}"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ github.event.inputs.beta }}
+          generate_release_notes: true
+          files: rails-paradedb-${{ env.VERSION }}.gem
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Publish to RubyGems
+        env:
+          RUBYGEMS_API_KEY: ${{ secrets.RUBYGEMS_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${RUBYGEMS_API_KEY:-}" ]]; then
+            echo "Missing RUBYGEMS_API_KEY secret"
+            exit 1
+          fi
+
+          mkdir -p "${HOME}/.gem"
+          cat > "${HOME}/.gem/credentials" <<EOF
+          ---
+          :rubygems_api_key: ${RUBYGEMS_API_KEY}
+          EOF
+          chmod 0600 "${HOME}/.gem/credentials"
+
+          gem push "rails-paradedb-${VERSION}.gem"
+
+      - name: Summary
+        run: |
+          {
+            echo "## Released v${VERSION}"
+            echo
+            echo "- GitHub tag: \`v${VERSION}\`"
+            echo "- GitHub release: created"
+            echo "- RubyGems: \`rails-paradedb ${VERSION}\` published"
+          } >> "${GITHUB_STEP_SUMMARY}"

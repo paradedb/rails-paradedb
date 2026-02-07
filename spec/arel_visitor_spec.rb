@@ -76,6 +76,16 @@ class ArelVisitorTest < Minitest::Test
     assert_equal %("products"."id" @@@ pdb.more_like_this(3, ARRAY['description'])), sql(node)
   end
 
+  def test_more_like_this_with_named_options
+    node = @builder.more_like_this(
+      :id,
+      3,
+      fields: [:description],
+      options: { min_term_frequency: 2, stopwords: %w[the a] }
+    )
+    assert_equal %("products"."id" @@@ pdb.more_like_this(3, ARRAY['description'], min_term_frequency => 2, stopwords => ARRAY['the', 'a'])), sql(node)
+  end
+
   def test_full_text_raw_expression
     node = @builder.full_text(:description, "pdb.all()")
     assert_equal %("products"."description" @@@ pdb.all()), sql(node)

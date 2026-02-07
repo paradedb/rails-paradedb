@@ -205,6 +205,84 @@ class GuardsUnitTest < Minitest::Test
     assert_match(/invalid value|ArgumentError/i, error.class.name)
   end
 
+  def test_more_like_this_rejects_unknown_option
+    error = assert_raises(ArgumentError) do
+      GuardTestProduct.more_like_this(1, unsupported_option: 2)
+    end
+    assert_includes error.message, "Unknown more_like_this option"
+  end
+
+  def test_more_like_this_rejects_non_integer_numeric_option
+    error = assert_raises(ArgumentError) do
+      GuardTestProduct.more_like_this(1, min_term_freq: "2")
+    end
+    assert_includes error.message, "min_term_frequency must be an Integer >= 1"
+  end
+
+  def test_more_like_this_rejects_out_of_range_numeric_option
+    error = assert_raises(ArgumentError) do
+      GuardTestProduct.more_like_this(1, min_term_freq: 0)
+    end
+    assert_includes error.message, "min_term_frequency must be an Integer >= 1"
+  end
+
+  def test_more_like_this_rejects_non_array_stopwords
+    error = assert_raises(ArgumentError) do
+      GuardTestProduct.more_like_this(1, stopwords: "the")
+    end
+    assert_includes error.message, "stopwords must be an Array of strings"
+  end
+
+  def test_more_like_this_rejects_non_string_stopword_terms
+    error = assert_raises(ArgumentError) do
+      GuardTestProduct.more_like_this(1, stopwords: ["the", 123])
+    end
+    assert_includes error.message, "stopwords must contain only strings"
+  end
+
+  def test_facets_requires_fields_or_agg
+    error = assert_raises(ArgumentError) do
+      GuardTestProduct.search(:description)
+                      .matching_all("shoes")
+                      .build_facet_query(fields: [])
+    end
+    assert_includes error.message, "facets requires at least one field or agg"
+  end
+
+  def test_facets_rejects_duplicate_fields
+    error = assert_raises(ArgumentError) do
+      GuardTestProduct.search(:description)
+                      .matching_all("shoes")
+                      .build_facet_query(fields: [:category, "category"])
+    end
+    assert_includes error.message, "Facet field names must be unique"
+  end
+
+  def test_facets_rejects_non_string_or_symbol_fields
+    error = assert_raises(TypeError) do
+      GuardTestProduct.search(:description)
+                      .matching_all("shoes")
+                      .build_facet_query(fields: [123])
+    end
+    assert_includes error.message, "Facet field names must be strings or symbols"
+  end
+
+  def test_facets_rejects_negative_size
+    error = assert_raises(ArgumentError) do
+      GuardTestProduct.search(:description)
+                      .matching_all("shoes")
+                      .build_facet_query(fields: [:category], size: -1)
+    end
+    assert_includes error.message, "Facet size must be an integer greater than or equal to 0."
+  end
+
+  def test_facets_with_agg_ignores_fields
+    facet_query = GuardTestProduct.search(:description)
+                                  .matching_all("shoes")
+                                  .build_facet_query(fields: [Object.new], agg: { "value_count" => { "field" => "id" } })
+    assert_includes facet_query.sql, %(pdb.agg('{"value_count":{"field":"id"}}'))
+  end
+
   # ──────────────────────────────────────────────
   # 5. Facet order validation (SearchMethods)
   # ──────────────────────────────────────────────

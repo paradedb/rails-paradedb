@@ -101,6 +101,24 @@ class UserApiUnitTest < Minitest::Test
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.more_like_this('{"description":"running shoes","category":"footwear"}'))), sql
   end
 
+  def test_more_like_this_with_advanced_options
+    sql = UnitProduct.more_like_this(
+      5,
+      fields: [:description],
+      min_term_freq: 2,
+      max_query_terms: 10,
+      min_doc_freq: 1,
+      max_term_freq: 20,
+      max_doc_freq: 200,
+      min_word_length: 3,
+      max_word_length: 15,
+      stopwords: %w[the a]
+    ).to_sql
+
+    expected = %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.more_like_this(5, ARRAY['description'], min_term_frequency => 2, max_query_terms => 10, min_doc_frequency => 1, max_term_frequency => 20, max_doc_frequency => 200, min_word_length => 3, max_word_length => 15, stopwords => ARRAY['the', 'a'])))
+    assert_sql_equal expected, sql
+  end
+
   def test_excluding
     sql = UnitProduct.search(:description).matching_all("shoes").excluding("cheap").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" &&& 'shoes') AND (NOT ("products"."description" &&& 'cheap'))), sql

@@ -80,11 +80,15 @@ module ParadeDB
         infix("@@@", column_node(column), rhs)
       end
 
-      def more_like_this(column, key, fields: nil)
+      def more_like_this(column, key, fields: nil, options: {})
         args = [quoted_value(key)]
         unless fields.nil?
-          field_values = fields.map { |field| quoted_value(field) }
+          field_values = Array(fields).map { |field| quoted_value(field.to_s) }
           args << Nodes::ArrayLiteral.new(field_values)
+        end
+
+        options.each do |name, value|
+          args << mlt_option_node(name, value)
         end
 
         rhs = ::Arel::Nodes::NamedFunction.new("pdb.more_like_this", args)
@@ -125,6 +129,19 @@ module ParadeDB
 
       def quoted_value(value)
         ::Arel::Nodes.build_quoted(value)
+      end
+
+      def mlt_option_node(name, value)
+        key = ::Arel::Nodes::SqlLiteral.new(name.to_s)
+        rendered_value =
+          if name.to_sym == :stopwords
+            stopwords = Array(value).map { |term| quoted_value(term.to_s) }
+            Nodes::ArrayLiteral.new(stopwords)
+          else
+            quoted_value(value)
+          end
+
+        ::Arel::Nodes::InfixOperation.new("=>", key, rendered_value)
       end
 
       def join_terms(terms)

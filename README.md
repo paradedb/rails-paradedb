@@ -8,6 +8,8 @@
 
 [ParadeDB](https://paradedb.com) — simple, Elastic-quality search for Postgres — integration for ActiveRecord.
 
+For complete ParadeDB documentation, see [docs.paradedb.com](https://docs.paradedb.com/).
+
 ## Requirements & Compatibility
 
 | Component  | Version                          |
@@ -164,6 +166,20 @@ Product.more_like_this(42, fields: [:description])
 
 # Similar to a custom document (JSON string)
 Product.more_like_this('{"description": "comfortable running shoes"}')
+
+# Advanced MLT options
+Product.more_like_this(
+  42,
+  fields: [:description],
+  min_term_freq: 2,
+  max_query_terms: 10,
+  min_doc_freq: 1,
+  max_term_freq: 100,
+  max_doc_freq: 1000,
+  min_word_length: 3,
+  max_word_length: 15,
+  stopwords: %w[the a]
+)
 ```
 
 **Combining with other filters:**
@@ -329,7 +345,7 @@ relation = Product.search(:description).matching_all("shoes")
                   .with_facets(
                     :category,
                     size: 20,           # Number of buckets (default: 10)
-                    order: "-count",    # Sort order: count, -count
+                    order: "-count",    # Sort order: count, -count, key, -key
                     missing: "Unknown"  # Value for documents without the field
                   )
                   .order(:rating)
@@ -341,6 +357,14 @@ relation = Product.search(:description).matching_all("shoes")
 ```ruby
 facets = Product.search(:description).matching_all("shoes")
                 .facets(agg: { "value_count" => { "field" => "id" } })
+
+# Works with rows too
+relation = Product.search(:description).matching_all("shoes")
+                  .with_facets(agg: { "value_count" => { "field" => "id" } })
+                  .order(:id)
+                  .limit(10)
+
+# When agg: is present, field/size/order/missing are ignored for payload generation.
 ```
 
 ### Combining with Other ActiveRecord Methods
@@ -396,26 +420,6 @@ Product.search(:description).matching_all("shoes")
 Works seamlessly with ActiveRecord's query interface:
 
 ```ruby
-# Chain with standard filters
-Product.search(:description).matching_all("shoes")
-       .where(in_stock: true)
-       .where("rating >= ?", 4)
-
-# Chain with exclusions
-Product.search(:description).matching_all("shoes")
-       .where.not(category: "clearance")
-
-# Select specific columns
-Product.search(:description).matching_all("shoes")
-       .select(:id, :name, :price)
-
-# Eager load associations
-Product.search(:description).matching_all("shoes")
-       .includes(:brand)
-
-# Preload associations
-Product.search(:description).matching_all("shoes")
-       .preload(:reviews)
 
 # Multiple search fields (AND composition)
 Product.search(:description).matching_all("running")
@@ -425,11 +429,24 @@ Product.search(:description).matching_all("running")
 left = Product.search(:description).matching_all("shoes")
 right = Product.search(:category).matching_all("footwear")
 left.or(right)
+
+# Preload associations
+Product.search(:description).matching_all("shoes")
+       .preload(:reviews)
+
+# Chain with standard filters
+Product.search(:description).matching_all("shoes")
+       .where(in_stock: true)
+       .where("rating >= ?", 4)
+
+# Chain with exclusions
+Product.search(:description).matching_all("shoes")
+       .where.not(category: "clearance")
 ```
 
 ## Arel Layer
 
-The user API is built on top of a dedicated Arel layer that provides an AST and SQL renderer for ParadeDB operators.
+The user API is built on top of a dedicated Arel layer that provides an AST and SQL renderer for ParadeDB operators. This is useful for building complex queries in case the ActiveRecord Syntax is not enough. All of the ActiveRecord syntax is available in the Arel layer as well. 
 
 ### Quickstart
 
@@ -486,13 +503,6 @@ predicate = fast.or(cheap.not)
 (("products"."description" &&& 'running' AND "products"."rating" === 4) OR NOT ("products"."description" &&& 'budget'))
 ```
 
-### Where To Look
-
-- `lib/parade_db/arel/builder.rb` for available node builders
-- `lib/parade_db/arel/visitor.rb` for SQL rendering details and operator mapping
-- `spec/arel_visitor_spec.rb` for precise SQL expectations per node
-- `spec/arel_integration_spec.rb` for composed predicates and end-to-end rendering checks
-
 ## Security
 
 ### SQL Injection Protection
@@ -521,62 +531,16 @@ Product.search(:description).matching_all(user_query)
 # The query is escaped and treated as a literal search term
 ```
 
-### PostgreSQL Adapter Guard
-
-The gem validates that you're using a PostgreSQL adapter:
-
-```ruby
-# Raises ParadeDB::UnsupportedAdapterError if not PostgreSQL
-ParadeDB.ensure_postgresql_adapter!(connection, context: "ParadeDB search")
-```
-
 ## Documentation
 
 - **ParadeDB Official Docs**: <https://docs.paradedb.com>
 - **ParadeDB Website**: <https://paradedb.com>
 
-## Development
+## Contributing
 
-### Setup
+Contribution and local development workflow live in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
-```bash
-# Clone the repository
-git clone https://github.com/paradedb/rails-paradedb.git
-cd rails-paradedb
-
-# Install dependencies
-bundle install
-```
-
-### Testing
-
-**Unit tests** verify individual components and logic without requiring a database connection.
-
-**Integration tests** validate the full workflow against a real ParadeDB instance.
-
-```bash
-# Start ParadeDB
-source scripts/run_paradedb.sh
-
-# Set database connection
-export PARADEDB_TEST_DSN="postgresql://postgres:postgres@localhost:5432/postgres"
-
-# Run tests
-bundle exec rake test
-```
-
-### Running Examples
-
-```bash
-# Install example dependencies
-BUNDLE_GEMFILE=examples/Gemfile bundle install
-
-# Start ParadeDB
-source scripts/run_paradedb.sh
-
-# Run any example
-BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/quickstart/quickstart.rb
-```
+Release process and policy live in [`RELEASE.md`](RELEASE.md).
 
 ## Support
 

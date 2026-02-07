@@ -18,9 +18,9 @@ module ParadeDB
         all.extending(SearchMethods).search(column)
       end
 
-      def more_like_this(key, fields: nil)
+      def more_like_this(key, fields: nil, **options)
         ensure_postgres!
-        all.extending(SearchMethods).more_like_this(key, fields: fields)
+        all.extending(SearchMethods).more_like_this(key, fields: fields, **options)
       end
 
       def with_facets(*fields, **opts)
