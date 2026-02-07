@@ -100,6 +100,7 @@ class ArelVisitorTest < Minitest::Test
     shoes = @builder.match(:description, "shoes")
     cheap = @builder.match(:description, "cheap")
     predicate = shoes.and(cheap.not)
-    assert_equal %(("products"."description" &&& 'shoes' AND NOT ("products"."description" &&& 'cheap'))), sql(predicate)
+    expected = %("products"."description" &&& 'shoes' AND NOT ("products"."description" &&& 'cheap'))
+    assert_sql_equal expected, sql(predicate)
   end
 end

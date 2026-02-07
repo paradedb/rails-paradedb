@@ -12,6 +12,7 @@ module ParadeDB
     attr_accessor :_paradedb_facet_opts
 
     def builder
+      ensure_paradedb_runtime!
       @_paradedb_builder ||= ParadeDB::Arel::Builder.new(table_name)
     end
 
@@ -26,6 +27,7 @@ module ParadeDB
     # ---- ParadeDB search entrypoints ----
 
     def search(column)
+      ensure_paradedb_runtime!
       extending(SearchMethods).tap { |rel| rel._paradedb_current_field = column }
     end
 
@@ -33,83 +35,71 @@ module ParadeDB
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
       node = builder.match(_paradedb_current_field, *terms, boost: boost)
-      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+      where(grouped(node))
     end
 
     def matching_any(*terms)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
       node = builder.match_any(_paradedb_current_field, *terms)
-      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+      where(grouped(node))
     end
 
     def excluding(*terms)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
       neg = builder.match(_paradedb_current_field, *terms)
-      where(::Arel.sql(ParadeDB::Arel.to_sql(neg.not, connection)))
+      where(grouped(neg.not))
     end
 
     def phrase(text, slop: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
       node = builder.phrase(_paradedb_current_field, text, slop: slop)
-      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+      where(grouped(node))
     end
 
     def fuzzy(term, distance:, prefix: nil, boost: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
       node = builder.fuzzy(_paradedb_current_field, term, distance: distance, prefix: prefix, boost: boost)
-      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+      where(grouped(node))
     end
 
     def regex(pattern)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
       node = builder.regex(_paradedb_current_field, pattern)
-      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+      where(grouped(node))
     end
 
     def term(value, boost: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
       node = builder.term(_paradedb_current_field, value, boost: boost)
-      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+      where(grouped(node))
     end
 
     def near(left_term, right_term, distance: 1)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
       node = builder.near(_paradedb_current_field, left_term, right_term, distance: distance)
-      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+      where(grouped(node))
     end
 
     def phrase_prefix(*terms)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       
       node = builder.phrase_prefix(_paradedb_current_field, *terms)
-      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+      where(grouped(node))
     end
 
     # Parse query-string syntax into ParadeDB query AST (e.g. "running AND shoes").
     # Mirrors Django's Parse convenience helper using relation-style Ruby DSL.
     def parse(query, lenient: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
-
-      options_sql = []
-      unless lenient.nil?
-        options_sql << "lenient => #{lenient ? 'true' : 'false'}"
-      end
-
-      expr = if options_sql.empty?
-               "pdb.parse(#{connection.quote(query)})"
-             else
-               "pdb.parse(#{connection.quote(query)}, #{options_sql.join(', ')})"
-             end
-
-      node = builder.full_text(_paradedb_current_field, expr)
-      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+      node = builder.parse(_paradedb_current_field, query, lenient: lenient)
+      where(grouped(node))
     end
 
     # Match-all wrapper for APIs that need an explicit ParadeDB predicate.
@@ -117,42 +107,43 @@ module ParadeDB
     def match_all
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      node = builder.full_text(_paradedb_current_field, "pdb.all()")
-      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+      where(grouped(builder.match_all(_paradedb_current_field)))
     end
 
     def more_like_this(key, fields: nil)
+      ensure_paradedb_runtime!
       key_value = key.respond_to?(:id) ? key.id : key
       pk_node = builder[primary_key]
       node = builder.more_like_this(pk_node, key_value, fields: fields)
-      where(::Arel.sql(ParadeDB::Arel.to_sql(node, connection)))
+      where(grouped(node))
     end
 
     # ---- Decorators ----
 
     def with_score
-      score_sql = %(pdb.score("#{table_name}"."#{primary_key}") AS search_score)
-      with_projection(score_sql)
+      with_projection(builder.score(primary_key).as("search_score"))
     end
 
     def with_snippet(column, start_tag: nil, end_tag: nil, max_chars: nil)
       formatted_args = []
-      formatted_args << connection.quote(start_tag) if start_tag
-      formatted_args << connection.quote(end_tag) if end_tag
-      formatted_args << max_chars if max_chars
-      
-      call = if formatted_args.empty?
-               %(pdb.snippet("#{table_name}"."#{column}"))
-             else
-               %(pdb.snippet("#{table_name}"."#{column}", #{formatted_args.join(', ')}))
-             end
-      
-      with_projection("#{call} AS #{column}_snippet")
+      formatted_args << start_tag unless start_tag.nil?
+      formatted_args << end_tag unless end_tag.nil?
+      formatted_args << Integer(max_chars) unless max_chars.nil?
+
+      snippet =
+        if formatted_args.empty?
+          builder.snippet(column)
+        else
+          builder.snippet(column, *formatted_args)
+        end
+
+      with_projection(snippet.as("#{column}_snippet"))
     end
 
     # ---- Facets ----
 
     def facets(*fields, size: 10, order: "-count", missing: nil, agg: nil)
+      ensure_paradedb_runtime!
       build_facet_query(
         fields: fields,
         size: size,
@@ -164,6 +155,7 @@ module ParadeDB
 
     # Internal method to build facet query (for testing)
     def build_facet_query(fields:, size: 10, order: "-count", missing: nil, agg: nil)
+      ensure_paradedb_runtime!
       FacetQuery.build(
         table_name,
         where_values_as_sql,
@@ -178,24 +170,26 @@ module ParadeDB
     end
 
     def with_facets(*fields, size: 10, order: nil, missing: nil, agg: nil)
+      ensure_paradedb_runtime!
       opts = { size: size, order: order, missing: missing, agg: agg }
-      
+
       rel = extending(FacetRelation)
       rel._paradedb_facet_fields = fields
       rel._paradedb_facet_opts = opts
-      
+
       # Add pdb.all() if no ParadeDB predicates exist (for aggregate pushdown)
       unless rel.has_paradedb_predicate?
         rel = rel.ensure_paradedb_predicate
       end
-      
+
       # Add window aggregates to SELECT
       facet_selects = fields.map do |field|
-        json = facet_json(field, opts)
-        ::Arel.sql(%(pdb.agg('#{json}') OVER () AS _#{field}_facet))
+        json_sql = connection.quote(facet_json(field, opts))
+        facet_alias = connection.quote_column_name("_#{field}_facet")
+        ::Arel.sql("pdb.agg(#{json_sql}) OVER () AS #{facet_alias}")
       end
 
-      rel = rel.select(::Arel.sql("#{table_name}.*")) if rel.select_values.empty?
+      rel = rel.select(::Arel.sql("#{connection.quote_table_name(table_name)}.*")) if rel.select_values.empty?
       rel.select(*facet_selects)
     end
 
@@ -207,16 +201,24 @@ module ParadeDB
 
     def ensure_paradedb_predicate
       # Add pdb.all() sentinel to force aggregate pushdown
-      pk_col = "#{connection.quote_table_name(table_name)}.#{connection.quote_column_name(primary_key)}"
-      where(::Arel.sql("#{pk_col} @@@ pdb.all()"))
+      where(grouped(builder.match_all(primary_key)))
     end
 
     private
 
-    def with_projection(sql_fragment)
+    def ensure_paradedb_runtime!
+      ParadeDB.ensure_postgresql_adapter!(connection, context: "ParadeDB search")
+      ParadeDB::Arel::Visitor.install!
+    end
+
+    def grouped(node)
+      ::Arel::Nodes::Grouping.new(node)
+    end
+
+    def with_projection(projection)
       rel = self
-      rel = rel.select(::Arel.sql("#{table_name}.*")) if rel.select_values.empty?
-      rel.select(::Arel.sql(sql_fragment))
+      rel = rel.select(klass.arel_table[::Arel.star]) if rel.select_values.empty?
+      rel.select(projection)
     end
 
     def where_values_as_sql
@@ -258,15 +260,18 @@ module ParadeDB
 
     def facet_json(field, opts)
       size = opts[:size] || 10
-      order_opt = opts[:order]
-      missing_clause = opts[:missing] ? %("missing": "#{opts[:missing]}", ) : ""
-      order_clause =
-        case order_opt
-        when "-count" then ', "order": {"_count": "desc"}'
-        when "count" then ', "order": {"_count": "asc"}'
-        else ""
+      order_direction =
+        case opts[:order]
+        when "-count" then "desc"
+        when "count" then "asc"
         end
-      %({"terms": {#{missing_clause}"field": "#{field}", "size": #{size}#{order_clause}}})
+
+      terms = []
+      terms << %("field": #{JSON.generate(field.to_s)})
+      terms << %("size": #{Integer(size)})
+      terms << %("missing": #{JSON.generate(opts[:missing].to_s)}) unless opts[:missing].nil?
+      terms << %("order": {"_count": #{JSON.generate(order_direction)}}) if order_direction
+      %({"terms": {#{terms.join(", ")}}})
     end
 
     # ---- Facet Query helper ----
@@ -295,32 +300,19 @@ module ParadeDB
       def build_sql(table, predicate_sql, primary_key, fields, size, order, missing, agg, connection)
         # Check if predicate contains ParadeDB operators
         has_paradedb_predicate = predicate_sql.match?(/(&&&|\|\|\||###|@@@)/)
-        
-        if agg
-          agg_json = agg
-        else
-          agg_json = ->(field) {
-            missing_clause = missing ? %("missing": "#{missing}", ) : ""
-            order_clause =
-              case order
-              when "-count" then ', "order": {"_count": "desc"}'
-              when "count" then ', "order": {"_count": "asc"}'
-              else ""
-              end
-            %({"terms": {#{missing_clause}"field": "#{field}", "size": #{size}#{order_clause}}})
-          }
-        end
 
         selects = fields.map do |field|
-          json = agg ? agg : agg_json.call(field)
-          %(pdb.agg('#{json}') AS #{field}_facet)
+          json = agg ? normalize_agg_json(agg) : facet_json_for(field, size: size, order: order, missing: missing)
+          json_sql = connection.quote(json)
+          facet_alias = connection.quote_column_name("#{field}_facet")
+          "pdb.agg(#{json_sql}) AS #{facet_alias}"
         end
 
         buf = []
         buf << "SELECT"
         buf << "  #{selects.join(",\n  ")}"
-        buf << "FROM #{table}"
-        
+        buf << "FROM #{connection.quote_table_name(table)}"
+
         # Add WHERE clause
         if !predicate_sql.empty? && has_paradedb_predicate
           buf << "WHERE #{predicate_sql}"
@@ -333,8 +325,27 @@ module ParadeDB
           pk_col = "#{connection.quote_table_name(table)}.#{connection.quote_column_name(primary_key)}"
           buf << "WHERE #{pk_col} @@@ pdb.all()"
         end
-        
+
         buf.join("\n")
+      end
+
+      def facet_json_for(field, size:, order:, missing:)
+        order_direction =
+          case order
+          when "-count" then "desc"
+          when "count" then "asc"
+          end
+
+        terms = []
+        terms << %("field": #{JSON.generate(field.to_s)})
+        terms << %("size": #{Integer(size)})
+        terms << %("missing": #{JSON.generate(missing.to_s)}) unless missing.nil?
+        terms << %("order": {"_count": #{JSON.generate(order_direction)}}) if order_direction
+        %({"terms": {#{terms.join(", ")}}})
+      end
+
+      def normalize_agg_json(agg)
+        agg.respond_to?(:to_hash) ? agg.to_hash.to_json : agg.to_s
       end
 
       def parse_facets(row)

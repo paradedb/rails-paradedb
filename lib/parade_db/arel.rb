@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "active_record"
+
 require_relative "arel/nodes"
 require_relative "arel/visitor"
 require_relative "arel/builder"
@@ -8,26 +10,19 @@ module ParadeDB
   module Arel
     # Convenience helper to render any ParadeDB Arel node to SQL.
     def self.to_sql(node, connection = nil)
-      Visitor.new(connection).accept(node)
+      conn = connection || ::ActiveRecord::Base.connection
+      ParadeDB.ensure_postgresql_adapter!(conn, context: "ParadeDB::Arel.to_sql")
+      Visitor.install!
+
+      collector = ::Arel::Collectors::SQLString.new
+      conn.visitor.accept(node, collector).value
     end
 
     # Helper to wrap raw SQL without quoting.
     def self.sql(raw)
-      Nodes::SqlLiteral.new(raw)
+      ::Arel.sql(raw)
     end
   end
 end
 
-# Extend Arel nodes to be compatible with ActiveRecord::Relation.where()
-module Arel
-  module Predications
-    # Allow ParadeDB nodes to be used directly in where() clauses
-  end
-end
-
-# Make ParadeDB nodes respond to to_sql for ActiveRecord compatibility
-ParadeDB::Arel::Nodes::Node.class_eval do
-  def to_sql(connection = nil)
-    ParadeDB::Arel.to_sql(self, connection)
-  end
-end
+ParadeDB::Arel::Visitor.install!

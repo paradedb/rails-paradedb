@@ -7,13 +7,13 @@ require_relative "../lib/parade_db"
 ActiveRecord::Base.logger = nil
 
 def establish_test_connection
-  if ENV["PARADEDB_TEST_DSN"]
-    # Integration tests: use real ParadeDB/PostgreSQL
-    ActiveRecord::Base.establish_connection(ENV["PARADEDB_TEST_DSN"])
-  else
-    # Unit tests: use SQLite in-memory database
-    ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: ":memory:")
+  dsn = ENV["PARADEDB_TEST_DSN"].to_s
+  if dsn.empty?
+    raise "PARADEDB_TEST_DSN is required for all tests. Example: postgres://postgres:postgres@localhost:5432/postgres"
   end
+
+  ActiveRecord::Base.establish_connection(dsn)
+  ParadeDB.ensure_postgresql_adapter!(ActiveRecord::Base.connection, context: "Test suite")
 end
 
 def setup_test_schema
