@@ -225,6 +225,16 @@ class ArelBuilderUnitTest < Minitest::Test
     assert_equal %("products"."id" @@@ pdb.more_like_this(5, ARRAY['description', 'category'])), sql(node)
   end
 
+  def test_more_like_this_with_options
+    node = @builder.more_like_this(
+      :id,
+      5,
+      fields: [:description],
+      options: { min_term_frequency: 2, max_query_terms: 10, stopwords: %w[the a] }
+    )
+    assert_equal %("products"."id" @@@ pdb.more_like_this(5, ARRAY['description'], min_term_frequency => 2, max_query_terms => 10, stopwords => ARRAY['the', 'a'])), sql(node)
+  end
+
   # ---- full_text ----
 
   def test_full_text_with_string_expression

@@ -6,6 +6,40 @@ module ParadeDB
   # SearchMethods extends ActiveRecord::Relation to add ParadeDB full-text search capabilities.
   # This module is mixed into relations via .search() to provide chainable query methods.
   module SearchMethods
+    MLT_OPTION_ALIASES = {
+      min_term_freq: :min_term_frequency,
+      min_term_frequency: :min_term_frequency,
+      max_query_terms: :max_query_terms,
+      min_doc_freq: :min_doc_frequency,
+      min_doc_frequency: :min_doc_frequency,
+      max_term_freq: :max_term_frequency,
+      max_term_frequency: :max_term_frequency,
+      max_doc_freq: :max_doc_frequency,
+      max_doc_frequency: :max_doc_frequency,
+      min_word_length: :min_word_length,
+      max_word_length: :max_word_length,
+      stopwords: :stopwords
+    }.freeze
+    MLT_INTEGER_OPTION_KEYS = %i[
+      min_term_frequency
+      max_query_terms
+      min_doc_frequency
+      max_term_frequency
+      max_doc_frequency
+      min_word_length
+      max_word_length
+    ].freeze
+    MLT_OPTION_ORDER = %i[
+      min_term_frequency
+      max_query_terms
+      min_doc_frequency
+      max_term_frequency
+      max_doc_frequency
+      min_word_length
+      max_word_length
+      stopwords
+    ].freeze
+
     # Internal state tracking
     attr_accessor :_paradedb_current_field
     attr_accessor :_paradedb_facet_fields
@@ -146,11 +180,12 @@ module ParadeDB
       where(grouped(builder.match_all(_paradedb_current_field)))
     end
 
-    def more_like_this(key, fields: nil)
+    def more_like_this(key, fields: nil, **options)
       ensure_paradedb_runtime!
       key_value = key.respond_to?(:id) ? key.id : key
       pk_node = builder[primary_key]
-      node = builder.more_like_this(pk_node, key_value, fields: fields)
+      mlt_options = normalize_more_like_this_options(options)
+      node = builder.more_like_this(pk_node, key_value, fields: fields, options: mlt_options)
       where(grouped(node))
     end
 
@@ -192,23 +227,30 @@ module ParadeDB
     # Internal method to build facet query (for testing)
     def build_facet_query(fields:, size: 10, order: "-count", missing: nil, agg: nil)
       ensure_paradedb_runtime!
+      facet_args = normalize_facet_inputs(fields: fields, size: size, order: order, missing: missing, agg: agg)
       FacetQuery.build(
         relation: self,
         primary_key: primary_key,
         builder: builder,
-        fields: fields,
-        size: size,
-        order: order,
-        missing: missing,
-        agg: agg,
+        fields: facet_args[:fields],
+        size: facet_args[:size],
+        order: facet_args[:order],
+        missing: facet_args[:missing],
+        agg: facet_args[:agg],
         connection: connection
       )
     end
 
     def with_facets(*fields, size: 10, order: "-count", missing: nil, agg: nil)
       ensure_paradedb_runtime!
-      opts = { size: size, order: order, missing: missing, agg: agg }
-      facet_fields = agg.nil? ? fields : [:agg]
+      facet_args = normalize_facet_inputs(fields: fields, size: size, order: order, missing: missing, agg: agg)
+      opts = {
+        size: facet_args[:size],
+        order: facet_args[:order],
+        missing: facet_args[:missing],
+        agg: facet_args[:agg]
+      }
+      facet_fields = facet_args[:agg].nil? ? facet_args[:fields] : [:agg]
 
       rel = extending(FacetRelation)
       rel._paradedb_facet_fields = facet_fields
@@ -220,7 +262,7 @@ module ParadeDB
 
       # Add window aggregates to SELECT using native Arel nodes.
       facet_selects = facet_fields.map do |field|
-        json = agg ? normalize_agg_json(agg) : facet_json(field, opts)
+        json = facet_args[:agg] || facet_json(field, opts)
         builder.agg(json).over.as("_#{field}_facet")
       end
 
@@ -259,10 +301,110 @@ module ParadeDB
       order_key, order_direction = facet_order(opts[:order])
       terms = []
       terms << %("field": #{JSON.generate(field.to_s)})
-      terms << %("size": #{Integer(size)}) unless size.nil?
+      terms << %("size": #{size}) unless size.nil?
       terms << %("missing": #{JSON.generate(opts[:missing].to_s)}) unless opts[:missing].nil?
       terms << %("order": {#{JSON.generate(order_key)}: #{JSON.generate(order_direction)}}) if order_key
       %({"terms": {#{terms.join(", ")}}})
+    end
+
+    def normalize_more_like_this_options(options)
+      normalized = {}
+      options.each do |raw_key, value|
+        canonical = MLT_OPTION_ALIASES[raw_key.to_sym]
+        unless canonical
+          allowed = MLT_OPTION_ALIASES.keys.map(&:inspect).join(", ")
+          raise ArgumentError, "Unknown more_like_this option #{raw_key.inspect}. Valid options: #{allowed}"
+        end
+
+        if MLT_INTEGER_OPTION_KEYS.include?(canonical)
+          normalized[canonical] = normalize_positive_integer_option!(canonical, value)
+          next
+        end
+
+        if canonical == :stopwords
+          normalized_stopwords = normalize_stopwords_option!(value)
+          normalized[canonical] = normalized_stopwords unless normalized_stopwords.empty?
+        end
+      end
+
+      ordered = {}
+      MLT_OPTION_ORDER.each do |key|
+        ordered[key] = normalized[key] if normalized.key?(key)
+      end
+      ordered
+    end
+
+    def normalize_facet_inputs(fields:, size:, order:, missing:, agg:)
+      normalized_agg = agg.nil? ? nil : normalize_agg_json(agg)
+      normalized_fields = normalize_facet_fields(fields, agg: normalized_agg)
+      normalized_size = normalize_facet_size(size)
+      facet_order(order)
+
+      {
+        fields: normalized_fields,
+        size: normalized_size,
+        order: order,
+        missing: missing,
+        agg: normalized_agg
+      }
+    end
+
+    def normalize_facet_fields(fields, agg:)
+      raw_fields = Array(fields)
+      return [] unless agg.nil?
+      raise ArgumentError, "facets requires at least one field or agg" if raw_fields.empty?
+
+      normalized = raw_fields.map do |field|
+        case field
+        when String then field
+        when Symbol then field.to_s
+        else
+          raise TypeError, "Facet field names must be strings or symbols, got #{field.class}"
+        end
+      end
+
+      if normalized.uniq.length != normalized.length
+        raise ArgumentError, "Facet field names must be unique."
+      end
+
+      normalized
+    end
+
+    def normalize_facet_size(size)
+      return nil if size.nil?
+
+      normalized = Integer(size)
+      raise ArgumentError, "Facet size must be an integer greater than or equal to 0." if normalized.negative?
+
+      normalized
+    rescue ArgumentError, TypeError
+      raise ArgumentError, "Facet size must be an integer greater than or equal to 0."
+    end
+
+    def normalize_positive_integer_option!(name, value)
+      unless value.is_a?(Integer)
+        raise ArgumentError, "#{name} must be an Integer >= 1, got #{value.class}"
+      end
+      raise ArgumentError, "#{name} must be an Integer >= 1" if value < 1
+
+      value
+    end
+
+    def normalize_stopwords_option!(value)
+      unless value.respond_to?(:to_ary)
+        raise ArgumentError, "stopwords must be an Array of strings"
+      end
+
+      stopwords = value.to_ary.map do |term|
+        case term
+        when String then term
+        when Symbol then term.to_s
+        else
+          raise ArgumentError, "stopwords must contain only strings"
+        end
+      end
+
+      stopwords.reject(&:empty?)
     end
 
     def facet_order(order)
@@ -358,7 +500,7 @@ module ParadeDB
         order_key, order_direction = facet_order(order)
         terms = []
         terms << %("field": #{JSON.generate(field.to_s)})
-        terms << %("size": #{Integer(size)}) unless size.nil?
+        terms << %("size": #{size}) unless size.nil?
         terms << %("missing": #{JSON.generate(missing.to_s)}) unless missing.nil?
         terms << %("order": {#{JSON.generate(order_key)}: #{JSON.generate(order_direction)}}) if order_key
         %({"terms": {#{terms.join(", ")}}})
