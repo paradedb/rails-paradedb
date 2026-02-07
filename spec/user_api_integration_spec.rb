@@ -237,13 +237,7 @@ class UserApiIntegrationTest < Minitest::Test
                        .build_facet_query(fields: [:category, :brand], size: 10, order: "-count")
                        .sql
 
-    expected = <<~SQL.strip
-      SELECT
-        pdb.agg('{"terms": {"field": "category", "size": 10, "order": {"_count": "desc"}}}') AS category_facet,
-        pdb.agg('{"terms": {"field": "brand", "size": 10, "order": {"_count": "desc"}}}') AS brand_facet
-      FROM products
-      WHERE ("products"."description" &&& 'shoes')
-    SQL
+    expected = %(SELECT pdb.agg('{"terms": {"field": "category", "size": 10, "order": {"_count": "desc"}}}') AS category_facet, pdb.agg('{"terms": {"field": "brand", "size": 10, "order": {"_count": "desc"}}}') AS brand_facet FROM (SELECT products.* FROM products WHERE ("products"."description" &&& 'shoes')) paradedb_facet_source)
 
     assert_sql_equal expected, facet_sql
   end
@@ -257,7 +251,7 @@ class UserApiIntegrationTest < Minitest::Test
                  .to_sql
 
     expected = <<~SQL.strip
-      SELECT products.*, pdb.agg('{"terms": {"field": "category", "size": 10}}') OVER () AS _category_facet, pdb.agg('{"terms": {"field": "brand", "size": 10}}') OVER () AS _brand_facet FROM products
+      SELECT products.*, pdb.agg('{"terms": {"field": "category", "size": 10, "order": {"_count": "desc"}}}') OVER () AS _category_facet, pdb.agg('{"terms": {"field": "brand", "size": 10, "order": {"_count": "desc"}}}') OVER () AS _brand_facet FROM products
       WHERE ("products"."description" &&& 'shoes') AND "products"."in_stock" = true
       ORDER BY "products"."rating" DESC
       LIMIT 10

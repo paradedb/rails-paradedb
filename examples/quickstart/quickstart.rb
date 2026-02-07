@@ -48,7 +48,7 @@ def demo_filtered_search
   results = MockItem.search(:description)
                     .matching_all("shoes")
                     .where(in_stock: true)
-                    .where("rating >= ?", 4)
+                    .where(MockItem.arel_table[:rating].gteq(4))
                     .with_score
                     .order(search_score: :desc)
                     .limit(5)

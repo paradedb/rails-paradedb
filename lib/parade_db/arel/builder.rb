@@ -14,6 +14,7 @@ module ParadeDB
       end
 
       def match(column, *terms, boost: nil)
+        validate_numeric!(boost, :boost)
         rhs = quoted_value(join_terms(terms))
         rhs = Nodes::BoostCast.new(rhs, quoted_value(boost)) unless boost.nil?
         infix("&&&", column_node(column), rhs)
@@ -29,18 +30,22 @@ module ParadeDB
       end
 
       def phrase(column, text, slop: nil)
+        validate_numeric!(slop, :slop)
         rhs = quoted_value(text)
         rhs = Nodes::SlopCast.new(rhs, quoted_value(slop)) unless slop.nil?
         infix("###", column_node(column), rhs)
       end
 
       def fuzzy(column, term, distance: 1, prefix: nil, boost: nil)
+        validate_numeric!(distance, :distance)
+        validate_numeric!(boost, :boost)
         rhs = Nodes::FuzzyCast.new(quoted_value(term), quoted_value(distance), prefix: prefix)
         rhs = Nodes::BoostCast.new(rhs, quoted_value(boost)) unless boost.nil?
         infix("===", column_node(column), rhs)
       end
 
       def term(column, term, boost: nil)
+        validate_numeric!(boost, :boost)
         rhs = quoted_value(term)
         rhs = Nodes::BoostCast.new(rhs, quoted_value(boost)) unless boost.nil?
         infix("===", column_node(column), rhs)
@@ -52,12 +57,15 @@ module ParadeDB
       end
 
       def near(column, left_term, right_term, distance: 1)
+        validate_numeric!(distance, :distance)
         near_chain = infix("##", infix("##", quoted_value(left_term), quoted_value(distance)), quoted_value(right_term))
         infix("@@@", column_node(column), ::Arel::Nodes::Grouping.new(near_chain))
       end
 
       def phrase_prefix(column, *terms)
-        array = Nodes::ArrayLiteral.new(terms.flatten.compact.map { |term| quoted_value(term) })
+        flat = terms.flatten.compact
+        raise ArgumentError, "phrase_prefix requires at least one term" if flat.empty?
+        array = Nodes::ArrayLiteral.new(flat.map { |term| quoted_value(term) })
         rhs = ::Arel::Nodes::NamedFunction.new("pdb.phrase_prefix", [array])
         infix("@@@", column_node(column), rhs)
       end
@@ -120,7 +128,16 @@ module ParadeDB
       end
 
       def join_terms(terms)
-        terms.flatten.compact.map(&:to_s).join(" ")
+        joined = terms.flatten.compact.map(&:to_s).join(" ")
+        raise ArgumentError, "at least one search term is required" if joined.strip.empty?
+        joined
+      end
+
+      def validate_numeric!(value, name)
+        return if value.nil?
+        unless value.is_a?(Numeric)
+          raise ArgumentError, "#{name} must be numeric, got #{value.class}"
+        end
       end
 
       def arel_table

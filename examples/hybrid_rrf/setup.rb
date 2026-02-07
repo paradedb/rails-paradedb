@@ -100,7 +100,9 @@ module HybridRrfSetup
 
     ExampleCommon.connect!
     embedding = MockItem.where.not(embedding: nil)
-                        .where("description ILIKE ?", "%#{seed_text}%")
+                        .search(:description)
+                        .matching_all(seed_text)
+                        .order(id: :asc)
                         .limit(1)
                         .pick(:embedding)
     raise "No embedding found for seed '#{seed_text}'" if embedding.nil?
