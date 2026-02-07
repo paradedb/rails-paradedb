@@ -16,6 +16,25 @@ jobs:
   test:
     name: rspec unit
     runs-on: ubuntu-latest
+    services:
+      paradedb:
+        image: paradedb/paradedb:0.21.4-pg18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      PARADEDB_TEST_DSN: postgresql://postgres@localhost:5432/postgres
+      PGPASSWORD: ${{ env.POSTGRES_PASSWORD }}
+
     steps:
       - uses: actions/checkout@v6
 
