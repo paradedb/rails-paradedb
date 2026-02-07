@@ -14,33 +14,33 @@ module ParadeDB
 
     module ClassMethods
       def search(column)
-        ensure_paradedb_ready!
+        ensure_postgres!
         all.extending(SearchMethods).search(column)
       end
 
       def more_like_this(key, fields: nil)
-        ensure_paradedb_ready!
+        ensure_postgres!
         all.extending(SearchMethods).more_like_this(key, fields: fields)
       end
 
       def with_facets(*fields, **opts)
-        ensure_paradedb_ready!
+        ensure_postgres!
         all.extending(SearchMethods).with_facets(*fields, **opts)
       end
 
       def facets(*fields, **opts)
-        ensure_paradedb_ready!
+        ensure_postgres!
         all.extending(SearchMethods).facets(*fields, **opts)
       end
 
       def paradedb_arel
-        ensure_paradedb_ready!
+        ensure_postgres!
         @paradedb_arel ||= ParadeDB::Arel::Builder.new(table_name)
       end
 
       private
 
-      def ensure_paradedb_ready!
+      def ensure_postgres!
         unless has_paradedb_index
           raise "ParadeDB is not enabled for #{name} (set self.has_paradedb_index = true)"
         end
