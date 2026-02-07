@@ -271,11 +271,21 @@ module ParadeDB
       when "count" then ["_count", "asc"]
       when "-key" then ["_key", "desc"]
       when "key" then ["_key", "asc"]
+      when nil then nil
+      else
+        raise ArgumentError,
+              "Unknown facet order #{order.inspect}. Valid values: '-count', 'count', '-key', 'key'"
       end
     end
 
     def normalize_agg_json(agg)
-      agg.respond_to?(:to_hash) ? agg.to_hash.to_json : agg.to_s
+      case agg
+      when Hash then agg.to_json
+      when String then agg
+      else
+        raise ArgumentError,
+              "agg must be a Hash or JSON String, got #{agg.class}"
+      end
     end
 
     # ---- Facet Query helper ----
@@ -355,7 +365,13 @@ module ParadeDB
       end
 
       def normalize_agg_json(agg)
-        agg.respond_to?(:to_hash) ? agg.to_hash.to_json : agg.to_s
+        case agg
+        when Hash then agg.to_json
+        when String then agg
+        else
+          raise ArgumentError,
+                "agg must be a Hash or JSON String, got #{agg.class}"
+        end
       end
 
       def facet_order(order)
@@ -364,6 +380,10 @@ module ParadeDB
         when "count" then ["_count", "asc"]
         when "-key" then ["_key", "desc"]
         when "key" then ["_key", "asc"]
+        when nil then nil
+        else
+          raise ArgumentError,
+                "Unknown facet order #{order.inspect}. Valid values: '-count', 'count', '-key', 'key'"
         end
       end
 
