@@ -205,12 +205,13 @@ module ParadeDB
       )
     end
 
-    def with_facets(*fields, size: 10, order: nil, missing: nil, agg: nil)
+    def with_facets(*fields, size: 10, order: "-count", missing: nil, agg: nil)
       ensure_paradedb_runtime!
       opts = { size: size, order: order, missing: missing, agg: agg }
+      facet_fields = agg.nil? ? fields : [:agg]
 
       rel = extending(FacetRelation)
-      rel._paradedb_facet_fields = fields
+      rel._paradedb_facet_fields = facet_fields
 
       # Add pdb.all() if no ParadeDB predicates exist (for aggregate pushdown)
       unless rel.has_paradedb_predicate?
@@ -218,8 +219,9 @@ module ParadeDB
       end
 
       # Add window aggregates to SELECT using native Arel nodes.
-      facet_selects = fields.map do |field|
-        builder.agg(facet_json(field, opts)).over.as("_#{field}_facet")
+      facet_selects = facet_fields.map do |field|
+        json = agg ? normalize_agg_json(agg) : facet_json(field, opts)
+        builder.agg(json).over.as("_#{field}_facet")
       end
 
       rel = rel.select(klass.arel_table[::Arel.star]) if rel.select_values.empty?
@@ -253,19 +255,27 @@ module ParadeDB
     end
 
     def facet_json(field, opts)
-      size = opts[:size] || 10
-      order_direction =
-        case opts[:order]
-        when "-count" then "desc"
-        when "count" then "asc"
-        end
-
+      size = opts.key?(:size) ? opts[:size] : 10
+      order_key, order_direction = facet_order(opts[:order])
       terms = []
       terms << %("field": #{JSON.generate(field.to_s)})
-      terms << %("size": #{Integer(size)})
+      terms << %("size": #{Integer(size)}) unless size.nil?
       terms << %("missing": #{JSON.generate(opts[:missing].to_s)}) unless opts[:missing].nil?
-      terms << %("order": {"_count": #{JSON.generate(order_direction)}}) if order_direction
+      terms << %("order": {#{JSON.generate(order_key)}: #{JSON.generate(order_direction)}}) if order_key
       %({"terms": {#{terms.join(", ")}}})
+    end
+
+    def facet_order(order)
+      case order
+      when "-count" then ["_count", "desc"]
+      when "count" then ["_count", "asc"]
+      when "-key" then ["_key", "desc"]
+      when "key" then ["_key", "asc"]
+      end
+    end
+
+    def normalize_agg_json(agg)
+      agg.respond_to?(:to_hash) ? agg.to_hash.to_json : agg.to_s
     end
 
     # ---- Facet Query helper ----
@@ -326,29 +336,35 @@ module ParadeDB
       end
 
       def build_facet_projections(builder, fields, size, order, missing, agg)
+        return [builder.agg(normalize_agg_json(agg)).as("agg_facet")] if agg
+
         fields.map do |field|
-          json = agg ? normalize_agg_json(agg) : facet_json_for(field, size: size, order: order, missing: missing)
+          json = facet_json_for(field, size: size, order: order, missing: missing)
           builder.agg(json).as("#{field}_facet")
         end
       end
 
       def facet_json_for(field, size:, order:, missing:)
-        order_direction =
-          case order
-          when "-count" then "desc"
-          when "count" then "asc"
-          end
-
+        order_key, order_direction = facet_order(order)
         terms = []
         terms << %("field": #{JSON.generate(field.to_s)})
-        terms << %("size": #{Integer(size)})
+        terms << %("size": #{Integer(size)}) unless size.nil?
         terms << %("missing": #{JSON.generate(missing.to_s)}) unless missing.nil?
-        terms << %("order": {"_count": #{JSON.generate(order_direction)}}) if order_direction
+        terms << %("order": {#{JSON.generate(order_key)}: #{JSON.generate(order_direction)}}) if order_key
         %({"terms": {#{terms.join(", ")}}})
       end
 
       def normalize_agg_json(agg)
         agg.respond_to?(:to_hash) ? agg.to_hash.to_json : agg.to_s
+      end
+
+      def facet_order(order)
+        case order
+        when "-count" then ["_count", "desc"]
+        when "count" then ["_count", "asc"]
+        when "-key" then ["_key", "desc"]
+        when "key" then ["_key", "asc"]
+        end
       end
 
       def parse_facets(row)

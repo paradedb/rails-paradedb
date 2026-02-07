@@ -251,7 +251,7 @@ class UserApiUnitTest < Minitest::Test
                      .to_sql
 
     expected = <<~SQL.strip
-      SELECT products.*, pdb.agg('{"terms": {"field": "category", "size": 10}}') OVER () AS _category_facet FROM products
+      SELECT products.*, pdb.agg('{"terms": {"field": "category", "size": 10, "order": {"_count": "desc"}}}') OVER () AS _category_facet FROM products
       WHERE "products"."in_stock" = TRUE AND ("products"."id" @@@ pdb.all())
     SQL
 
