@@ -164,6 +164,23 @@ class UserApiUnitTest < Minitest::Test
     assert_sql_equal expected, facet_sql
   end
 
+  def test_facets_with_custom_agg_without_fields_still_projects_aggregate
+    facet_sql = UnitProduct.search(:description).matching_all("shoes")
+                           .build_facet_query(
+                             fields: [],
+                             size: 99,
+                             order: "count",
+                             missing: "(missing)",
+                             agg: { "value_count" => { "field" => "id" } }
+                           )
+                           .sql
+
+    assert_includes facet_sql, %(pdb.agg('{"value_count":{"field":"id"}}'))
+    refute_includes facet_sql, %({"terms":)
+    refute_includes facet_sql, %("size":)
+    refute_includes facet_sql, %("_count")
+  end
+
   def test_facets_without_paradedb_predicates
     facet_sql = UnitProduct.where(in_stock: true)
                            .extending(ParadeDB::SearchMethods)
@@ -184,6 +201,15 @@ class UserApiUnitTest < Minitest::Test
     expected = %(SELECT pdb.agg('{"terms": {"field": "category", "size": 5}}') AS category_facet FROM (SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.all())) paradedb_facet_source)
 
     assert_sql_equal expected, facet_sql
+  end
+
+  def test_facets_with_size_nil_omits_size_clause
+    facet_sql = UnitProduct.search(:description).matching_all("shoes")
+                           .build_facet_query(fields: [:category], size: nil, order: nil)
+                           .sql
+
+    assert_includes facet_sql, %("field": "category")
+    refute_includes facet_sql, %("size":)
   end
 
   def test_facets_with_raw_paradedb_sql_predicate_does_not_append_match_all
@@ -230,6 +256,34 @@ class UserApiUnitTest < Minitest::Test
     SQL
 
     assert_sql_equal expected, sql
+  end
+
+  def test_with_facets_default_order_is_desc_count
+    sql = UnitProduct.search(:description)
+                     .matching_all("shoes")
+                     .with_facets(:category, size: 10)
+                     .to_sql
+
+    assert_includes sql, %("order": {"_count": "desc"})
+  end
+
+  def test_with_facets_uses_custom_agg_and_ignores_field_size_order_missing
+    sql = UnitProduct.search(:description)
+                     .matching_all("shoes")
+                     .with_facets(
+                       :category,
+                       size: 20,
+                       order: "-count",
+                       missing: "(missing)",
+                       agg: { "value_count" => { "field" => "id" } }
+                     )
+                     .to_sql
+
+    assert_includes sql, %(pdb.agg('{"value_count":{"field":"id"}}') OVER ())
+    refute_includes sql, %({"terms":)
+    refute_includes sql, %("field": "category")
+    refute_includes sql, %("size": 20)
+    refute_includes sql, %("missing":)
   end
 
   def test_with_facets_load_requires_order_and_limit
