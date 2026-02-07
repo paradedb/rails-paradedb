@@ -11,6 +11,43 @@ module ParadeDB
     attr_accessor :_paradedb_facet_fields
     attr_accessor :_paradedb_facet_opts
 
+    module PredicateInspector
+      PARADEDB_INFIX_OPERATORS = %w[&&& ||| ### @@@ === ##].freeze
+      PARADEDB_SQL_PATTERN = /(&&&|\|\|\||###|@@@|===|##|pdb\.)/
+
+      module_function
+
+      def relation_has_paradedb_predicate?(relation)
+        contains_paradedb_predicate?(relation.where_clause&.ast)
+      end
+
+      def contains_paradedb_predicate?(node)
+        case node
+        when nil
+          false
+        when ::Array
+          node.any? { |child| contains_paradedb_predicate?(child) }
+        when ::Arel::Nodes::InfixOperation
+          PARADEDB_INFIX_OPERATORS.include?(node.operator.to_s) ||
+            contains_paradedb_predicate?(node.left) ||
+            contains_paradedb_predicate?(node.right)
+        when ::Arel::Nodes::NamedFunction
+          node.name.to_s.start_with?("pdb.") ||
+            node.expressions.any? { |expr| contains_paradedb_predicate?(expr) }
+        when ::Arel::Nodes::SqlLiteral
+          node.to_s.match?(PARADEDB_SQL_PATTERN)
+        when ::Arel::Nodes::Nary
+          node.children.any? { |child| contains_paradedb_predicate?(child) }
+        when ::Arel::Nodes::Binary
+          contains_paradedb_predicate?(node.left) || contains_paradedb_predicate?(node.right)
+        when ::Arel::Nodes::Unary
+          contains_paradedb_predicate?(node.expr)
+        else
+          false
+        end
+      end
+    end
+
     def builder
       ensure_paradedb_runtime!
       @_paradedb_builder ||= ParadeDB::Arel::Builder.new(table_name)
@@ -157,9 +194,9 @@ module ParadeDB
     def build_facet_query(fields:, size: 10, order: "-count", missing: nil, agg: nil)
       ensure_paradedb_runtime!
       FacetQuery.build(
-        table_name,
-        where_values_as_sql,
-        primary_key,
+        relation: self,
+        primary_key: primary_key,
+        builder: builder,
         fields: fields,
         size: size,
         order: order,
@@ -192,9 +229,7 @@ module ParadeDB
     end
 
     def has_paradedb_predicate?
-      sql = where_values_as_sql
-      # Check for ParadeDB operators: &&&, |||, ###, @@@
-      sql.match?(/(&&&|\|\|\||###|@@@)/)
+      PredicateInspector.relation_has_paradedb_predicate?(self)
     end
 
     def ensure_paradedb_predicate
@@ -219,43 +254,6 @@ module ParadeDB
       rel.select(projection)
     end
 
-    def where_values_as_sql
-      # Extract WHERE clause SQL from the relation
-      # For facet queries that need the predicate SQL
-      where_clause = arel.where_sql
-      return "" if where_clause.nil? || where_clause.empty?
-      
-      # Remove "WHERE " prefix if present
-      predicate_sql = where_clause.sub(/^\s*WHERE\s+/i, '')
-      literalize_where_binds(predicate_sql)
-    end
-
-    def literalize_where_binds(sql)
-      _, binds, = connection.send(:to_sql_and_binds, arel)
-      return sql if binds.nil? || binds.empty?
-
-      rendered = sql.dup
-      if rendered.include?("$")
-        binds.each_with_index.to_a.reverse_each do |bind, idx|
-          rendered.gsub!(/\$#{idx + 1}\b/, quote_bind_value(bind))
-        end
-      elsif rendered.include?("?")
-        binds.each do |bind|
-          rendered.sub!("?", quote_bind_value(bind))
-        end
-      end
-
-      rendered
-    rescue NoMethodError
-      # Fall back to raw SQL if adapter internals are unavailable.
-      sql
-    end
-
-    def quote_bind_value(bind)
-      value = bind.respond_to?(:value_for_database) ? bind.value_for_database : bind
-      connection.quote(value)
-    end
-
     def facet_json(field, opts)
       size = opts[:size] || 10
       order_direction =
@@ -274,57 +272,66 @@ module ParadeDB
 
     # ---- Facet Query helper ----
     class FacetQuery
-      attr_reader :sql, :connection
+      attr_reader :relation, :connection
 
-      def self.build(table, predicate_sql, primary_key, fields:, size:, order:, missing:, agg:, connection:)
-        new(table, predicate_sql, primary_key, fields, size, order, missing, agg, connection)
+      def self.build(relation:, primary_key:, builder:, fields:, size:, order:, missing:, agg:, connection:)
+        new(
+          relation: relation,
+          primary_key: primary_key,
+          builder: builder,
+          fields: fields,
+          size: size,
+          order: order,
+          missing: missing,
+          agg: agg,
+          connection: connection
+        )
       end
 
-      def initialize(table, predicate_sql, primary_key, fields, size, order, missing, agg, connection)
+      def initialize(relation:, primary_key:, builder:, fields:, size:, order:, missing:, agg:, connection:)
         @connection = connection
-        @table = table
-        @primary_key = primary_key
-        @sql = build_sql(table, predicate_sql, primary_key, fields, size, order, missing, agg, connection)
+        @relation = build_relation(
+          relation: relation,
+          primary_key: primary_key,
+          builder: builder,
+          fields: fields,
+          size: size,
+          order: order,
+          missing: missing,
+          agg: agg
+        )
+      end
+
+      def sql
+        relation.to_sql
       end
 
       def execute
-        result = connection.execute(sql)
-        # Parse JSON results into hash
-        parse_facets(result.first)
+        parse_facets(connection.select_one(sql))
       end
 
       private
 
-      def build_sql(table, predicate_sql, primary_key, fields, size, order, missing, agg, connection)
-        # Check if predicate contains ParadeDB operators
-        has_paradedb_predicate = predicate_sql.match?(/(&&&|\|\|\||###|@@@)/)
+      def build_relation(relation:, primary_key:, builder:, fields:, size:, order:, missing:, agg:)
+        predicate_scope = relation.except(:select, :order, :limit, :offset, :group, :having, :distinct)
+        predicate_scope = predicate_scope.select(relation.klass.arel_table[::Arel.star]) if predicate_scope.select_values.empty?
 
-        selects = fields.map do |field|
+        unless PredicateInspector.relation_has_paradedb_predicate?(predicate_scope)
+          predicate_scope = predicate_scope.where(::Arel::Nodes::Grouping.new(builder.match_all(primary_key)))
+        end
+
+        source_alias = "paradedb_facet_source"
+        source = predicate_scope.arel.as(source_alias)
+        projections = build_facet_projections(builder, fields, size, order, missing, agg)
+
+        relation.klass.unscoped.from(source).select(*projections)
+      end
+
+      def build_facet_projections(builder, fields, size, order, missing, agg)
+        fields.map do |field|
           json = agg ? normalize_agg_json(agg) : facet_json_for(field, size: size, order: order, missing: missing)
-          json_sql = connection.quote(json)
-          facet_alias = connection.quote_column_name("#{field}_facet")
-          "pdb.agg(#{json_sql}) AS #{facet_alias}"
+          builder.agg(json).as("#{field}_facet")
         end
-
-        buf = []
-        buf << "SELECT"
-        buf << "  #{selects.join(",\n  ")}"
-        buf << "FROM #{connection.quote_table_name(table)}"
-
-        # Add WHERE clause
-        if !predicate_sql.empty? && has_paradedb_predicate
-          buf << "WHERE #{predicate_sql}"
-        elsif !predicate_sql.empty? && !has_paradedb_predicate
-          # Has predicates but no ParadeDB operators - add pdb.all()
-          pk_col = "#{connection.quote_table_name(table)}.#{connection.quote_column_name(primary_key)}"
-          buf << "WHERE #{predicate_sql} AND #{pk_col} @@@ pdb.all()"
-        elsif predicate_sql.empty?
-          # No predicates at all - add pdb.all() sentinel
-          pk_col = "#{connection.quote_table_name(table)}.#{connection.quote_column_name(primary_key)}"
-          buf << "WHERE #{pk_col} @@@ pdb.all()"
-        end
-
-        buf.join("\n")
       end
 
       def facet_json_for(field, size:, order:, missing:)

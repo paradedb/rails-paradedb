@@ -159,13 +159,7 @@ class UserApiUnitTest < Minitest::Test
                            .build_facet_query(fields: [:category, :brand], size: 10, order: "-count")
                            .sql
 
-    expected = <<~SQL.strip
-      SELECT
-        pdb.agg('{"terms": {"field": "category", "size": 10, "order": {"_count": "desc"}}}') AS category_facet,
-        pdb.agg('{"terms": {"field": "brand", "size": 10, "order": {"_count": "desc"}}}') AS brand_facet
-      FROM products
-      WHERE ("products"."description" &&& 'shoes')
-    SQL
+    expected = %(SELECT pdb.agg('{"terms": {"field": "category", "size": 10, "order": {"_count": "desc"}}}') AS category_facet, pdb.agg('{"terms": {"field": "brand", "size": 10, "order": {"_count": "desc"}}}') AS brand_facet FROM (SELECT products.* FROM products WHERE ("products"."description" &&& 'shoes')) paradedb_facet_source)
 
     assert_sql_equal expected, facet_sql
   end
@@ -176,12 +170,7 @@ class UserApiUnitTest < Minitest::Test
                            .build_facet_query(fields: [:category], size: 10, order: nil)
                            .sql
 
-    expected = <<~SQL.strip
-      SELECT
-        pdb.agg('{"terms": {"field": "category", "size": 10}}') AS category_facet
-      FROM products
-      WHERE "products"."in_stock" = TRUE AND "products"."id" @@@ pdb.all()
-    SQL
+    expected = %(SELECT pdb.agg('{"terms": {"field": "category", "size": 10}}') AS category_facet FROM (SELECT products.* FROM products WHERE "products"."in_stock" = TRUE AND ("products"."id" @@@ pdb.all())) paradedb_facet_source)
 
     assert_sql_equal expected, facet_sql
   end
@@ -192,12 +181,7 @@ class UserApiUnitTest < Minitest::Test
                            .build_facet_query(fields: [:category], size: 5, order: nil)
                            .sql
 
-    expected = <<~SQL.strip
-      SELECT
-        pdb.agg('{"terms": {"field": "category", "size": 5}}') AS category_facet
-      FROM products
-      WHERE "products"."id" @@@ pdb.all()
-    SQL
+    expected = %(SELECT pdb.agg('{"terms": {"field": "category", "size": 5}}') AS category_facet FROM (SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.all())) paradedb_facet_source)
 
     assert_sql_equal expected, facet_sql
   end
