@@ -13,7 +13,7 @@ namespace :test do
     # Set up ParadeDB connection
     ENV["PARADEDB_TEST_DSN"] ||= "postgresql://postgres:postgres@localhost:5432/postgres"
     ENV["PGPASSWORD"] ||= "postgres"
-    
+
     sh "ruby -Ilib -Ispec -e 'Dir[\"spec/*_integration_spec.rb\", \"spec/*integration*_spec.rb\"].sort.each { |f| require File.expand_path(f) }'"
   end
 

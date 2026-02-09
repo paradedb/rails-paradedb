@@ -37,6 +37,7 @@ class IndexDslUnitTest < Minitest::Test
       self.table_name = :products
       self.key_field = :id
       self.fields = [
+        :id,
         { description: :simple },
         { description: :literal }
       ]
@@ -52,6 +53,7 @@ class IndexDslUnitTest < Minitest::Test
       self.table_name = :products
       self.key_field = :id
       self.fields = [
+        :id,
         { description: { simple: { alias: "description_simple" }, literal: { alias: "description_exact" } } }
       ]
     end

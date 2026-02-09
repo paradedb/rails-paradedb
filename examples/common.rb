@@ -9,6 +9,19 @@ end
 require "active_record"
 require_relative "../lib/parade_db"
 
+class MockItemIndex < ParadeDB::Index
+  self.table_name = :mock_items
+  self.key_field = :id
+  self.fields = [
+    :id,
+    :description,
+    :rating,
+    { category: { literal: { alias: "category" } } },
+    { "metadata->>'color'" => { literal: { alias: "metadata_color" } } },
+    { "metadata->>'location'" => { literal: { alias: "metadata_location" } } }
+  ]
+end
+
 module ExampleCommon
   module_function
 
@@ -39,17 +52,8 @@ module ExampleCommon
     conn.execute(
       "CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');"
     )
-    conn.execute("DROP INDEX IF EXISTS mock_items_bm25_idx;")
-    conn.execute(<<~SQL)
-      CREATE INDEX mock_items_bm25_idx ON mock_items USING bm25 (
-        id,
-        description,
-        rating,
-        (category::pdb.literal('alias=category')),
-        ((metadata->>'color')::pdb.literal('alias=metadata_color')),
-        ((metadata->>'location')::pdb.literal('alias=metadata_location'))
-      ) WITH (key_field='id');
-    SQL
+    conn.remove_bm25_index(:mock_items, if_exists: true)
+    conn.create_paradedb_index(MockItemIndex)
 
     MockItem.reset_column_information
     MockItem.count

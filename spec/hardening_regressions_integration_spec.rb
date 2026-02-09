@@ -2,7 +2,7 @@
 
 require "spec_helper"
 
-class CodeReviewIssuesIntegrationTest < Minitest::Test
+class HardeningRegressionsIntegrationTest < Minitest::Test
   def setup
     skip "Integration test requires PostgreSQL" unless postgresql?
 
@@ -29,7 +29,7 @@ class CodeReviewIssuesIntegrationTest < Minitest::Test
     conn.drop_table(:articles, if_exists: true) rescue nil
   end
 
-  def test_alias_metadata_is_not_rendered_in_tokenizer_sql
+  def test_alias_metadata_is_rendered_in_tokenizer_sql
     index_klass = Class.new(ParadeDB::Index) do
       self.table_name = :articles
       self.key_field = :id
@@ -42,11 +42,11 @@ class CodeReviewIssuesIntegrationTest < Minitest::Test
     conn = ActiveRecord::Base.connection
     sql = conn.send(:build_create_sql, index_klass.compiled_definition, if_not_exists: false)
 
-    refute_includes sql, "alias="
+    assert_includes sql, "alias=title_simple"
     assert_includes sql, "pdb.simple"
   end
 
-  def test_alias_with_tokenizer_options_emits_only_real_options
+  def test_alias_with_tokenizer_options_emits_alias_and_real_options
     index_klass = Class.new(ParadeDB::Index) do
       self.table_name = :articles
       self.key_field = :id
@@ -59,7 +59,7 @@ class CodeReviewIssuesIntegrationTest < Minitest::Test
     conn = ActiveRecord::Base.connection
     sql = conn.send(:build_create_sql, index_klass.compiled_definition, if_not_exists: false)
 
-    refute_includes sql, "alias="
+    assert_includes sql, "alias=body_ngram"
     assert_includes sql, "pdb.ngram"
     assert_includes sql, "2"
     assert_includes sql, "5"
@@ -81,13 +81,15 @@ class CodeReviewIssuesIntegrationTest < Minitest::Test
       ]
     end
 
+    article_model.singleton_class.define_method(:paradedb_index_class) { index_klass }
+
     conn = ActiveRecord::Base.connection
     conn.create_paradedb_index(index_klass)
 
     assert index_exists?(:articles, "articles_bm25_idx")
 
     article_model.create!(title: "Ruby Programming", body: "Learn Ruby basics")
-    results = article_model.search(:title).matching_all("ruby").to_a
+    results = article_model.search(:title_text).matching_all("ruby").to_a
     assert_equal 1, results.length
   end
 
@@ -176,7 +178,7 @@ class CodeReviewIssuesIntegrationTest < Minitest::Test
     index_klass = Class.new(ParadeDB::Index) do
       self.table_name = :articles
       self.key_field = "user.id"
-      self.fields = [:id, :title]
+      self.fields = ["user.id", :title]
     end
 
     conn = ActiveRecord::Base.connection

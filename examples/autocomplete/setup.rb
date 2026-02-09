@@ -3,6 +3,18 @@
 
 require_relative "../common"
 
+class AutocompleteItemIndex < ParadeDB::Index
+  self.table_name = :autocomplete_items
+  self.index_name = :autocomplete_items_idx
+  self.key_field = :id
+  self.fields = [
+    :id,
+    :description,
+    { description: { ngram: { min: 3, max: 8, alias: "description_ngram" } } },
+    { category: { literal: { alias: "category" } } }
+  ]
+end
+
 module AutocompleteSetup
   module_function
 
@@ -40,17 +52,8 @@ module AutocompleteSetup
     puts "  + Copied #{count} products from mock_items"
 
     puts "\nCreating autocomplete-optimized BM25 index..."
-    conn.execute("DROP INDEX IF EXISTS autocomplete_items_idx;")
-    conn.execute(<<~SQL)
-      CREATE INDEX autocomplete_items_idx ON autocomplete_items
-      USING bm25 (
-        id,
-        description,
-        (description::pdb.ngram(3,8,'alias=description_ngram')),
-        (category::pdb.literal('alias=category'))
-      )
-      WITH (key_field='id');
-    SQL
+    conn.remove_bm25_index(:autocomplete_items, name: :autocomplete_items_idx, if_exists: true)
+    conn.create_paradedb_index(AutocompleteItemIndex)
 
     puts "  + Created BM25 index with:"
     puts "    - description (standard tokenizer)"

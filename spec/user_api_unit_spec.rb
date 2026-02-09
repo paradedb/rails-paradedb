@@ -138,6 +138,13 @@ class UserApiUnitTest < Minitest::Test
       WHERE ("products"."description" &&& 'shoes')), sql
   end
 
+  def test_with_score_prefers_paradedb_key_field_when_available
+    with_stubbed_paradedb_key_field(UnitProduct, :category) do
+      sql = UnitProduct.search(:description).matching_all("shoes").with_score.to_sql
+      assert_includes sql, %(pdb.score("products"."category") AS search_score)
+    end
+  end
+
   def test_with_snippet_default
     sql = UnitProduct.search(:description).matching_all("shoes").with_snippet(:description).to_sql
     assert_sql_equal %(SELECT products.*, pdb.snippet("products"."description") AS description_snippet FROM products
@@ -250,6 +257,18 @@ class UserApiUnitTest < Minitest::Test
     assert_includes facet_sql, %("products"."id" @@@ pdb.all())
   end
 
+  def test_facets_with_non_paradedb_sql_predicate_uses_paradedb_key_field_for_match_all
+    with_stubbed_paradedb_key_field(UnitProduct, :category) do
+      facet_sql = UnitProduct.where(Arel.sql(%("products"."price" > 50)))
+                             .extending(ParadeDB::SearchMethods)
+                             .build_facet_query(fields: [:category], size: 10, order: nil)
+                             .sql
+
+      assert_includes facet_sql, %("products"."category" @@@ pdb.all())
+      refute_includes facet_sql, %("products"."id" @@@ pdb.all())
+    end
+  end
+
   def test_facets_with_mixed_paradedb_and_standard_predicates_keeps_existing_paradedb_predicate
     facet_sql = UnitProduct.where(in_stock: true)
                            .search(:description)
@@ -274,6 +293,18 @@ class UserApiUnitTest < Minitest::Test
     SQL
 
     assert_sql_equal expected, sql
+  end
+
+  def test_with_facets_without_paradedb_predicates_uses_paradedb_key_field_for_match_all
+    with_stubbed_paradedb_key_field(UnitProduct, :category) do
+      sql = UnitProduct.where(in_stock: true)
+                       .extending(ParadeDB::SearchMethods)
+                       .with_facets(:category, size: 10)
+                       .to_sql
+
+      assert_includes sql, %("products"."category" @@@ pdb.all())
+      refute_includes sql, %("products"."id" @@@ pdb.all())
+    end
   end
 
   def test_with_facets_default_order_is_desc_count
@@ -388,5 +419,33 @@ class UserApiUnitTest < Minitest::Test
     SQL
 
     assert_sql_equal expected, sql
+  end
+
+  def test_more_like_this_model_input_prefers_paradedb_key_field_value
+    with_stubbed_paradedb_key_field(UnitProduct, :category) do
+      doc = Struct.new(:id, :category).new(7, "audio")
+      sql = UnitProduct.more_like_this(doc, fields: [:description]).to_sql
+
+      assert_includes sql, %("products"."category" @@@ pdb.more_like_this('audio', ARRAY['description']))
+      refute_includes sql, %("products"."id" @@@ pdb.more_like_this(7, ARRAY['description']))
+    end
+  end
+
+  private
+
+  def with_stubbed_paradedb_key_field(model, field)
+    singleton = model.singleton_class
+    original_defined = singleton.method_defined?(:paradedb_key_field)
+    singleton.class_eval { alias_method :__original_paradedb_key_field_for_test, :paradedb_key_field } if original_defined
+    singleton.define_method(:paradedb_key_field) { field }
+    yield
+  ensure
+    singleton.class_eval do
+      remove_method :paradedb_key_field
+      if method_defined?(:__original_paradedb_key_field_for_test)
+        alias_method :paradedb_key_field, :__original_paradedb_key_field_for_test
+        remove_method :__original_paradedb_key_field_for_test
+      end
+    end
   end
 end

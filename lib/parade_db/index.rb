@@ -62,6 +62,7 @@ module ParadeDB
             raise InvalidIndexDefinition, "fields must include at least one indexed field"
           end
 
+          validate_key_field_shape!(key_field.to_s, entries)
           validate_query_key_collisions!(entries)
 
           Compiled.new(
@@ -110,19 +111,15 @@ module ParadeDB
           when Symbol, String
             [build_tokenized_entry(source_name, tokenizer_spec.to_s, {})]
           when Hash
-            if tokenizer_spec.key?(:alias) || tokenizer_spec.key?("alias")
-              [build_tokenized_entry(source_name, nil, normalize_options(tokenizer_spec))]
-            else
-              tokenizer_spec.map do |tokenizer, opts|
-                case opts
-                when Hash
-                  build_tokenized_entry(source_name, tokenizer.to_s, normalize_options(opts))
-                when Symbol, String
-                  build_tokenized_entry(source_name, tokenizer.to_s, normalize_positional_option(opts))
-                else
-                  raise InvalidIndexDefinition,
-                        "tokenizer options for #{source_name}.#{tokenizer} must be a Hash, Symbol, or String"
-                end
+            tokenizer_spec.map do |tokenizer, opts|
+              case opts
+              when Hash
+                build_tokenized_entry(source_name, tokenizer.to_s, normalize_options(opts))
+              when Symbol, String
+                build_tokenized_entry(source_name, tokenizer.to_s, normalize_positional_option(opts))
+              else
+                raise InvalidIndexDefinition,
+                      "tokenizer options for #{source_name}.#{tokenizer} must be a Hash, Symbol, or String"
               end
             end
           else
@@ -144,13 +141,11 @@ module ParadeDB
         def build_tokenized_entry(source_name, tokenizer, options)
           validate_tokenizer_name!(source_name, tokenizer) unless tokenizer.nil?
           key = options[:alias]&.to_s || source_name
-          # Strip :alias from options - it's query metadata, not tokenizer config
-          sql_options = options.except(:alias)
           Entry.new(
             source: source_name,
             expression: expression?(source_name),
             tokenizer: tokenizer,
-            options: sql_options,
+            options: options,
             query_key: key
           )
         end
@@ -177,6 +172,24 @@ module ParadeDB
                   "ambiguous index definition for query key #{query_key.inspect}: #{conflict_sources}. " \
                   "Use unique alias values to disambiguate."
           end
+        end
+
+        def validate_key_field_shape!(key_field_name, entries)
+          unless entries.any? { |entry| entry.source == key_field_name }
+            raise InvalidIndexDefinition,
+                  "key_field #{key_field_name.inspect} must be present in fields."
+          end
+
+          first_entry = entries.first
+          unless first_entry.source == key_field_name
+            raise InvalidIndexDefinition,
+                  "key_field #{key_field_name.inspect} must be first in fields."
+          end
+
+          return if first_entry.tokenizer.nil?
+
+          raise InvalidIndexDefinition,
+                "key_field #{key_field_name.inspect} must not be tokenized."
         end
       end
     end

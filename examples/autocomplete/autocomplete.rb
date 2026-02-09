@@ -22,8 +22,8 @@ def demo_autocomplete
   queries.each do |query|
     puts "\nUser types: '#{query}' ->"
 
-    results = AutocompleteItem.search(:description)
-                              .parse("description_ngram:#{query}")
+    results = AutocompleteItem.search(:description_ngram)
+                              .matching_all(query)
                               .with_score
                               .order(search_score: :desc)
                               .limit(5)

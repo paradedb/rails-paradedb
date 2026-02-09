@@ -193,8 +193,9 @@ module ParadeDB
 
     def more_like_this(key, fields: nil, **options)
       ensure_paradedb_runtime!
-      key_value = key.respond_to?(:id) ? key.id : key
-      pk_node = builder[primary_key]
+      runtime_key_field = paradedb_runtime_key_field
+      key_value = more_like_this_key_value(key, runtime_key_field)
+      pk_node = builder[runtime_key_field]
       mlt_options = normalize_more_like_this_options(options)
       node = builder.more_like_this(pk_node, key_value, fields: fields, options: mlt_options)
       where(grouped(node))
@@ -203,7 +204,7 @@ module ParadeDB
     # ---- Decorators ----
 
     def with_score
-      with_projection(builder.score(primary_key).as("search_score"))
+      with_projection(builder.score(paradedb_runtime_key_field).as("search_score"))
     end
 
     def with_snippet(column, start_tag: nil, end_tag: nil, max_chars: nil)
@@ -241,7 +242,7 @@ module ParadeDB
       facet_args = normalize_facet_inputs(fields: fields, size: size, order: order, missing: missing, agg: agg)
       FacetQuery.build(
         relation: self,
-        primary_key: primary_key,
+        primary_key: paradedb_runtime_key_field,
         builder: builder,
         fields: facet_args[:fields],
         size: facet_args[:size],
@@ -287,10 +288,26 @@ module ParadeDB
 
     def ensure_paradedb_predicate
       # Add pdb.all() sentinel to force aggregate pushdown
-      where(grouped(builder.match_all(primary_key)))
+      where(grouped(builder.match_all(paradedb_runtime_key_field)))
     end
 
     private
+
+    def paradedb_runtime_key_field
+      return primary_key unless klass.respond_to?(:paradedb_key_field)
+
+      key_field = klass.paradedb_key_field
+      return primary_key if key_field.nil? || key_field.to_s.empty?
+
+      key_field
+    end
+
+    def more_like_this_key_value(key, runtime_key_field)
+      return key.public_send(runtime_key_field) if key.respond_to?(runtime_key_field)
+      return key.id if key.respond_to?(:id)
+
+      key
+    end
 
     def ensure_paradedb_runtime!
       ParadeDB.ensure_postgresql_adapter!(connection, context: "ParadeDB search")

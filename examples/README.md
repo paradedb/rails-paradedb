@@ -91,4 +91,5 @@ BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/rag/rag.rb
 
 - ActiveRecord connection bootstrap
 - `MockItem` model using `ParadeDB::Model`
-- `setup_mock_items!` to create the table + BM25 index
+- `setup_mock_items!` to create the table + BM25 index via
+  `ParadeDB::Index` DSL (`MockItemIndex`)

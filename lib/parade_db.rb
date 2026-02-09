@@ -11,8 +11,23 @@ module ParadeDB
   class FacetQueryError < ArgumentError; end
   class UnsupportedAdapterError < ArgumentError; end
   class MethodCollisionError < ArgumentError; end
+  class FieldNotIndexed < ArgumentError; end
+  class IndexClassNotFoundError < ArgumentError; end
+  class IndexDriftError < ArgumentError; end
 
   module_function
+
+  def index_validation_mode
+    @index_validation_mode ||= :warn
+  end
+
+  def index_validation_mode=(mode)
+    normalized = mode.to_sym
+    valid_modes = %i[warn raise off]
+    return @index_validation_mode = normalized if valid_modes.include?(normalized)
+
+    raise ArgumentError, "index_validation_mode must be one of: #{valid_modes.join(', ')}"
+  end
 
   def ensure_postgresql_adapter!(connection, context:)
     adapter_name = connection.adapter_name.to_s

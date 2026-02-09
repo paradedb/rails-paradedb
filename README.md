@@ -6,7 +6,8 @@
 [![Slack URL](https://img.shields.io/badge/Join%20Slack-purple?logo=slack&link=https%3A%2F%2Fjoin.slack.com%2Ft%2Fparadedbcommunity%2Fshared_invite%2Fzt-32abtyjg4-yoYoi~RPh9MSW8tDbl0BQw)](https://join.slack.com/t/paradedbcommunity/shared_invite/zt-32abtyjg4-yoYoi~RPh9MSW8tDbl0BQw)
 [![X URL](https://img.shields.io/twitter/url?url=https%3A%2F%2Ftwitter.com%2Fparadedb&label=Follow%20%40paradedb)](https://x.com/paradedb)
 
-[ParadeDB](https://paradedb.com) — simple, Elastic-quality search for Postgres — integration for ActiveRecord.
+[ParadeDB](https://paradedb.com) — simple, Elastic-quality search for
+Postgres — integration for ActiveRecord.
 
 For complete ParadeDB documentation, see [docs.paradedb.com](https://docs.paradedb.com/).
 
@@ -19,7 +20,9 @@ For complete ParadeDB documentation, see [docs.paradedb.com](https://docs.parade
 | ParadeDB   | 0.21.* (tested on 0.21.4)        |
 | PostgreSQL | 17, 18 (with ParadeDB extension) |
 
-**Note**: This gem requires ActiveRecord with PostgreSQL. The DSL and Arel layer delegate SQL value quoting to `ActiveRecord::Base.connection.quote` for type safety and proper escaping.
+**Note**: This gem requires ActiveRecord with PostgreSQL. The DSL and Arel
+layer delegate SQL value quoting to `ActiveRecord::Base.connection.quote` for
+type safety and proper escaping.
 
 ## Installation
 
@@ -60,15 +63,157 @@ Check out some examples:
 - [Hybrid Search (RRF)](examples/hybrid_rrf/hybrid_rrf.rb)
 - [RAG](examples/rag/rag.rb)
 
-## BM25 Index
+## BM25 Index DSL and Migrations
 
-> **Note:** This gem does not yet provide a Rails DSL for BM25 index creation or migrations. This feature will be added in a future version.
->
-> For now, please refer to the [ParadeDB documentation](https://docs.paradedb.com/) for index creation, migrations, tokenizers, and stemmers configuration.
+Define an index class with `ParadeDB::Index`:
+
+```ruby
+# app/models/product_index.rb
+class ProductIndex < ParadeDB::Index
+  self.table_name = :products
+  self.key_field = :id
+  self.fields = [
+    :id,                                # key_field must be first
+    { description: :simple },           # tokenizer shorthand
+    { category: { literal: {} } },      # tokenizer with options hash
+    { "metadata->>'title'" => { simple: { alias: "metadata_title" } } }
+  ]
+end
+```
+
+Run migrations with helper APIs:
+
+```ruby
+class AddProductBm25Index < ActiveRecord::Migration[8.0]
+  disable_ddl_transaction! # recommended for concurrent reindex paths
+
+  def up
+    create_paradedb_index ProductIndex
+  end
+
+  def down
+    remove_bm25_index :products
+  end
+end
+```
+
+Helpers available on PostgreSQL adapters:
+
+- `create_paradedb_index ProductIndex, if_not_exists: true`
+- `replace_paradedb_index ProductIndex`
+- `add_bm25_index :products, fields:, key_field:, name: nil, if_not_exists: false`
+- `remove_bm25_index :products, name: nil, if_exists: false`
+- `reindex_bm25 :products, name: nil, concurrently: false`
+
+`reindex_bm25` accepts `name:` so you can target a specific index when
+multiple BM25 indexes exist:
+
+```ruby
+reindex_bm25 :products, name: :products_bm25_v2_idx, concurrently: true
+```
+
+### Tokenizer forms
+
+The DSL supports both shorthand and explicit forms:
+
+```ruby
+class ProductIndex < ParadeDB::Index
+  self.table_name = :products
+  self.key_field = :id
+  self.fields = [
+    :id,
+    { description: :simple },                      # => ::pdb.simple
+    { description: { ngram: { min: 2, max: 5 } } }, # => ::pdb.ngram(2, 5)
+    { title: { lindera: :japanese } },            # => ::pdb.lindera(japanese)
+    { title: { "pdb::abc(12, \"fafda\")" => {} } } # inline tokenizer expression
+  ]
+end
+```
+
+### Runtime model workflow
+
+By convention, `Product` resolves `ProductIndex` automatically. You can still
+include `ParadeDB::Model` explicitly, but it is not required.
+
+```ruby
+class Product < ApplicationRecord
+end
+
+Product.search(:description).matching_all("running shoes")
+Product.paradedb_indexed_fields  # => ["id", "description", ...]
+Product.paradedb_key_field       # => :id
+Product.paradedb_index_name      # => "products_bm25_idx"
+```
+
+Field validation is enforced:
+
+```ruby
+Product.search(:non_indexed_field)
+# raises ParadeDB::FieldNotIndexed
+```
+
+## Index Lifecycle Workflows
+
+### 1. Keep one stable index name (simple path)
+
+Use a single class with default index name and replace in place:
+
+```ruby
+class ProductIndex < ParadeDB::Index
+  self.table_name = :products
+  self.key_field = :id
+  self.fields = [:id, { description: :simple }]
+end
+
+replace_paradedb_index ProductIndex
+```
+
+This is simplest but performs a drop/create on the same name.
+
+### 2. Versioned index names (safer rollout path)
+
+Create a second index with a new name and new fields, keep old index until
+validation is complete:
+
+```ruby
+class ProductIndexV2 < ParadeDB::Index
+  self.table_name = :products
+  self.index_name = :products_bm25_v2_idx
+  self.key_field = :id
+  self.fields = [
+    :id,
+    { description: :simple },
+    { category: :literal }
+  ]
+end
+
+create_paradedb_index ProductIndexV2, if_not_exists: true
+```
+
+Then:
+
+1. Validate query behavior/performance against V2.
+2. Reindex only V2 if needed:
+   - `reindex_bm25 :products, name: :products_bm25_v2_idx, concurrently: true`
+3. Remove the old index when ready:
+   - `remove_bm25_index :products, name: :products_bm25_idx, if_exists: true`
+
+### 3. Schema dump/load with DSL class references
+
+When indexes are created through helper APIs, schema dump includes DSL
+references like:
+
+```ruby
+create_paradedb_index "ProductIndexV2"
+```
+
+On schema load, the class name is resolved and the index is recreated from
+your DSL definition.
 
 ## Query Types
 
-For a full list of supported query types and advanced options, please refer to the [ParadeDB Query Builder Documentation](https://docs.paradedb.com/documentation/query-builder/overview).
+For a full list of supported query types and advanced options, refer to the
+[ParadeDB Query Builder Documentation](https://docs.paradedb.com/documentation/query-builder/overview).
 
 ### Basic Search
 
@@ -128,9 +273,13 @@ Product.search(:category).term("electronics", boost: 2.0)
 
 ### When to use `term` vs `matching_all`
 
-- **`matching_all`** / **`matching_any`**: Standard full-text search. The query string is tokenized and matched against indexed tokens. Use for natural language queries like `"running shoes"`.
+- **`matching_all`** / **`matching_any`**: Standard full-text search. The
+  query string is tokenized and matched against indexed tokens. Use for natural
+  language queries like `"running shoes"`.
 
-- **`term`**: Exact token match without further tokenization. The query is treated as a finalized token. Use when you need precise control, such as matching a specific category value or status field.
+- **`term`**: Exact token match without further tokenization. The query is
+  treated as a finalized token. Use when you need precise control, such as
+  matching a specific category value or status field.
 
 ```ruby
 # Full-text search - tokenizes "running shoes" into ["running", "shoes"]
@@ -233,7 +382,8 @@ Product.search(:description).parse("running AND shoes", lenient: true)
 
 ### BM25 Score
 
-Get the relevance score for each result. For more information on how scores are calculated, see [BM25 Scoring](https://docs.paradedb.com/documentation/sorting/score).
+Get the relevance score for each result. For more information on how scores are
+calculated, see [BM25 Scoring](https://docs.paradedb.com/documentation/sorting/score).
 
 ```ruby
 Product.search(:description).matching_all("shoes")
@@ -275,7 +425,8 @@ Product.search(:description).matching_all("running", "shoes")
 
 ## Faceted Search
 
-For a full list of supported aggregations and advanced options, please refer to the [ParadeDB Aggregations Documentation](https://docs.paradedb.com/documentation/aggregates/overview).
+For a full list of supported aggregations and advanced options, refer to the
+[ParadeDB Aggregations Documentation](https://docs.paradedb.com/documentation/aggregates/overview).
 
 ### Requirements
 
@@ -294,7 +445,9 @@ The `.with_facets()` method has specific requirements:
 
 **Why these requirements?**
 
-ParadeDB's aggregation uses window functions (`pdb.agg() OVER ()`) which require ordered, limited result sets when combined with row data. Without ordering and limits, PostgreSQL cannot efficiently compute the aggregations.
+ParadeDB's aggregation uses window functions (`pdb.agg() OVER ()`) which
+require ordered, limited result sets when combined with row data. Without
+ordering and limits, PostgreSQL cannot efficiently compute the aggregations.
 
 ### Basic Usage
 
@@ -309,7 +462,11 @@ relation = Product.search(:description).matching_all("shoes")
 
 rows = relation.to_a           # Product records
 facets = relation.facets       # Facet buckets hash
-# facets = {"category" => {"buckets" => [{"key" => "footwear", "doc_count" => 5}, ...]}}
+# facets = {
+#   "category" => {
+#     "buckets" => [{ "key" => "footwear", "doc_count" => 5 }, ...]
+#   }
+# }
 ```
 
 ```ruby
@@ -446,7 +603,9 @@ Product.search(:description).matching_all("shoes")
 
 ## Arel Layer
 
-The user API is built on top of a dedicated Arel layer that provides an AST and SQL renderer for ParadeDB operators. This is useful for building complex queries in case the ActiveRecord Syntax is not enough. All of the ActiveRecord syntax is available in the Arel layer as well. 
+The user API is built on top of a dedicated Arel layer that provides an AST
+and SQL renderer for ParadeDB operators. This is useful for building complex
+queries when ActiveRecord syntax is not enough.
 
 ### Quickstart
 
@@ -460,30 +619,33 @@ predicate = arel.match(:description, "running", "shoes")
                .and(arel.term(:in_stock, true))
 
 sql = ParadeDB::Arel.to_sql(predicate, Product.connection)
-# => ("products"."description" &&& 'running shoes' AND "products"."description" @@@ pdb.regex('run.*') AND "products"."in_stock" === TRUE)
+# => ("products"."description" &&& 'running shoes'
+#     AND "products"."description" @@@ pdb.regex('run.*')
+#     AND "products"."in_stock" === TRUE)
 
 Product.where(Arel.sql(sql))
 ```
 
-Render any node with `ParadeDB::Arel.to_sql(node)`. All nodes respond to `.and`, `.or`, and `.not`.
+Render any node with `ParadeDB::Arel.to_sql(node)`. All nodes respond to
+`.and`, `.or`, and `.not`.
 
 ### Builder Methods
 
-| Method | ParadeDB SQL |
-|--------|--------------|
-| `match(column, *terms, boost: nil)` | `column &&& 'a b'::pdb.boost(N)` |
-| `match_any(column, *terms)` | `column \|\|\| 'a b'` |
-| `phrase(column, text, slop: n)` | `column ### 'text'::pdb.slop(n)` |
-| `term(column, term, boost: nil)` | `column === 'term'::pdb.boost(N)` |
-| `fuzzy(column, term, distance:, prefix:, boost:)` | `column === 'term'::pdb.fuzzy(d[, "true"])::pdb.boost(N)` |
-| `regex(column, pattern)` | `column @@@ pdb.regex('pattern')` |
-| `near(column, a, b, distance:)` | `column @@@ ('a' ## d ## 'b')` |
-| `phrase_prefix(column, *terms)` | `column @@@ pdb.phrase_prefix(ARRAY['a','b'])` |
-| `full_text(column, expr)` | `column @@@ expr` (raw right-hand value) |
-| `more_like_this(column, key, fields: [:f1, :f2])` | `column @@@ pdb.more_like_this(key, ARRAY['f1','f2'])` |
-| `score(key_field)` | `pdb.score(key_field)` |
-| `snippet(column, start, finish, max)` | `pdb.snippet(column, start, finish, max)` |
-| `agg(json)` | `pdb.agg(json)` |
+- `match(column, *terms, boost: nil)`: `column &&& 'a b'::pdb.boost(N)`
+- `match_any(column, *terms)`: `column ||| 'a b'`
+- `phrase(column, text, slop: n)`: `column ### 'text'::pdb.slop(n)`
+- `term(column, term, boost: nil)`: `column === 'term'::pdb.boost(N)`
+- `fuzzy(column, term, distance:, prefix:, boost:)`:
+  `column === 'term'::pdb.fuzzy(d[, "true"])::pdb.boost(N)`
+- `regex(column, pattern)`: `column @@@ pdb.regex('pattern')`
+- `near(column, a, b, distance:)`: `column @@@ ('a' ## d ## 'b')`
+- `phrase_prefix(column, *terms)`: `column @@@ pdb.phrase_prefix(ARRAY['a','b'])`
+- `full_text(column, expr)`: `column @@@ expr` (raw right-hand value)
+- `more_like_this(column, key, fields: [:f1, :f2])`:
+  `column @@@ pdb.more_like_this(key, ARRAY['f1','f2'])`
+- `score(key_field)`: `pdb.score(key_field)`
+- `snippet(column, start, finish, max)`: `pdb.snippet(column, start, finish, max)`
+- `agg(json)`: `pdb.agg(json)`
 
 `Builder#[]` returns a column node for manual composition: `arel[:description]`.
 
@@ -500,7 +662,8 @@ predicate = fast.or(cheap.not)
 `predicate` renders to:
 
 ```sql
-(("products"."description" &&& 'running' AND "products"."rating" === 4) OR NOT ("products"."description" &&& 'budget'))
+(("products"."description" &&& 'running' AND "products"."rating" === 4)
+ OR NOT ("products"."description" &&& 'budget'))
 ```
 
 ## Security
@@ -513,11 +676,13 @@ rails-paradedb uses **ActiveRecord's quoting** for all search terms:
 
 - All user input is quoted via `ActiveRecord::Base.connection.quote`
 - Search terms use Arel's `Nodes.build_quoted()` for type-safe SQL generation
-- This prevents SQL injection while maintaining compatibility with ParadeDB's full-text operators
+- This prevents SQL injection while maintaining compatibility with ParadeDB's
+  full-text operators
 
 **Implementation Details:**
 
 All values flow through ActiveRecord's connection adapter quoting, which handles:
+
 - String escaping (`'` → `''`)
 - Type coercion (booleans, numbers)
 - NULL handling

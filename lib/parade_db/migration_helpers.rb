@@ -4,15 +4,19 @@ module ParadeDB
   module MigrationHelpers
     def create_paradedb_index(index_klass, if_not_exists: false)
       ensure_postgresql_adapter!
-      compiled = index_klass.compiled_definition
+      resolved = resolve_index_klass(index_klass)
+      compiled = resolved.compiled_definition
       execute(build_create_sql(compiled, if_not_exists: if_not_exists))
+      remember_schema_index_reference(resolved)
     end
 
     def replace_paradedb_index(index_klass)
       ensure_postgresql_adapter!
-      compiled = index_klass.compiled_definition
+      resolved = resolve_index_klass(index_klass)
+      compiled = resolved.compiled_definition
       remove_bm25_index(compiled.table_name, name: compiled.index_name, if_exists: true)
       execute(build_create_sql(compiled, if_not_exists: false))
+      remember_schema_index_reference(resolved)
     end
 
     def add_bm25_index(table, fields:, key_field:, name: nil, if_not_exists: false)
@@ -33,6 +37,31 @@ module ParadeDB
       execute("DROP INDEX #{prefix}#{quote_table_name(index_name)}")
     end
 
+    def reindex_bm25(table, name: nil, concurrently: false)
+      ensure_postgresql_adapter!
+      if concurrently && transaction_open_for_paradedb?
+        raise ArgumentError, "reindex_bm25 concurrently: true cannot run inside a transaction"
+      end
+
+      index_name = (name || "#{table}_bm25_idx").to_s
+      modifier = concurrently ? " CONCURRENTLY" : ""
+      execute("REINDEX INDEX#{modifier} #{quote_table_name(index_name)}")
+    end
+
+    def dump_paradedb_indexes(stream)
+      refs = paradedb_schema_index_references
+      return if refs.empty?
+
+      stream.puts
+      refs.each do |index_class_name|
+        stream.puts %(  create_paradedb_index "#{index_class_name}")
+      end
+    end
+
+    def paradedb_schema_index_references
+      (@paradedb_schema_index_references || []).uniq.sort
+    end
+
     private
 
     def ensure_postgresql_adapter!
@@ -42,11 +71,12 @@ module ParadeDB
     def build_create_sql(compiled, if_not_exists:)
       prefix = if_not_exists ? "IF NOT EXISTS " : ""
       fields_sql = compiled.entries.map { |entry| bm25_entry_sql(entry) }.join(", ")
+      escaped_key_field = quote_string(compiled.key_field.to_s)
 
       <<~SQL.strip.gsub(/\s+/, " ")
         CREATE INDEX #{prefix}#{quote_table_name(compiled.index_name)} ON #{quote_table_name(compiled.table_name)}
         USING bm25 (#{fields_sql})
-        WITH (key_field='#{compiled.key_field}')
+        WITH (key_field='#{escaped_key_field}')
       SQL
     end
 
@@ -104,9 +134,60 @@ module ParadeDB
 
       [positional, named]
     end
+
+    def resolve_index_klass(index_klass)
+      case index_klass
+      when String
+        resolve_named_constant(index_klass)
+      else
+        index_klass
+      end
+    end
+
+    def resolve_named_constant(name)
+      name.to_s.split("::").inject(Object) { |ctx, const_name| ctx.const_get(const_name) }
+    rescue NameError
+      raise ParadeDB::InvalidIndexDefinition, "Unknown index class #{name.inspect}"
+    end
+
+    def remember_schema_index_reference(index_klass)
+      return unless index_klass.respond_to?(:name)
+
+      klass_name = index_klass.name
+      return if klass_name.nil? || klass_name.empty?
+
+      @paradedb_schema_index_references ||= []
+      @paradedb_schema_index_references << klass_name
+    end
+
+    def transaction_open_for_paradedb?
+      return transaction_open? if respond_to?(:transaction_open?)
+      return open_transactions.to_i.positive? if respond_to?(:open_transactions)
+
+      false
+    end
   end
 end
 
 if defined?(ActiveRecord::ConnectionAdapters::AbstractAdapter)
   ActiveRecord::ConnectionAdapters::AbstractAdapter.include(ParadeDB::MigrationHelpers)
+end
+
+if defined?(ActiveRecord::SchemaDumper)
+  module ParadeDB
+    module SchemaDumperPatch
+      def tables(stream)
+        super
+        conn =
+          if instance_variable_defined?(:@connection)
+            instance_variable_get(:@connection)
+          elsif respond_to?(:connection_pool)
+            connection_pool.connection
+          end
+        conn.dump_paradedb_indexes(stream) if conn&.respond_to?(:dump_paradedb_indexes)
+      end
+    end
+  end
+
+  ActiveRecord::SchemaDumper.prepend(ParadeDB::SchemaDumperPatch)
 end

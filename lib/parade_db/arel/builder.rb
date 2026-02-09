@@ -122,7 +122,7 @@ module ParadeDB
 
       def column_node(column)
         case column
-        when ::Arel::Attributes::Attribute, ::Arel::Nodes::Node
+        when ::Arel::Attributes::Attribute, ::Arel::Nodes::Node, ::Arel::Nodes::SqlLiteral
           column
         when Symbol, String
           if arel_table

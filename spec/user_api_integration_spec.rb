@@ -15,603 +15,220 @@ class Category < ActiveRecord::Base
 end
 
 class UserApiIntegrationTest < Minitest::Test
-  def test_matching_all_with_filters
-    sql = Product.search(:description)
+  def setup
+    skip "Integration tests require PostgreSQL" unless postgresql?
+
+    ensure_paradedb_setup!
+    seed_products!
+  end
+
+  def test_matching_all_with_filters_executes
+    ids = Product.search(:description)
                  .matching_all("running", "shoes")
                  .where(in_stock: true)
                  .where("products.price < 100")
                  .where(rating: 4..)
-                 .to_sql
+                 .order(:id)
+                 .pluck(:id)
 
-    expected = <<~SQL.strip
-      SELECT products.* FROM products
-      WHERE ("products"."description" &&& 'running shoes')
-        AND "products"."in_stock" = true
-        AND (products.price < 100)
-        AND "products"."rating" >= 4
-    SQL
-
-    assert_sql_equal expected, sql
+    assert_equal [2], ids
   end
 
-  def test_closed_range_filter
-    sql = Product.search(:description)
-                 .matching_all("shoes")
-                 .where(price: 10..100)
-                 .to_sql
+  def test_range_filters_execute
+    closed = Product.search(:description).matching_all("shoes").where(price: 90..120).order(:id).pluck(:id)
+    exclusive = Product.search(:description).matching_all("shoes").where(price: 90...120).order(:id).pluck(:id)
 
-    expected = <<~SQL.strip
-      SELECT products.* FROM products
-      WHERE ("products"."description" &&& 'shoes')
-        AND "products"."price" BETWEEN 10 AND 100
-    SQL
-
-    assert_sql_equal expected, sql
+    assert_equal [1, 2], closed
+    assert_equal [2], exclusive
   end
 
-  def test_exclusive_end_range_filter
-    sql = Product.search(:description)
-                 .matching_all("shoes")
-                 .where(price: 10...100)
-                 .to_sql
+  def test_chain_multiple_search_fields_with_and_executes
+    ids = Product.search(:description).matching_all("running", "shoes")
+                 .search(:category).phrase("footwear")
+                 .order(:id)
+                 .pluck(:id)
 
-    expected = <<~SQL.strip
-      SELECT products.* FROM products
-      WHERE ("products"."description" &&& 'shoes')
-        AND "products"."price" >= 10 AND "products"."price" < 100
-    SQL
-
-    assert_sql_equal expected, sql
+    assert_equal [1, 2], ids
   end
 
-  def test_chain_multiple_search_fields_and
-    sql = Product.search(:description).matching_all("running", "shoes")
-                 .search(:category).phrase("Footwear")
-                 .to_sql
-
-    expected = <<~SQL.strip
-      SELECT products.* FROM products
-      WHERE ("products"."description" &&& 'running shoes') AND ("products"."category" ### 'Footwear')
-    SQL
-
-    assert_sql_equal expected, sql
+  def test_matching_any_excluding_phrase_fuzzy_regex_term_near_prefix_parse_match_all_execute
+    assert_equal [3, 5], Product.search(:description).matching_any("wireless", "hiking").order(:id).pluck(:id)
+    assert_equal [1], Product.search(:description).matching_all("shoes").excluding("trail").order(:id).pluck(:id)
+    assert_equal [1, 2], Product.search(:description).phrase("running shoes").order(:id).pluck(:id)
+    assert_equal [1, 2], Product.search(:description).fuzzy("shose", distance: 2).order(:id).pluck(:id)
+    assert_equal [1, 2, 6], Product.search(:description).regex("run.*").order(:id).pluck(:id)
+    assert_equal [3, 4], Product.search(:category).term("audio").order(:id).pluck(:id)
+    assert_equal [1, 2], Product.search(:description).near("running", "shoes", distance: 1).order(:id).pluck(:id)
+    assert_equal [1, 2, 5], Product.search(:category).phrase_prefix("foot").order(:id).pluck(:id)
+    assert_equal [1, 2], Product.search(:description).parse("running AND shoes", lenient: true).order(:id).pluck(:id)
+    assert_equal [1, 2, 3], Product.search(:id).match_all.order(:id).limit(3).pluck(:id)
   end
 
-  def test_matching_any_or_semantics
-    sql = Product.search(:description).matching_any("wireless", "bluetooth").to_sql
-    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ||| 'wireless bluetooth')), sql
+  def test_more_like_this_executes
+    ids = Product.more_like_this(3, fields: [:description]).order(:id).pluck(:id)
+    assert_includes ids, 4
   end
 
-  def test_excluding_terms
-    sql = Product.search(:description)
-                 .matching_all("shoes")
-                 .excluding("cheap", "budget")
-                 .to_sql
+  def test_with_score_and_snippet_projections_execute
+    rows = Product.search(:description)
+                  .matching_all("running shoes")
+                  .with_score
+                  .with_snippet(:description, start_tag: "<mark>", end_tag: "</mark>", max_chars: 80)
+                  .order(search_score: :desc)
+                  .limit(3)
+                  .to_a
 
-    expected = <<~SQL.strip
-      SELECT products.* FROM products
-      WHERE ("products"."description" &&& 'shoes') AND (NOT ("products"."description" &&& 'cheap budget'))
-    SQL
-
-    assert_sql_equal expected, sql
+    refute_empty rows
+    rows.each do |row|
+      refute_nil row.search_score
+      refute_nil row.description_snippet
+      assert_includes row.description_snippet, "<mark>"
+    end
   end
 
-  def test_phrase_with_slop
-    sql = Product.search(:description).phrase("running shoes", slop: 2).to_sql
-    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ### 'running shoes'::pdb.slop(2))), sql
-  end
-
-  def test_fuzzy_with_prefix
-    sql = Product.search(:description).fuzzy("runn", distance: 1, prefix: true).to_sql
-    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" === 'runn'::pdb.fuzzy(1, "true"))), sql
-  end
-
-  def test_regex
-    sql = Product.search(:description).regex("run.*shoes").to_sql
-    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.regex('run.*shoes'))), sql
-  end
-
-  def test_term_exact
-    sql = Product.search(:description).term("shoes").to_sql
-    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" === 'shoes')), sql
-  end
-
-  def test_near_proximity
-    sql = Product.search(:description).near("sleek", "shoes", distance: 1).to_sql
-    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('sleek' ## 1 ## 'shoes'))), sql
-  end
-
-  def test_phrase_prefix
-    sql = Product.search(:description).phrase_prefix("run", "sh").to_sql
-    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.phrase_prefix(ARRAY['run', 'sh']))), sql
-  end
-
-  def test_parse_query
-    sql = Product.search(:description).parse("running AND shoes", lenient: true).to_sql
-    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.parse('running AND shoes', lenient => true))), sql
-  end
-
-  def test_match_all_wrapper
-    sql = Product.search(:id).match_all.to_sql
-    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.all())), sql
-  end
-
-  def test_more_like_this
-    sql = Product.more_like_this(3, fields: [:description]).to_sql
-    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.more_like_this(3, ARRAY['description']))), sql
-  end
-
-  def test_with_score_and_order
-    sql = Product.search(:description)
-                 .matching_all("running", "shoes")
-                 .with_score
-                 .order(search_score: :desc)
-                 .to_sql
-
-    expected = <<~SQL.strip
-      SELECT products.*, pdb.score("products"."id") AS search_score FROM products
-      WHERE ("products"."description" &&& 'running shoes')
-      ORDER BY search_score DESC
-    SQL
-
-    assert_sql_equal expected, sql
-  end
-
-  def test_with_snippet_default
-    sql = Product.search(:description)
-                 .matching_all("running shoes")
-                 .with_snippet(:description)
-                 .to_sql
-
-    expected = <<~SQL.strip
-      SELECT products.*, pdb.snippet("products"."description") AS description_snippet FROM products
-      WHERE ("products"."description" &&& 'running shoes')
-    SQL
-
-    assert_sql_equal expected, sql
-  end
-
-  def test_with_snippet_custom
-    sql = Product.search(:description)
-                 .matching_all("running shoes")
-                 .with_snippet(:description, start_tag: '<mark>', end_tag: '</mark>', max_chars: 100)
-                 .to_sql
-
-    expected = <<~SQL.strip
-      SELECT products.*, pdb.snippet("products"."description", '<mark>', '</mark>', 100) AS description_snippet FROM products
-      WHERE ("products"."description" &&& 'running shoes')
-    SQL
-
-    assert_sql_equal expected, sql
-  end
-
-  def test_with_score_then_with_snippet_keeps_both_projections
-    sql = Product.search(:description)
-                 .matching_all("shoes")
-                 .with_score
-                 .with_snippet(:description)
-                 .to_sql
-
-    expected = <<~SQL.strip
-      SELECT products.*, pdb.score("products"."id") AS search_score, pdb.snippet("products"."description") AS description_snippet FROM products
-      WHERE ("products"."description" &&& 'shoes')
-    SQL
-
-    assert_sql_equal expected, sql
-  end
-
-  def test_with_snippet_then_with_score_keeps_both_projections
-    sql = Product.search(:description)
-                 .matching_all("shoes")
-                 .with_snippet(:description)
-                 .with_score
-                 .to_sql
-
-    expected = <<~SQL.strip
-      SELECT products.*, pdb.snippet("products"."description") AS description_snippet, pdb.score("products"."id") AS search_score FROM products
-      WHERE ("products"."description" &&& 'shoes')
-    SQL
-
-    assert_sql_equal expected, sql
-  end
-
-  def test_or_across_fields
-    base = Product.where(in_stock: true).order(id: :desc).limit(10)
+  def test_or_across_fields_with_base_scope_executes
+    base = Product.where(in_stock: true)
     left = base.search(:description).matching_all("shoes")
     right = base.search(:category).matching_all("footwear")
 
-    sql = left.or(right).to_sql
-
-    expected = <<~SQL.strip
-      SELECT products.* FROM products
-      WHERE "products"."in_stock" = TRUE AND ("products"."description" &&& 'shoes' OR "products"."category" &&& 'footwear')
-      ORDER BY "products"."id" DESC
-      LIMIT 10
-    SQL
-
-    assert_sql_equal expected, sql
+    ids = left.or(right).order(:id).pluck(:id)
+    assert_equal [1, 2, 5], ids
   end
 
-  def test_facets_only
-    facet_sql = Product.search(:description).matching_all("shoes")
-                       .build_facet_query(fields: [:category, :brand], size: 10, order: "-count")
-                       .sql
+  def test_facets_only_executes
+    facets = Product.search(:description).matching_all("shoes").facets(:rating, size: 10)
 
-    expected = %(SELECT pdb.agg('{"terms":{"field":"category","size":10,"order":{"_count":"desc"}}}') AS category_facet, pdb.agg('{"terms":{"field":"brand","size":10,"order":{"_count":"desc"}}}') AS brand_facet FROM (SELECT products.* FROM products WHERE ("products"."description" &&& 'shoes')) paradedb_facet_source)
-
-    assert_sql_equal expected, facet_sql
+    assert_kind_of Hash, facets
+    assert_includes facets, "rating"
   end
 
-  def test_with_facets_rows_plus_facets
-    sql = Product.search(:description).matching_all("shoes")
-                 .where(in_stock: true)
-                 .with_facets(:category, :brand, size: 10)
-                 .order(rating: :desc)
-                 .limit(10)
-                 .to_sql
+  def test_with_facets_rows_plus_facets_executes
+    relation = Product.search(:description).matching_all("shoes")
+                      .where(in_stock: true)
+                      .with_facets(:rating, size: 10)
+                      .order(rating: :desc)
+                      .limit(10)
 
-    expected = <<~SQL.strip
-      SELECT products.*, pdb.agg('{"terms":{"field":"category","size":10,"order":{"_count":"desc"}}}') OVER () AS _category_facet, pdb.agg('{"terms":{"field":"brand","size":10,"order":{"_count":"desc"}}}') OVER () AS _brand_facet FROM products
-      WHERE ("products"."description" &&& 'shoes') AND "products"."in_stock" = true
-      ORDER BY "products"."rating" DESC
-      LIMIT 10
-    SQL
+    rows = relation.to_a
+    assert_equal [1, 2], rows.map(&:id).sort
 
-    assert_sql_equal expected, sql
+    facets = relation.facets
+    assert_includes facets, "rating"
   end
 
-  # ===== Tests combining ActiveRecord + ParadeDB features =====
-
-  def test_search_on_scoped_relation_preserves_scope
-    # Start with a scoped relation, then add search
-    sql = Product.where(in_stock: true)
+  def test_search_on_scoped_relation_preserves_scope_semantics
+    ids = Product.where(in_stock: true)
                  .where(price: 10..100)
                  .search(:description)
                  .matching_all("wireless")
-                 .to_sql
+                 .order(:id)
+                 .pluck(:id)
 
-    expected = <<~SQL.strip
-      SELECT products.* FROM products
-      WHERE "products"."in_stock" = true
-        AND "products"."price" BETWEEN 10 AND 100
-        AND ("products"."description" &&& 'wireless')
-    SQL
-
-    assert_sql_equal expected, sql
+    assert_equal [3], ids
   end
 
-  def test_search_with_joins
-    # Search combined with JOIN
-    sql = Product.joins("LEFT JOIN categories ON products.category_id = categories.id")
+  def test_search_with_joins_executes
+    ids = Product.joins("INNER JOIN categories ON categories.name = products.category")
                  .search(:description)
-                 .matching_all("shoes")
-                 .where("categories.active = true")
-                 .to_sql
+                 .matching_all("running")
+                 .where(categories: { name: "footwear" })
+                 .order(:id)
+                 .pluck(:id)
 
-    expected = <<~SQL.strip
-      SELECT products.* FROM products
-      LEFT JOIN categories ON products.category_id = categories.id
-      WHERE ("products"."description" &&& 'shoes')
-        AND (categories.active = true)
-    SQL
-
-    assert_sql_equal expected, sql
+    assert_equal [1, 2], ids
   end
 
-  def test_search_with_group_and_having
-    # Search with GROUP BY and HAVING
-    sql = Product.search(:description)
-                 .matching_all("shoes")
-                 .select("products.*, COUNT(*) as order_count")
-                 .group("products.id")
-                 .having("COUNT(*) > 5")
-                 .to_sql
+  def test_search_with_group_and_having_executes
+    rows = Product.search(:description)
+                  .matching_all("running")
+                  .group(:category)
+                  .having("COUNT(*) >= 2")
+                  .order(:category)
+                  .pluck(:category, Arel.sql("COUNT(*)::int"))
 
-    expected = <<~SQL.strip
-      SELECT products.*, COUNT(*) as order_count FROM products
-      WHERE ("products"."description" &&& 'shoes')
-      GROUP BY products.id
-      HAVING (COUNT(*) > 5)
-    SQL
-
-    assert_sql_equal expected, sql
+    assert_equal [["footwear", 2]], rows
   end
 
-  def test_search_with_offset_and_limit
-    # Pagination with search
-    sql = Product.search(:description)
-                 .matching_all("wireless")
-                 .where(in_stock: true)
-                 .order(created_at: :desc)
-                 .limit(20)
-                 .offset(40)
-                 .to_sql
+  def test_search_with_distinct_and_not_and_in_executes
+    distinct_ids = Product.search(:description).matching_all("shoes").distinct.order(:id).pluck(:id)
+    not_ids = Product.search(:description).matching_all("shoes").where.not(category: "audio").order(:id).pluck(:id)
+    in_ids = Product.search(:description).matching_all("wireless").where(category: %w[audio footwear]).order(:id).pluck(:id)
 
-    expected = <<~SQL.strip
-      SELECT products.* FROM products
-      WHERE ("products"."description" &&& 'wireless')
-        AND "products"."in_stock" = true
-      ORDER BY created_at DESC
-      LIMIT 20
-      OFFSET 40
-    SQL
-
-    assert_sql_equal expected, sql
+    assert_equal [1, 2], distinct_ids
+    assert_equal [1, 2], not_ids
+    assert_equal [3], in_ids
   end
 
-  def test_search_with_distinct
-    # DISTINCT with search
-    sql = Product.search(:description)
-                 .matching_all("shoes")
-                 .distinct
-                 .to_sql
+  def test_complex_or_and_subquery_filters_execute
+    left = Product.where(price: 0..50).search(:description).matching_all("budget")
+    right = Product.where(rating: 4..).search(:description).matching_all("premium")
+    assert_equal [4], left.or(right).order(:id).pluck(:id)
 
-    expected = <<~SQL.strip
-      SELECT DISTINCT products.* FROM products
-      WHERE ("products"."description" &&& 'shoes')
-    SQL
-
-    assert_sql_equal expected, sql
+    avg_footwear = Product.where(category: "footwear").select("AVG(price)")
+    subquery_ids = Product.search(:description).matching_all("running")
+                         .where("price < (?)", avg_footwear)
+                         .order(:id)
+                         .pluck(:id)
+    assert_equal [2, 6], subquery_ids
   end
 
-  def test_search_with_includes_reference
-    # Search with includes (generates JOIN)
-    sql = Product.where(in_stock: true)
-                 .references(:categories)
-                 .search(:description)
-                 .matching_all("electronics")
-                 .to_sql
+  def test_relation_mutators_unscope_rewhere_readonly_execute
+    unscoped_ids = Product.where(in_stock: true)
+                          .order(rating: :desc)
+                          .search(:description)
+                          .matching_all("shoes")
+                          .unscope(:order)
+                          .order(:id)
+                          .pluck(:id)
+    assert_equal [1, 2], unscoped_ids
 
-    # Note: includes would trigger eager loading, but references just ensures JOIN
-    expected = <<~SQL.strip
-      SELECT products.* FROM products
-      WHERE "products"."in_stock" = true
-        AND ("products"."description" &&& 'electronics')
-    SQL
+    rewhere_ids = Product.where(in_stock: true)
+                         .search(:description)
+                         .matching_all("shoes")
+                         .rewhere(in_stock: false)
+                         .pluck(:id)
+    assert_empty rewhere_ids
 
-    assert_sql_equal expected, sql
+    readonly_rows = Product.search(:description).matching_all("shoes").readonly.limit(1).to_a
+    assert_equal true, readonly_rows.first.readonly?
   end
 
-  def test_search_with_multiple_orders
-    # Multiple ORDER BY clauses
-    sql = Product.search(:description)
-                 .matching_all("shoes")
-                 .with_score
-                 .order(search_score: :desc)
-                 .order(created_at: :desc)
-                 .to_sql
+  private
 
-    expected = <<~SQL.strip
-      SELECT products.*, pdb.score("products"."id") AS search_score FROM products
-      WHERE ("products"."description" &&& 'shoes')
-      ORDER BY search_score DESC, created_at DESC
-    SQL
-
-    assert_sql_equal expected, sql
+  def postgresql?
+    ActiveRecord::Base.connection.adapter_name.downcase.include?("postgres")
   end
 
-  def test_complex_or_with_where_conditions
-    # Complex OR with different WHERE conditions on each side
-    left = Product.where(price: 0..50)
-                  .search(:description)
-                  .matching_all("budget", "cheap")
+  def ensure_paradedb_setup!
+    return if self.class.instance_variable_get(:@paradedb_setup_done)
 
-    right = Product.where(rating: 4..)
-                   .search(:description)
-                   .matching_all("premium")
-
-    sql = left.or(right).to_sql
-
-    expected = <<~SQL.strip
-      SELECT products.* FROM products
-      WHERE ("products"."price" BETWEEN 0 AND 50 AND ("products"."description" &&& 'budget cheap')
-        OR "products"."rating" >= 4 AND ("products"."description" &&& 'premium'))
+    conn = ActiveRecord::Base.connection
+    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search;")
+    conn.execute("DROP INDEX IF EXISTS products_bm25_idx;")
+    conn.execute(<<~SQL)
+      CREATE INDEX products_bm25_idx ON products
+      USING bm25 (id, description, category, rating, in_stock, price)
+      WITH (key_field='id');
     SQL
 
-    assert_sql_equal expected, sql
+    self.class.instance_variable_set(:@paradedb_setup_done, true)
   end
 
-  def test_search_with_not_conditions
-    # Search combined with NOT conditions
-    sql = Product.search(:description)
-                 .matching_all("shoes")
-                 .where.not(category: "Discontinued")
-                 .where.not(in_stock: false)
-                 .to_sql
+  def seed_products!
+    conn = ActiveRecord::Base.connection
+    conn.execute("TRUNCATE TABLE products RESTART IDENTITY;")
+    conn.execute("TRUNCATE TABLE categories RESTART IDENTITY;")
 
-    expected = <<~SQL.strip
-      SELECT products.* FROM products
-      WHERE ("products"."description" &&& 'shoes')
-        AND "products"."category" != 'Discontinued'
-        AND "products"."in_stock" != FALSE
-    SQL
+    Product.create!(description: "running shoes lightweight", category: "footwear", rating: 5, in_stock: true, price: 120)
+    Product.create!(description: "trail running shoes grip", category: "footwear", rating: 4, in_stock: true, price: 90)
+    Product.create!(description: "wireless bluetooth earbuds", category: "audio", rating: 5, in_stock: true, price: 80)
+    Product.create!(description: "budget wired earbuds", category: "audio", rating: 3, in_stock: false, price: 20)
+    Product.create!(description: "hiking boots waterproof", category: "footwear", rating: 4, in_stock: true, price: 110)
+    Product.create!(description: "running socks breathable", category: "apparel", rating: 2, in_stock: true, price: 15)
 
-    assert_sql_equal expected, sql
-  end
-
-  def test_search_with_in_condition
-    # Search with IN clause
-    sql = Product.search(:description)
-                 .matching_all("wireless")
-                 .where(category: ["Electronics", "Audio", "Video"])
-                 .to_sql
-
-    expected = <<~SQL.strip
-      SELECT products.* FROM products
-      WHERE ("products"."description" &&& 'wireless')
-        AND "products"."category" IN ('Electronics', 'Audio', 'Video')
-    SQL
-
-    assert_sql_equal expected, sql
-  end
-
-  def test_search_with_like_pattern
-    # Search combined with LIKE
-    sql = Product.search(:description)
-                 .matching_all("shoes")
-                 .where("products.sku LIKE ?", "RUN-%")
-                 .to_sql
-
-    expected = <<~SQL.strip
-      SELECT products.* FROM products
-      WHERE ("products"."description" &&& 'shoes')
-        AND (products.sku LIKE 'RUN-%')
-    SQL
-
-    assert_sql_equal expected, sql
-  end
-
-  def test_search_with_null_checks
-    # Search with NULL checks
-    sql = Product.search(:description)
-                 .matching_all("shoes")
-                 .where.not(description: nil)
-                 .where(discontinued_at: nil)
-                 .to_sql
-
-    expected = <<~SQL.strip
-      SELECT products.* FROM products
-      WHERE ("products"."description" &&& 'shoes')
-        AND "products"."description" IS NOT NULL
-        AND "products"."discontinued_at" IS NULL
-    SQL
-
-    assert_sql_equal expected, sql
-  end
-
-  def test_chained_search_fields_with_mixed_where
-    # Multiple search fields with WHERE clauses interspersed
-    sql = Product.where(in_stock: true)
-                 .search(:description)
-                 .matching_all("wireless")
-                 .where(price: 0..200)
-                 .search(:category)
-                 .phrase("Electronics")
-                 .where.not(rating: nil)
-                 .to_sql
-
-    expected = <<~SQL.strip
-      SELECT products.* FROM products
-      WHERE "products"."in_stock" = true
-        AND ("products"."description" &&& 'wireless')
-        AND "products"."price" BETWEEN 0 AND 200
-        AND ("products"."category" ### 'Electronics')
-        AND "products"."rating" IS NOT NULL
-    SQL
-
-    assert_sql_equal expected, sql
-  end
-
-  def test_search_with_subquery_in_where
-    # Search with subquery
-    sql = Product.search(:description)
-                 .matching_all("shoes")
-                 .where("price < (SELECT AVG(price) FROM products)")
-                 .to_sql
-
-    expected = <<~SQL.strip
-      SELECT products.* FROM products
-      WHERE ("products"."description" &&& 'shoes')
-        AND (price < (SELECT AVG(price) FROM products))
-    SQL
-
-    assert_sql_equal expected, sql
-  end
-
-  def test_conditional_search_building
-    # Simulating conditional query building (common pattern)
-    query = Product.where(in_stock: true)
-
-    # Conditionally add search
-    query = query.search(:description).matching_all("wireless")
-
-    # Conditionally add filters
-    query = query.where(price: 0..100)
-
-    # Conditionally add ordering
-    query = query.order(rating: :desc).limit(10)
-
-    sql = query.to_sql
-
-    expected = <<~SQL.strip
-      SELECT products.* FROM products
-      WHERE "products"."in_stock" = true
-        AND ("products"."description" &&& 'wireless')
-        AND "products"."price" BETWEEN 0 AND 100
-      ORDER BY "products"."rating" DESC
-      LIMIT 10
-    SQL
-
-    assert_sql_equal expected, sql
-  end
-
-  def test_search_with_readonly
-    # Readonly doesn't affect SQL but ensures proper chaining
-    sql = Product.search(:description)
-                 .matching_all("shoes")
-                 .readonly
-                 .to_sql
-
-    expected = <<~SQL.strip
-      SELECT products.* FROM products
-      WHERE ("products"."description" &&& 'shoes')
-    SQL
-
-    assert_sql_equal expected, sql
-  end
-
-  def test_search_on_relation_from_scope
-    # Simulate a named scope returning a relation
-    scoped = Product.where(in_stock: true).order(created_at: :desc)
-
-    sql = scoped.search(:description)
-                .matching_all("shoes")
-                .limit(5)
-                .to_sql
-
-    expected = <<~SQL.strip
-      SELECT products.* FROM products
-      WHERE "products"."in_stock" = true
-        AND ("products"."description" &&& 'shoes')
-      ORDER BY created_at DESC
-      LIMIT 5
-    SQL
-
-    assert_sql_equal expected, sql
-  end
-
-  def test_search_with_unscope
-    # Unscope to remove certain conditions
-    sql = Product.where(in_stock: true)
-                 .order(created_at: :desc)
-                 .search(:description)
-                 .matching_all("shoes")
-                 .unscope(:order)
-                 .to_sql
-
-    expected = <<~SQL.strip
-      SELECT products.* FROM products
-      WHERE "products"."in_stock" = true
-        AND ("products"."description" &&& 'shoes')
-    SQL
-
-    assert_sql_equal expected, sql
-  end
-
-  def test_search_with_rewhere
-    # Rewhere to replace existing condition
-    sql = Product.where(in_stock: true)
-                 .search(:description)
-                 .matching_all("shoes")
-                 .rewhere(in_stock: false)
-                 .to_sql
-
-    expected = <<~SQL.strip
-      SELECT products.* FROM products
-      WHERE ("products"."description" &&& 'shoes')
-        AND "products"."in_stock" = FALSE
-    SQL
-
-    assert_sql_equal expected, sql
+    Category.create!(name: "footwear")
+    Category.create!(name: "audio")
+    Category.create!(name: "apparel")
+    Category.create!(name: "home")
   end
 end
