@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+# rubocop:disable Lint/MissingSuper
 
 module ParadeDB
   module Arel
@@ -105,3 +106,4 @@ module ParadeDB
     end
   end
 end
+# rubocop:enable Lint/MissingSuper

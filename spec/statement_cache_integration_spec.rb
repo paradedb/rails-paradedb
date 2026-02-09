@@ -28,7 +28,7 @@ class StatementCacheIntegrationTest < Minitest::Test
 
   def test_statement_cache_execution
     # Verifies that a cached statement containing ParadeDB nodes can be executed.
-    cache = ActiveRecord::StatementCache.create(StatementCacheProduct.connection) do |params|
+    cache = ActiveRecord::StatementCache.create(StatementCacheProduct.connection) do
       StatementCacheProduct.search(:description).matching_all("shoes", boost: 2.0)
     end
 

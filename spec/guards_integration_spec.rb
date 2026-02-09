@@ -167,7 +167,8 @@ class GuardsUnitTest < Minitest::Test
   end
 
   def test_phrase_prefix_with_empty_array_raises
-    error = assert_raises(ArgumentError) { builder.phrase_prefix(:description, *[]) }
+    terms = []
+    error = assert_raises(ArgumentError) { builder.phrase_prefix(:description, *terms) }
     assert_includes error.message, "phrase_prefix requires at least one term"
   end
 
