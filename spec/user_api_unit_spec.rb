@@ -177,7 +177,7 @@ class UserApiUnitTest < Minitest::Test
                            .build_facet_query(fields: [:category, :brand], size: 10, order: "-count")
                            .sql
 
-    expected = %(SELECT pdb.agg('{"terms": {"field": "category", "size": 10, "order": {"_count": "desc"}}}') AS category_facet, pdb.agg('{"terms": {"field": "brand", "size": 10, "order": {"_count": "desc"}}}') AS brand_facet FROM (SELECT products.* FROM products WHERE ("products"."description" &&& 'shoes')) paradedb_facet_source)
+    expected = %(SELECT pdb.agg('{"terms":{"field":"category","size":10,"order":{"_count":"desc"}}}') AS category_facet, pdb.agg('{"terms":{"field":"brand","size":10,"order":{"_count":"desc"}}}') AS brand_facet FROM (SELECT products.* FROM products WHERE ("products"."description" &&& 'shoes')) paradedb_facet_source)
 
     assert_sql_equal expected, facet_sql
   end
@@ -205,7 +205,7 @@ class UserApiUnitTest < Minitest::Test
                            .build_facet_query(fields: [:category], size: 10, order: nil)
                            .sql
 
-    expected = %(SELECT pdb.agg('{"terms": {"field": "category", "size": 10}}') AS category_facet FROM (SELECT products.* FROM products WHERE "products"."in_stock" = TRUE AND ("products"."id" @@@ pdb.all())) paradedb_facet_source)
+    expected = %(SELECT pdb.agg('{\"terms\":{\"field\":\"category\",\"size\":10}}') AS category_facet FROM (SELECT products.* FROM products WHERE \"products\".\"in_stock\" = TRUE AND (\"products\".\"id\" @@@ pdb.all())) paradedb_facet_source)
 
     assert_sql_equal expected, facet_sql
   end
@@ -216,7 +216,7 @@ class UserApiUnitTest < Minitest::Test
                            .build_facet_query(fields: [:category], size: 5, order: nil)
                            .sql
 
-    expected = %(SELECT pdb.agg('{"terms": {"field": "category", "size": 5}}') AS category_facet FROM (SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.all())) paradedb_facet_source)
+    expected = %(SELECT pdb.agg('{\"terms\":{\"field\":\"category\",\"size\":5}}') AS category_facet FROM (SELECT products.* FROM products WHERE (\"products\".\"id\" @@@ pdb.all())) paradedb_facet_source)
 
     assert_sql_equal expected, facet_sql
   end
@@ -226,8 +226,8 @@ class UserApiUnitTest < Minitest::Test
                            .build_facet_query(fields: [:category], size: nil, order: nil)
                            .sql
 
-    assert_includes facet_sql, %("field": "category")
-    refute_includes facet_sql, %("size":)
+    expected = %(SELECT pdb.agg('{"terms":{"field":"category"}}') AS category_facet FROM (SELECT products.* FROM products WHERE ("products"."description" &&& 'shoes')) paradedb_facet_source)
+    assert_sql_equal expected, facet_sql
   end
 
   def test_facets_with_raw_paradedb_sql_predicate_does_not_append_match_all
@@ -269,7 +269,7 @@ class UserApiUnitTest < Minitest::Test
                      .to_sql
 
     expected = <<~SQL.strip
-      SELECT products.*, pdb.agg('{"terms": {"field": "category", "size": 10, "order": {"_count": "desc"}}}') OVER () AS _category_facet FROM products
+      SELECT products.*, pdb.agg('{"terms":{"field":"category","size":10,"order":{"_count":"desc"}}}') OVER () AS _category_facet FROM products
       WHERE "products"."in_stock" = TRUE AND ("products"."id" @@@ pdb.all())
     SQL
 
@@ -282,7 +282,8 @@ class UserApiUnitTest < Minitest::Test
                      .with_facets(:category, size: 10)
                      .to_sql
 
-    assert_includes sql, %("order": {"_count": "desc"})
+    expected = %(SELECT products.*, pdb.agg('{"terms":{"field":"category","size":10,"order":{"_count":"desc"}}}') OVER () AS _category_facet FROM products WHERE ("products"."description" &&& 'shoes'))
+    assert_sql_equal expected, sql
   end
 
   def test_with_facets_uses_custom_agg_and_ignores_field_size_order_missing

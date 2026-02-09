@@ -14,9 +14,7 @@ module ParadeDB
       end
 
       def match(column, *terms, boost: nil)
-        validate_numeric!(boost, :boost)
-        rhs = quoted_value(join_terms(terms))
-        rhs = Nodes::BoostCast.new(rhs, quoted_value(boost)) unless boost.nil?
+        rhs = apply_boost(quoted_value(join_terms(terms)), boost)
         infix("&&&", column_node(column), rhs)
       end
 
@@ -30,24 +28,19 @@ module ParadeDB
       end
 
       def phrase(column, text, slop: nil)
-        validate_numeric!(slop, :slop)
-        rhs = quoted_value(text)
-        rhs = Nodes::SlopCast.new(rhs, quoted_value(slop)) unless slop.nil?
+        rhs = apply_slop(quoted_value(text), slop)
         infix("###", column_node(column), rhs)
       end
 
       def fuzzy(column, term, distance: 1, prefix: nil, boost: nil)
         validate_numeric!(distance, :distance)
-        validate_numeric!(boost, :boost)
         rhs = Nodes::FuzzyCast.new(quoted_value(term), quoted_value(distance), prefix: prefix)
-        rhs = Nodes::BoostCast.new(rhs, quoted_value(boost)) unless boost.nil?
+        rhs = apply_boost(rhs, boost)
         infix("===", column_node(column), rhs)
       end
 
       def term(column, term, boost: nil)
-        validate_numeric!(boost, :boost)
-        rhs = quoted_value(term)
-        rhs = Nodes::BoostCast.new(rhs, quoted_value(boost)) unless boost.nil?
+        rhs = apply_boost(quoted_value(term), boost)
         infix("===", column_node(column), rhs)
       end
 
@@ -58,6 +51,7 @@ module ParadeDB
 
       def near(column, left_term, right_term, distance: 1)
         validate_numeric!(distance, :distance)
+        # Produce: (left ## distance) ## right
         near_chain = infix("##", infix("##", quoted_value(left_term), quoted_value(distance)), quoted_value(right_term))
         infix("@@@", column_node(column), ::Arel::Nodes::Grouping.new(near_chain))
       end
@@ -110,6 +104,18 @@ module ParadeDB
 
       private
 
+      def apply_boost(node, boost)
+        return node if boost.nil?
+        validate_numeric!(boost, :boost)
+        Nodes::BoostCast.new(node, quoted_value(boost))
+      end
+
+      def apply_slop(node, slop)
+        return node if slop.nil?
+        validate_numeric!(slop, :slop)
+        Nodes::SlopCast.new(node, quoted_value(slop))
+      end
+
       def infix(operator, left, right)
         ::Arel::Nodes::InfixOperation.new(operator, left, right)
       end
@@ -118,12 +124,14 @@ module ParadeDB
         case column
         when ::Arel::Attributes::Attribute, ::Arel::Nodes::Node
           column
-        else
+        when Symbol, String
           if arel_table
             arel_table[column.to_sym]
           else
             ::Arel::Nodes::SqlLiteral.new(::ActiveRecord::Base.connection.quote_column_name(column.to_s))
           end
+        else
+          raise ArgumentError, "Unsupported column type: #{column.class}"
         end
       end
 

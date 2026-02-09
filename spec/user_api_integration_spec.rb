@@ -237,7 +237,7 @@ class UserApiIntegrationTest < Minitest::Test
                        .build_facet_query(fields: [:category, :brand], size: 10, order: "-count")
                        .sql
 
-    expected = %(SELECT pdb.agg('{"terms": {"field": "category", "size": 10, "order": {"_count": "desc"}}}') AS category_facet, pdb.agg('{"terms": {"field": "brand", "size": 10, "order": {"_count": "desc"}}}') AS brand_facet FROM (SELECT products.* FROM products WHERE ("products"."description" &&& 'shoes')) paradedb_facet_source)
+    expected = %(SELECT pdb.agg('{"terms":{"field":"category","size":10,"order":{"_count":"desc"}}}') AS category_facet, pdb.agg('{"terms":{"field":"brand","size":10,"order":{"_count":"desc"}}}') AS brand_facet FROM (SELECT products.* FROM products WHERE ("products"."description" &&& 'shoes')) paradedb_facet_source)
 
     assert_sql_equal expected, facet_sql
   end
@@ -251,7 +251,7 @@ class UserApiIntegrationTest < Minitest::Test
                  .to_sql
 
     expected = <<~SQL.strip
-      SELECT products.*, pdb.agg('{"terms": {"field": "category", "size": 10, "order": {"_count": "desc"}}}') OVER () AS _category_facet, pdb.agg('{"terms": {"field": "brand", "size": 10, "order": {"_count": "desc"}}}') OVER () AS _brand_facet FROM products
+      SELECT products.*, pdb.agg('{"terms":{"field":"category","size":10,"order":{"_count":"desc"}}}') OVER () AS _category_facet, pdb.agg('{"terms":{"field":"brand","size":10,"order":{"_count":"desc"}}}') OVER () AS _brand_facet FROM products
       WHERE ("products"."description" &&& 'shoes') AND "products"."in_stock" = true
       ORDER BY "products"."rating" DESC
       LIMIT 10
@@ -521,16 +521,16 @@ class UserApiIntegrationTest < Minitest::Test
   def test_conditional_search_building
     # Simulating conditional query building (common pattern)
     query = Product.where(in_stock: true)
-    
+
     # Conditionally add search
     query = query.search(:description).matching_all("wireless")
-    
+
     # Conditionally add filters
     query = query.where(price: 0..100)
-    
+
     # Conditionally add ordering
     query = query.order(rating: :desc).limit(10)
-    
+
     sql = query.to_sql
 
     expected = <<~SQL.strip
@@ -563,7 +563,7 @@ class UserApiIntegrationTest < Minitest::Test
   def test_search_on_relation_from_scope
     # Simulate a named scope returning a relation
     scoped = Product.where(in_stock: true).order(created_at: :desc)
-    
+
     sql = scoped.search(:description)
                 .matching_all("shoes")
                 .limit(5)
