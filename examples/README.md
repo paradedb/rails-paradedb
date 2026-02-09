@@ -1,8 +1,6 @@
-# ParadeDB for Rails: Examples & Cookbook
+# ParadeDB for Rails: Examples
 
-Welcome to the **ParadeDB for Rails** examples. This directory contains
-self-contained scripts that show how to integrate ParadeDB search features into
-your Ruby on Rails / ActiveRecord application.
+Runnable scripts for integrating ParadeDB search features into an ActiveRecord application.
 
 ## Getting Started
 
@@ -28,63 +26,59 @@ BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/quickstart/quickstart.
 
 ## Examples
 
-### Essentials
+### Core Examples
 
 1. Quickstart (`quickstart/quickstart.rb`)
 
-Core search operations:
-- keyword search
-- score ordering
-- phrase matching
-- snippets/highlighting
-- search + ActiveRecord filters
+Shows keyword search, score ordering, phrase matching, snippet generation,
+and standard ActiveRecord filtering.
 
 ```bash
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/quickstart/quickstart.rb
 ```
 
-2. Faceted Search (`faceted_search/faceted_search.rb`)
+1. Faceted Search (`faceted_search/faceted_search.rb`)
 
-Top-N rows plus facet buckets in one flow.
+Returns top-N rows with facet aggregations in one query flow.
 
 ```bash
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/faceted_search/faceted_search.rb
 ```
 
-### Smart Features
+### Advanced Examples
 
-3. Autocomplete (`autocomplete/`)
+1. Autocomplete (`autocomplete/`)
 
-Creates an ngram index and runs as-you-type queries.
+Creates an ngram index and runs prefix-style queries.
 
 ```bash
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/autocomplete/setup.rb
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/autocomplete/autocomplete.rb
 ```
 
-4. More Like This (`more_like_this/more_like_this.rb`)
+1. More Like This (`more_like_this/more_like_this.rb`)
 
-Recommendation-style search based on document similarity.
+Runs similarity search based on document term statistics.
 
 ```bash
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/more_like_this/more_like_this.rb
 ```
 
-### AI & Vectors
+### Vector and RAG Examples
 
-5. Hybrid Search with RRF (`hybrid_rrf/`)
+1. Hybrid Search with RRF (`hybrid_rrf/`)
 
-Combines BM25 + vector ranking with Reciprocal Rank Fusion in a single SQL query
-using CTEs, built from ParadeDB and neighbor ActiveRecord relations.
+Combines BM25 and vector ranking with Reciprocal Rank Fusion in a single SQL
+query using CTEs.
 
 ```bash
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/hybrid_rrf/setup.rb
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/hybrid_rrf/hybrid_rrf.rb
 ```
 
-6. RAG (`rag/rag.rb`)
+1. RAG (`rag/rag.rb`)
 
-Retrieves products with ParadeDB and sends context to OpenRouter.
+Retrieves product rows with ParadeDB and sends context to OpenRouter.
 
 ```bash
 export OPENROUTER_API_KEY=sk-...
@@ -94,6 +88,7 @@ BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/rag/rag.rb
 ## Shared Helpers
 
 `examples/common.rb` provides:
+
 - ActiveRecord connection bootstrap
 - `MockItem` model using `ParadeDB::Model`
 - `setup_mock_items!` to create the table + BM25 index
