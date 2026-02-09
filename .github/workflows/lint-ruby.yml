@@ -1,0 +1,36 @@
+name: Lint Ruby
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: lint-ruby-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-ruby:
+    name: rubocop --lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: .ruby-version
+
+      - name: Install RuboCop
+        run: gem install rubocop --no-document
+
+      - name: Run RuboCop lint cops
+        run: |
+          rubocop --version
+          rubocop --lint \
+            lib \
+            spec \
+            rails-paradedb.gemspec \
+            Rakefile

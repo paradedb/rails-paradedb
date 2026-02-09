@@ -36,6 +36,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.PARADEDB_BOT_GITHUB_TOKEN }}
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -45,7 +47,7 @@ jobs:
 
       - name: Validate version and release state
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.PARADEDB_BOT_GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
@@ -84,8 +86,8 @@ jobs:
       - name: Create and push tag
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "paradedb[bot]"
+          git config user.email "developers@paradedb.com"
           git tag "v${VERSION}" "${GITHUB_SHA}"
           git push origin "v${VERSION}"
 
@@ -98,23 +100,23 @@ jobs:
           generate_release_notes: true
           files: rails-paradedb-${{ env.VERSION }}.gem
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.PARADEDB_BOT_GITHUB_TOKEN }}
 
       - name: Publish to RubyGems
         env:
-          RUBYGEMS_API_KEY: ${{ secrets.RUBYGEMS_API_KEY }}
+          RUBYGEMS_TOKEN: ${{ secrets.RUBYGEMS_TOKEN || secrets.RUBYGEMS_API_KEY }}
         run: |
           set -euo pipefail
 
-          if [[ -z "${RUBYGEMS_API_KEY:-}" ]]; then
-            echo "Missing RUBYGEMS_API_KEY secret"
+          if [[ -z "${RUBYGEMS_TOKEN:-}" ]]; then
+            echo "Missing RubyGems secret (RUBYGEMS_TOKEN or RUBYGEMS_API_KEY)"
             exit 1
           fi
 
           mkdir -p "${HOME}/.gem"
           cat > "${HOME}/.gem/credentials" <<EOF
           ---
-          :rubygems_api_key: ${RUBYGEMS_API_KEY}
+          :rubygems_api_key: ${RUBYGEMS_TOKEN}
           EOF
           chmod 0600 "${HOME}/.gem/credentials"
 

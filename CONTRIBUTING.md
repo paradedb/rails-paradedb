@@ -13,6 +13,10 @@ External contributions should be linked to a GitHub issue.
 If no issue exists for your bug/feature, please open one first.
 
 Good starter issues are usually labeled `good first issue`.
+Ideal issues for external contributors are well-scoped changes that are less
+likely to conflict with core roadmap work. We welcome small documentation
+contributions that accompany a feature, correct wrong information, or fix
+typos, but we do not accept generic "documentation improvement" PRs.
 
 ### Claiming Issues
 
@@ -30,7 +34,7 @@ git clone https://github.com/paradedb/rails-paradedb.git
 cd rails-paradedb
 
 bundle install
-pre-commit install
+prek install -f
 ```
 
 ### Running Tests
@@ -55,7 +59,17 @@ bash scripts/run_unit_tests.sh spec/user_api_unit_spec.rb
 
 ### Linting and Formatting
 
-This repo currently enforces markdown/style checks via `pre-commit`.
+This repo currently enforces markdown/style checks via `prek`.
+This repository uses `.pre-commit-config.yaml`, which `prek` supports directly.
+Common commands:
+
+```bash
+prek run --all-files
+prek install -f
+```
+
+If you are migrating from `pre-commit`, replace `pre-commit` commands with
+`prek` and reinstall hooks once with `prek install -f`.
 If you change Ruby code, keep style consistent with existing files and tests.
 
 ### Pull Request Workflow
@@ -68,6 +82,7 @@ If you change Ruby code, keep style consistent with existing files and tests.
 6. Ensure CI passes.
 
 The repository enforces PR title linting and follows Conventional Commits.
+We will not merge a feature without appropriate tests.
 
 ### Documentation
 
@@ -77,13 +92,30 @@ If you add a user-facing feature, include docs updates in the same PR:
 - `examples/` for practical usage
 - inline comments/docstrings when needed for maintainability
 
-## Legal
+We will not merge a feature without appropriate documentation.
+
+## Legal Info
 
 ### Contributor License Agreement
 
-ParadeDB uses CLA Assistant. You must sign the CLA before your contribution can
-be merged. This is a one-time step per repository.
+In order for us, ParadeDB, Inc., to accept patches and other contributions
+from you, you need to adopt our ParadeDB Contributor License Agreement (the
+"**CLA**"). The current version of the CLA can be found on the
+[CLA Assistant website](https://cla-assistant.io/paradedb/paradedb).
+
+ParadeDB uses a tool called CLA Assistant to help us track contributors' CLA
+status. CLA Assistant will automatically post a comment to your pull request
+indicating whether you have signed the CLA. If you have not signed the CLA, you
+must do so before we can accept your contribution. Signing the CLA is a one-time
+process for this repository, is valid for all future contributions to
+rails-paradedb, and can be done in under a minute by signing in with your
+GitHub account.
+
+If you have any questions about the CLA, please reach out to us in the
+[ParadeDB Community Slack](https://join.slack.com/t/paradedbcommunity/shared_invite/zt-32abtyjg4-yoYoi~RPh9MSW8tDbl0BQw)
+or via email at [legal@paradedb.com](mailto:legal@paradedb.com).
 
 ### License
 
-By contributing, you agree your contributions are licensed under MIT.
+By contributing to rails-paradedb, you agree that your contributions will be
+licensed under the [MIT License](LICENSE).

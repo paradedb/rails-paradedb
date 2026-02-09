@@ -29,12 +29,11 @@ repos:
     hooks:
       - id: markdownlint
 
-  # TODO: Enable RuboCop once the gem scaffold is in place.
-  # - repo: local
-  #   hooks:
-  #     - id: rubocop
-  #       name: rubocop
-  #       entry: bundle exec rubocop
-  #       language: system
-  #       types: [ruby]
-  #       pass_filenames: true
+  - repo: local
+    hooks:
+      - id: ruby-syntax
+        name: ruby syntax check
+        entry: ruby -wc
+        language: system
+        files: (^|/)(Rakefile|.*\.rb|.*\.rake|.*\.gemspec)$
+        pass_filenames: true

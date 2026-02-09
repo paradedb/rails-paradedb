@@ -1,64 +1,63 @@
-# Release Management and Compatibility
+# Release Management
 
-This document defines release policies for `rails-paradedb`, including version
-source, compatibility expectations, and release workflow.
+This document describes how to cut a `rails-paradedb` release and what
+compatibility guarantees we target.
 
-## Version Source of Truth
-
-The canonical gem version is:
-
-- `lib/parade_db/version.rb` (`ParadeDB::VERSION`)
-
-The gemspec (`rails-paradedb.gemspec`) reads this constant.
-
-Release automation validates that the requested release version matches
-`ParadeDB::VERSION`.
-
-## Versioning Policy
+## Versioning
 
 `rails-paradedb` follows SemVer:
 
-- MAJOR: Breaking public API/behavior changes.
-- MINOR: Backward-compatible features.
-- PATCH: Backward-compatible fixes/documentation updates.
+- MAJOR: Breaking API or behavior changes
+- MINOR: Backward-compatible features
+- PATCH: Backward-compatible fixes and docs updates
+
+Version source of truth:
+
+- `lib/parade_db/version.rb` (`ParadeDB::VERSION`)
+
+The release workflow validates that the requested version matches this value.
 
 ## Compatibility Targets
 
-Current policy target:
-
 - Ruby: 3.2+
-- Rails / ActiveRecord: 8.x
+- ActiveRecord: 8.x
 - PostgreSQL: ParadeDB-supported versions
-- ParadeDB: latest tested minor and previous minor where feasible
+- ParadeDB: latest tested minor (and previous minor when feasible)
 
-## Release Checklist
+## Pre-Release Checklist
 
-Before triggering a release workflow:
+Before running the release workflow:
 
-1. Bump `ParadeDB::VERSION` in `lib/parade_db/version.rb`.
-2. Add a changelog entry in `CHANGELOG.md`.
-3. Ensure CI is green on `main`.
-4. Confirm README/docs/examples are consistent with release behavior.
+1. Update `ParadeDB::VERSION` in `lib/parade_db/version.rb`.
+2. Add release notes to `CHANGELOG.md`.
+3. Make sure CI on `main` is green.
+4. Confirm `README.md` and examples reflect shipped behavior.
 
-## Automated Release Workflow
+## Release Workflow
 
-The `Release` workflow (manual dispatch):
+Use GitHub Actions workflow `Release` (`.github/workflows/release.yml`) with:
 
-1. Validates confirmation and version format.
-2. Verifies requested version equals `ParadeDB::VERSION`.
-3. Verifies `v<version>` tag/release do not already exist.
-4. Builds the gem.
-5. Creates and pushes the tag `v<version>`.
-6. Creates a GitHub release.
-7. Publishes gem to RubyGems.
+- `version`: release version (must equal `ParadeDB::VERSION`)
+- `beta`: mark as prerelease if needed
+- `confirmation`: set to true
 
-Required secret:
+The workflow will:
 
-- `RUBYGEMS_API_KEY`
+1. Validate version format and release state.
+2. Verify tag/release `v<version>` do not already exist.
+3. Build `rails-paradedb-<version>.gem`.
+4. Create and push tag `v<version>`.
+5. Create a GitHub release.
+6. Publish the gem to RubyGems.
 
-## Feature Availability Notes
+RubyGems secret:
 
-When introducing behavior gated by ParadeDB server capabilities, document the
+- Preferred: `RUBYGEMS_TOKEN`
+- Backward-compatible fallback: `RUBYGEMS_API_KEY`
+
+## Feature Gating
+
+If a feature depends on a specific ParadeDB server capability, document the
 minimum ParadeDB version in:
 
 - `README.md` (user-facing)
@@ -66,6 +65,6 @@ minimum ParadeDB version in:
 
 ## Deprecation Policy
 
-- Deprecations must be documented with an introduction version.
+- Deprecations must include the version where they were introduced.
 - Remove deprecated behavior no earlier than the next MINOR release, or after
   two MINOR releases, whichever is later.

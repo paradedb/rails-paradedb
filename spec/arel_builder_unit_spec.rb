@@ -35,6 +35,13 @@ class ArelBuilderUnitTest < Minitest::Test
     assert_equal %("description"), sql(attr)
   end
 
+  def test_column_node_with_invalid_type
+    error = assert_raises(ArgumentError) do
+      @builder.match(123, "term")
+    end
+    assert_match(/Unsupported column type: Integer/, error.message)
+  end
+
   def test_attribute_without_table_renders_column_only
     attr = @no_table_builder[:description]
     assert_equal %("description"), sql(attr)
