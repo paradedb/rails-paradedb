@@ -305,6 +305,28 @@ class UserApiUnitTest < Minitest::Test
     refute_includes sql, %("missing":)
   end
 
+  def test_with_facets_custom_agg_without_fields
+    sql = UnitProduct.search(:description)
+                     .matching_all("shoes")
+                     .with_facets(agg: { "value_count" => { "field" => "id" } })
+                     .to_sql
+
+    assert_includes sql, %(pdb.agg('{"value_count":{"field":"id"}}') OVER () AS _agg_facet)
+    refute_includes sql, %({"terms":)
+  end
+
+  def test_facets_supports_key_order_variants
+    key_asc = UnitProduct.search(:description).matching_all("shoes")
+                         .build_facet_query(fields: [:category], size: 10, order: "key")
+                         .sql
+    key_desc = UnitProduct.search(:description).matching_all("shoes")
+                          .build_facet_query(fields: [:category], size: 10, order: "-key")
+                          .sql
+
+    assert_includes key_asc, %("order":{"_key":"asc"})
+    assert_includes key_desc, %("order":{"_key":"desc"})
+  end
+
   def test_with_facets_load_requires_order_and_limit
     rel = UnitProduct.search(:description)
                      .matching_all("shoes")
