@@ -2,8 +2,7 @@
 # frozen_string_literal: true
 
 require "json"
-
-require_relative "../common"
+require_relative "model"
 
 module HybridRrfSetup
   module_function
@@ -13,6 +12,49 @@ module HybridRrfSetup
     "footwear for exercise" => "Sleek running shoes",
     "wireless earbuds" => "Innovative wireless earbuds"
   }.freeze
+
+  def database_url
+    return ENV["DATABASE_URL"] if ENV["DATABASE_URL"]
+
+    host = ENV.fetch("PGHOST", "localhost")
+    port = ENV.fetch("PGPORT", "5432")
+    user = ENV.fetch("PGUSER", "postgres")
+    password = ENV.fetch("PGPASSWORD", "postgres")
+    database = ENV.fetch("PGDATABASE", "postgres")
+
+    "postgresql://#{user}:#{password}@#{host}:#{port}/#{database}"
+  end
+
+  def connect!
+    return if ActiveRecord::Base.connected?
+
+    ActiveRecord::Base.establish_connection(database_url)
+    ActiveRecord::Base.logger = nil
+  end
+
+  def setup_mock_items!
+    connect!
+
+    conn = ActiveRecord::Base.connection
+    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search;")
+    conn.execute(
+      "CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');"
+    )
+    conn.execute("DROP INDEX IF EXISTS mock_items_bm25_idx;")
+    conn.execute(<<~SQL)
+      CREATE INDEX mock_items_bm25_idx ON mock_items USING bm25 (
+        id,
+        description,
+        rating,
+        (category::pdb.literal('alias=category')),
+        ((metadata->>'color')::pdb.literal('alias=metadata_color')),
+        ((metadata->>'location')::pdb.literal('alias=metadata_location'))
+      ) WITH (key_field='id');
+    SQL
+
+    MockItem.reset_column_information
+    MockItem.count
+  end
 
   def embeddings_csv_path
     File.expand_path("mock_items_embeddings.csv", __dir__)
@@ -42,7 +84,7 @@ module HybridRrfSetup
   end
 
   def setup!
-    count = ExampleCommon.setup_mock_items!
+    count = setup_mock_items!
 
     conn = ActiveRecord::Base.connection
     conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")
@@ -83,22 +125,18 @@ module HybridRrfSetup
       )
 
       current = index + 1
-      if (current % 10).zero? || current == total
-        puts "  [#{current}/#{total}]"
-      end
+      puts "  [#{current}/#{total}]" if (current % 10).zero? || current == total
     end
 
     puts "+ Loaded #{total} embeddings"
     count
   end
 
-  # Resolve a demo query to a stable seed document embedding.
-  # Returns an Array<Float> for neighbor's nearest_neighbors API.
   def query_embedding_for(query)
     seed_text = QUERY_SEED_TEXT[query.to_s.downcase.strip]
     raise "No query embedding seed configured for '#{query}'" unless seed_text
 
-    ExampleCommon.connect!
+    connect!
     embedding = MockItem.where.not(embedding: nil)
                         .search(:description)
                         .matching_all(seed_text)
@@ -132,5 +170,5 @@ if $PROGRAM_NAME == __FILE__
 
   HybridRrfSetup.setup!
 
-  puts "\nSetup complete! Run: bundle exec ruby examples/hybrid_rrf/hybrid_rrf.rb"
+  puts "\nSetup complete! Run: BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/hybrid_rrf/hybrid_rrf.rb"
 end

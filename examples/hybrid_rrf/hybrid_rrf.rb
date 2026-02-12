@@ -1,27 +1,17 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require "neighbor"
-
-require_relative "../common"
 require_relative "setup"
 
-class MockItem < ActiveRecord::Base
-  has_neighbors :embedding
-end
-
-# Only keep helpers for SQL that Rails DSL genuinely cannot express
 module RrfHelpers
   module_function
 
-  # RRF score formula - the core calculation that repeats
   def rrf_score(weight:, rrf_k:, rank_column:)
     "#{weight.to_f}::float8 / (#{rrf_k.to_f}::float8 + #{rank_column}.rank_position)"
   end
 end
 
 def fulltext_ranked_cte(query, top_k:)
-  # ParadeDB DSL branch: parse + score + rank.
   fulltext_source = MockItem.search(:description)
                             .parse(query, lenient: true)
                             .with_score
@@ -34,7 +24,6 @@ def fulltext_ranked_cte(query, top_k:)
 end
 
 def semantic_ranked_cte(query_embedding, top_k:)
-  # Neighbor DSL branch: nearest neighbors + rank by neighbor_distance.
   semantic_source = MockItem.nearest_neighbors(:embedding, query_embedding, distance: "cosine")
                             .limit(top_k)
 

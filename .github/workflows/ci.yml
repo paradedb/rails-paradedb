@@ -68,10 +68,20 @@ jobs:
         env:
           DATABASE_URL: ${{ env.PARADEDB_TEST_DSN }}
         run: |
-          BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/quickstart/quickstart.rb
-          BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/autocomplete/setup.rb
-          BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/autocomplete/autocomplete.rb
-          BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/more_like_this/more_like_this.rb
-          BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/faceted_search/faceted_search.rb
-          BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/hybrid_rrf/setup.rb
-          BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/hybrid_rrf/hybrid_rrf.rb
+          run_example() {
+            local script="$1"
+            local expected="$2"
+
+            echo "Running ${script}"
+            output="$(BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby "${script}")"
+            echo "${output}"
+            echo "${output}" | grep -F "${expected}" >/dev/null
+          }
+
+          run_example examples/quickstart/quickstart.rb "rails-paradedb Quickstart Example"
+          run_example examples/autocomplete/setup.rb "Autocomplete Setup - Creating Dedicated Table"
+          run_example examples/autocomplete/autocomplete.rb "rails-paradedb Autocomplete Example"
+          run_example examples/more_like_this/more_like_this.rb "rails-paradedb MoreLikeThis Example"
+          run_example examples/faceted_search/faceted_search.rb "rails-paradedb Faceted Search Example"
+          run_example examples/hybrid_rrf/setup.rb "Hybrid Search Setup - Loading Embeddings from CSV"
+          run_example examples/hybrid_rrf/hybrid_rrf.rb "Hybrid Search with Reciprocal Rank Fusion (single SQL query)"

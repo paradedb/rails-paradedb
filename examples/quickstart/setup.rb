@@ -1,15 +1,8 @@
 # frozen_string_literal: true
 
-begin
-  require "neighbor"
-rescue LoadError
-  abort "Examples require neighbor. Run with `BUNDLE_GEMFILE=examples/Gemfile bundle exec ...`."
-end
+require_relative "model"
 
-require "active_record"
-require_relative "../lib/parade_db"
-
-module ExampleCommon
+module QuickstartSetup
   module_function
 
   def database_url
@@ -54,13 +47,4 @@ module ExampleCommon
     MockItem.reset_column_information
     MockItem.count
   end
-
-end
-
-class MockItem < ActiveRecord::Base
-  include ParadeDB::Model
-
-  self.table_name = "mock_items"
-  self.primary_key = "id"
-  self.has_paradedb_index = true
 end

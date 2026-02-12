@@ -1,7 +1,8 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require_relative "../common"
+require "json"
+require_relative "setup"
 
 def demo_similar_to_single_product
   puts "\n#{"=" * 60}"
@@ -127,7 +128,7 @@ if $PROGRAM_NAME == __FILE__
   puts "Find similar documents without vector embeddings"
   puts "=" * 60
 
-  count = ExampleCommon.setup_mock_items!
+  count = MoreLikeThisSetup.setup_mock_items!
   puts "Loaded #{count} mock items"
 
   demo_similar_to_single_product

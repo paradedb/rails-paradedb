@@ -1,19 +1,57 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require_relative "../common"
+require_relative "model"
 
 module AutocompleteSetup
   module_function
 
-  def setup_autocomplete_table!
-    ExampleCommon.connect!
-    conn = ActiveRecord::Base.connection
+  def database_url
+    return ENV["DATABASE_URL"] if ENV["DATABASE_URL"]
 
+    host = ENV.fetch("PGHOST", "localhost")
+    port = ENV.fetch("PGPORT", "5432")
+    user = ENV.fetch("PGUSER", "postgres")
+    password = ENV.fetch("PGPASSWORD", "postgres")
+    database = ENV.fetch("PGDATABASE", "postgres")
+
+    "postgresql://#{user}:#{password}@#{host}:#{port}/#{database}"
+  end
+
+  def connect!
+    return if ActiveRecord::Base.connected?
+
+    ActiveRecord::Base.establish_connection(database_url)
+    ActiveRecord::Base.logger = nil
+  end
+
+  def setup_mock_items!
+    connect!
+
+    conn = ActiveRecord::Base.connection
     conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search;")
     conn.execute(
       "CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');"
     )
+    conn.execute("DROP INDEX IF EXISTS mock_items_bm25_idx;")
+    conn.execute(<<~SQL)
+      CREATE INDEX mock_items_bm25_idx ON mock_items USING bm25 (
+        id,
+        description,
+        rating,
+        (category::pdb.literal('alias=category')),
+        ((metadata->>'color')::pdb.literal('alias=metadata_color')),
+        ((metadata->>'location')::pdb.literal('alias=metadata_location'))
+      ) WITH (key_field='id');
+    SQL
+
+    MockItem.reset_column_information
+    MockItem.count
+  end
+
+  def setup_autocomplete_table!
+    setup_mock_items!
+    conn = ActiveRecord::Base.connection
 
     puts "\nCreating autocomplete_items table..."
     conn.execute("DROP TABLE IF EXISTS autocomplete_items CASCADE;")
@@ -71,5 +109,5 @@ if $PROGRAM_NAME == __FILE__
   puts "\n" + "=" * 60
   puts "+ Setup complete! Created autocomplete_items with #{count} products"
   puts "=" * 60
-  puts "\nRun: bundle exec ruby examples/autocomplete/autocomplete.rb"
+  puts "\nRun: BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/autocomplete/autocomplete.rb"
 end

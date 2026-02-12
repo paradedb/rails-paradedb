@@ -4,7 +4,7 @@
 require "json"
 require "net/http"
 require "uri"
-require_relative "../common"
+require_relative "setup"
 
 OPENROUTER_API_KEY = ENV["OPENROUTER_API_KEY"]
 MODEL = ENV.fetch("RAG_MODEL", "anthropic/claude-3-haiku")
@@ -70,7 +70,7 @@ if $PROGRAM_NAME == __FILE__
   puts "Using model: #{MODEL}"
   puts "Set RAG_MODEL to use a different model"
 
-  count = ExampleCommon.setup_mock_items!
+  count = RagSetup.setup_mock_items!
   puts "Loaded #{count} products"
 
   [

@@ -1,14 +1,14 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require_relative "../common"
+require_relative "setup"
 
 if $PROGRAM_NAME == __FILE__
   puts "=" * 60
   puts "rails-paradedb Faceted Search Example"
   puts "=" * 60
 
-  count = ExampleCommon.setup_mock_items!
+  count = FacetedSearchSetup.setup_mock_items!
   puts "Loaded #{count} mock items"
 
   search_query = "shoes"
