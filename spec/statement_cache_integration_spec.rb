@@ -7,12 +7,11 @@ class StatementCacheProduct < ActiveRecord::Base
   self.table_name = :products
 end
 
-class StatementCacheIntegrationTest < Minitest::Test
-  def setup
+RSpec.describe "StatementCacheIntegrationTest" do
+  before do
     ensure_paradedb_setup!
   end
-
-  def test_arel_node_identity_in_ast
+  it "arel node identity in ast" do
     # Verifies that ParadeDB nodes allow Arel ASTs to be compared for equality,
     # which is a prerequisite for effective ActiveRecord statement caching.
     rel1 = StatementCacheProduct.search(:description).matching_all("shoes", boost: 2.0)
@@ -25,8 +24,7 @@ class StatementCacheIntegrationTest < Minitest::Test
     refute_equal rel1.arel.ast, rel3.arel.ast
     refute_equal rel1.arel.ast.hash, rel3.arel.ast.hash
   end
-
-  def test_statement_cache_execution
+  it "statement cache execution" do
     # Verifies that a cached statement containing ParadeDB nodes can be executed.
     cache = ActiveRecord::StatementCache.create(StatementCacheProduct.connection) do
       StatementCacheProduct.search(:description).matching_all("shoes", boost: 2.0)

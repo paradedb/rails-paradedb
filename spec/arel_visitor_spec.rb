@@ -2,81 +2,67 @@
 
 require "spec_helper"
 
-class ArelVisitorTest < Minitest::Test
-  def setup
+RSpec.describe "ArelVisitorTest" do
+  before do
     @builder = ParadeDB::Arel::Builder.new(:products)
   end
 
   def sql(node)
     ParadeDB::Arel.to_sql(node)
   end
-
-  def test_match
+  it "match" do
     node = @builder.match(:description, "running", "shoes")
     assert_equal %("products"."description" &&& 'running shoes'), sql(node)
   end
-
-  def test_match_any
+  it "match any" do
     node = @builder.match_any(:description, "wireless", "bluetooth")
     assert_equal %("products"."description" ||| 'wireless bluetooth'), sql(node)
   end
-
-  def test_phrase_with_slop
+  it "phrase with slop" do
     node = @builder.phrase(:description, "running shoes", slop: 2)
     assert_equal %("products"."description" ### 'running shoes'::pdb.slop(2)), sql(node)
   end
-
-  def test_term_exact
+  it "term exact" do
     node = @builder.term(:description, "shoes")
     assert_equal %("products"."description" === 'shoes'), sql(node)
   end
-
-  def test_term_with_boost
+  it "term with boost" do
     node = @builder.term(:description, "shoes", boost: 2)
     assert_equal %("products"."description" === 'shoes'::pdb.boost(2)), sql(node)
   end
-
-  def test_fuzzy_with_prefix
+  it "fuzzy with prefix" do
     node = @builder.fuzzy(:description, "runn", distance: 1, prefix: true)
     assert_equal %("products"."description" === 'runn'::pdb.fuzzy(1, "true")), sql(node)
   end
-
-  def test_fuzzy_with_boost
+  it "fuzzy with boost" do
     node = @builder.fuzzy(:description, "shose", distance: 2, boost: 2)
     assert_equal %("products"."description" === 'shose'::pdb.fuzzy(2)::pdb.boost(2)), sql(node)
   end
-
-  def test_fuzzy_with_prefix_and_boost
+  it "fuzzy with prefix and boost" do
     node = @builder.fuzzy(:description, "runn", distance: 1, prefix: true, boost: 1.5)
     assert_equal %("products"."description" === 'runn'::pdb.fuzzy(1, "true")::pdb.boost(1.5)), sql(node)
   end
-
-  def test_boost
+  it "boost" do
     node = @builder.match(:description, "shoes", boost: 2)
     assert_equal %("products"."description" &&& 'shoes'::pdb.boost(2)), sql(node)
   end
-
-  def test_regex
+  it "regex" do
     node = @builder.regex(:description, "run.*shoes")
     assert_equal %("products"."description" @@@ pdb.regex('run.*shoes')), sql(node)
   end
-
-  def test_near
+  it "near" do
     node = @builder.near(:description, "sleek", "shoes", distance: 1)
     assert_equal %("products"."description" @@@ ('sleek' ## 1 ## 'shoes')), sql(node)
   end
-
-  def test_phrase_prefix
+  it "phrase prefix" do
     node = @builder.phrase_prefix(:description, "running", "sh")
     assert_equal %("products"."description" @@@ pdb.phrase_prefix(ARRAY['running', 'sh'])), sql(node)
   end
-
-  def test_more_like_this
+  it "more like this" do
     node = @builder.more_like_this(:id, 3, fields: [:description])
     assert_equal %("products"."id" @@@ pdb.more_like_this(3, ARRAY['description'])), sql(node)
   end
-
-  def test_more_like_this_with_named_options
+  it "more like this with named options" do
     node = @builder.more_like_this(
       :id,
       3,
@@ -85,28 +71,23 @@ class ArelVisitorTest < Minitest::Test
     )
     assert_equal %("products"."id" @@@ pdb.more_like_this(3, ARRAY['description'], min_term_frequency => 2, stopwords => ARRAY['the', 'a'])), sql(node)
   end
-
-  def test_full_text_raw_expression
+  it "full text raw expression" do
     node = @builder.full_text(:description, "pdb.all()")
     assert_equal %("products"."description" @@@ pdb.all()), sql(node)
   end
-
-  def test_score
+  it "score" do
     node = @builder.score(:id)
     assert_equal %(pdb.score("products"."id")), sql(node)
   end
-
-  def test_snippet
+  it "snippet" do
     node = @builder.snippet(:description, "<b>", "</b>", 50)
     assert_equal %(pdb.snippet("products"."description", '<b>', '</b>', 50)), sql(node)
   end
-
-  def test_agg
+  it "agg" do
     node = @builder.agg('{"terms":{"field":"category"}}')
     assert_equal %(pdb.agg('{"terms":{"field":"category"}}')), sql(node)
   end
-
-  def test_boolean_composition
+  it "boolean composition" do
     shoes = @builder.match(:description, "shoes")
     cheap = @builder.match(:description, "cheap")
     predicate = shoes.and(cheap.not)

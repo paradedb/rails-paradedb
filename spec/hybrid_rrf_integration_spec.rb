@@ -8,15 +8,14 @@ class HybridRrfProduct < ActiveRecord::Base
   self.has_paradedb_index = true
 end
 
-class HybridRrfIntegrationTest < Minitest::Test
-  def setup
+RSpec.describe "HybridRrfIntegrationTest" do
+  before do
     skip "Hybrid RRF integration test requires PostgreSQL" unless postgresql?
 
     ensure_paradedb_setup!
     seed_products!
   end
-
-  def test_union_all_hybrid_relation_sql_and_weight_behavior
+  it "union all hybrid relation sql and weight behavior" do
     base_relation = hybrid_relation("running shoes", top_k: 5, limit: 10, rrf_k: 60, fulltext_weight: 1.0, structured_weight: 1.0)
     sql = base_relation.to_sql
 

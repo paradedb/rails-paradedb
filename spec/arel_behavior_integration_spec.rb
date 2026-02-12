@@ -23,8 +23,8 @@ end
 #   4 | "budget wired earbuds"       | audio    | 3 | false |  20
 #   5 | "hiking boots waterproof"    | footwear | 4 | true  | 110
 #   6 | "running socks breathable"   | apparel  | 2 | true  |  15
-class ArelBehaviorIntegrationTest < Minitest::Test
-  def setup
+RSpec.describe "ArelBehaviorIntegrationTest" do
+  before do
     skip "Arel behavior integration tests require PostgreSQL" unless postgresql?
 
     ensure_paradedb_setup!
@@ -32,38 +32,32 @@ class ArelBehaviorIntegrationTest < Minitest::Test
   end
 
   # ---- match (matching_all) ----
-
-  def test_match_returns_expected_rows
+  it "match returns expected rows" do
     ids = search(:description).matching_all("running", "shoes").order(:id).pluck(:id)
     assert_equal [1, 2], ids
   end
-
-  def test_match_single_term_broader_results
+  it "match single term broader results" do
     ids = search(:description).matching_all("running").order(:id).pluck(:id)
     assert_equal [1, 2, 6], ids
   end
-
-  def test_match_with_boost_returns_same_rows
+  it "match with boost returns same rows" do
     # Boost affects scoring, not result set
     ids = search(:description).matching_all("running", "shoes", boost: 2).order(:id).pluck(:id)
     assert_equal [1, 2], ids
   end
 
   # ---- match_any ----
-
-  def test_match_any_returns_union
+  it "match any returns union" do
     ids = search(:description).matching_any("wireless", "hiking").order(:id).pluck(:id)
     assert_equal [3, 5], ids
   end
-
-  def test_match_any_single_term
+  it "match any single term" do
     ids = search(:description).matching_any("waterproof").order(:id).pluck(:id)
     assert_equal [5], ids
   end
 
   # ---- excluding ----
-
-  def test_excluding_removes_matching_rows
+  it "excluding removes matching rows" do
     # "running" hits [1,2,6]; excluding "lightweight" removes 1
     ids = search(:description)
             .matching_all("running")
@@ -72,8 +66,7 @@ class ArelBehaviorIntegrationTest < Minitest::Test
             .pluck(:id)
     assert_equal [2, 6], ids
   end
-
-  def test_excluding_multiple_terms
+  it "excluding multiple terms" do
     ids = search(:description)
             .matching_all("earbuds")
             .excluding("budget")
@@ -83,64 +76,54 @@ class ArelBehaviorIntegrationTest < Minitest::Test
   end
 
   # ---- phrase ----
-
-  def test_phrase_without_slop_exact_adjacency
+  it "phrase without slop exact adjacency" do
     ids = search(:description).phrase("running shoes").order(:id).pluck(:id)
     assert_equal [1, 2], ids
   end
-
-  def test_phrase_with_slop_relaxes_adjacency
+  it "phrase with slop relaxes adjacency" do
     # "shoes lightweight" is in row 1 but not as exact phrase;
     # with slop it can still match "running shoes lightweight"
     ids = search(:description).phrase("running shoes", slop: 2).order(:id).pluck(:id)
     assert_equal [1, 2], ids
   end
-
-  def test_phrase_no_match
+  it "phrase no match" do
     ids = search(:description).phrase("running earbuds").order(:id).pluck(:id)
     assert_empty ids
   end
 
   # ---- term ----
-
-  def test_term_on_category
+  it "term on category" do
     ids = search(:category).term("audio").order(:id).pluck(:id)
     assert_equal [3, 4], ids
   end
-
-  def test_term_with_boost_returns_same_set
+  it "term with boost returns same set" do
     ids = search(:category).term("audio", boost: 3).order(:id).pluck(:id)
     assert_equal [3, 4], ids
   end
-
-  def test_term_on_category_footwear
+  it "term on category footwear" do
     ids = search(:category).term("footwear").order(:id).pluck(:id)
     assert_equal [1, 2, 5], ids
   end
 
   # ---- fuzzy ----
-
-  def test_fuzzy_corrects_typo
+  it "fuzzy corrects typo" do
     # "shose" is 1 edit from "shoes"
     ids = search(:description).fuzzy("shose", distance: 2).order(:id).pluck(:id)
     assert_equal [1, 2], ids
   end
-
-  def test_fuzzy_with_prefix_true
+  it "fuzzy with prefix true" do
     ids = search(:description).fuzzy("runn", distance: 1, prefix: true).order(:id).pluck(:id)
     assert_includes ids, 1
     assert_includes ids, 2
   end
-
-  def test_fuzzy_with_small_distance_fewer_matches
+  it "fuzzy with small distance fewer matches" do
     # distance 1 may not correct "shose" -> "shoes" depending on tokenizer
     ids_d1 = search(:description).fuzzy("shose", distance: 1).order(:id).pluck(:id)
     ids_d2 = search(:description).fuzzy("shose", distance: 2).order(:id).pluck(:id)
     # Larger distance should be superset or equal
     assert (ids_d1 - ids_d2).empty?, "distance=2 should include all distance=1 results"
   end
-
-  def test_fuzzy_with_boost_and_prefix
+  it "fuzzy with boost and prefix" do
     ids = search(:description)
             .fuzzy("runn", distance: 1, prefix: true, boost: 1.5)
             .order(:id)
@@ -149,121 +132,101 @@ class ArelBehaviorIntegrationTest < Minitest::Test
   end
 
   # ---- regex ----
-
-  def test_regex_wildcard
+  it "regex wildcard" do
     ids = search(:description).regex("run.*").order(:id).pluck(:id)
     assert_equal [1, 2, 6], ids
   end
-
-  def test_regex_alternation
+  it "regex alternation" do
     ids = search(:description).regex("(wireless|hiking)").order(:id).pluck(:id)
     assert_equal [3, 5], ids
   end
-
-  def test_regex_no_match
+  it "regex no match" do
     ids = search(:description).regex("zzznomatch.*").order(:id).pluck(:id)
     assert_empty ids
   end
 
   # ---- near ----
-
-  def test_near_adjacent_words
+  it "near adjacent words" do
     ids = search(:description).near("running", "shoes", distance: 1).order(:id).pluck(:id)
     assert_equal [1, 2], ids
   end
-
-  def test_near_larger_distance
+  it "near larger distance" do
     ids = search(:description).near("running", "shoes", distance: 5).order(:id).pluck(:id)
     # Same set — "running shoes" are always adjacent
     assert_equal [1, 2], ids
   end
-
-  def test_near_no_match
+  it "near no match" do
     ids = search(:description).near("running", "earbuds", distance: 1).order(:id).pluck(:id)
     assert_empty ids
   end
 
   # ---- phrase_prefix ----
-
-  def test_phrase_prefix_category
+  it "phrase prefix category" do
     ids = search(:category).phrase_prefix("foot").order(:id).pluck(:id)
     assert_equal [1, 2, 5], ids
   end
-
-  def test_phrase_prefix_description
+  it "phrase prefix description" do
     ids = search(:description).phrase_prefix("wire").order(:id).pluck(:id)
     assert_includes ids, 3
   end
-
-  def test_phrase_prefix_no_match
+  it "phrase prefix no match" do
     ids = search(:description).phrase_prefix("zzz").order(:id).pluck(:id)
     assert_empty ids
   end
 
   # ---- parse ----
-
-  def test_parse_with_and
+  it "parse with and" do
     ids = search(:description).parse("running AND shoes", lenient: true).order(:id).pluck(:id)
     assert_equal [1, 2], ids
   end
-
-  def test_parse_with_or
+  it "parse with or" do
     ids = search(:description).parse("wireless OR hiking", lenient: true).order(:id).pluck(:id)
     assert_equal [3, 5], ids
   end
-
-  def test_parse_without_lenient
+  it "parse without lenient" do
     ids = search(:description).parse("running AND shoes").order(:id).pluck(:id)
     assert_equal [1, 2], ids
   end
-
-  def test_parse_with_lenient_false
+  it "parse with lenient false" do
     ids = search(:description).parse("running AND shoes", lenient: false).order(:id).pluck(:id)
     assert_equal [1, 2], ids
   end
 
   # ---- match_all ----
-
-  def test_match_all_returns_all_rows
+  it "match all returns all rows" do
     ids = search(:id).match_all.order(:id).pluck(:id)
     assert_equal [1, 2, 3, 4, 5, 6], ids
   end
-
-  def test_match_all_with_limit
+  it "match all with limit" do
     ids = search(:id).match_all.order(:id).limit(3).pluck(:id)
     assert_equal [1, 2, 3], ids
   end
 
   # ---- more_like_this ----
-
-  def test_more_like_this_with_id
+  it "more like this with id" do
     ids = ArelBehaviorProduct.more_like_this(1, fields: [:description]).order(:id).pluck(:id)
     refute_empty ids
     # Should find row 2 (similar running shoes)
     assert_includes ids, 2
   end
-
-  def test_more_like_this_with_json_string
+  it "more like this with json string" do
     json_doc = { description: "wireless bluetooth" }.to_json
     ids = ArelBehaviorProduct.more_like_this(json_doc).order(:id).pluck(:id)
     assert_includes ids, 3
   end
-
-  def test_more_like_this_with_json_multiple_fields
+  it "more like this with json multiple fields" do
     json_doc = { description: "running shoes", category: "footwear" }.to_json
     ids = ArelBehaviorProduct.more_like_this(json_doc).order(:id).pluck(:id)
     assert_includes ids, 1
     assert_includes ids, 2
   end
-
-  def test_more_like_this_without_fields
+  it "more like this without fields" do
     ids = ArelBehaviorProduct.more_like_this(3).order(:id).pluck(:id)
     refute_empty ids
   end
 
   # ---- with_score ----
-
-  def test_with_score_returns_positive_floats
+  it "with score returns positive floats" do
     rows = search(:description)
              .matching_all("running shoes")
              .with_score
@@ -276,8 +239,7 @@ class ArelBehaviorIntegrationTest < Minitest::Test
       assert_operator score, :>, 0.0, "Score should be positive"
     end
   end
-
-  def test_with_score_ordering
+  it "with score ordering" do
     rows = search(:description)
              .matching_all("running", "shoes")
              .with_score
@@ -289,8 +251,7 @@ class ArelBehaviorIntegrationTest < Minitest::Test
   end
 
   # ---- with_snippet ----
-
-  def test_with_snippet_default_tags
+  it "with snippet default tags" do
     rows = search(:description)
              .matching_all("running shoes")
              .with_snippet(:description)
@@ -303,8 +264,7 @@ class ArelBehaviorIntegrationTest < Minitest::Test
       refute_empty row.description_snippet.to_s
     end
   end
-
-  def test_with_snippet_custom_tags
+  it "with snippet custom tags" do
     rows = search(:description)
              .matching_all("running shoes")
              .with_snippet(:description, start_tag: "<mark>", end_tag: "</mark>", max_chars: 100)
@@ -319,8 +279,7 @@ class ArelBehaviorIntegrationTest < Minitest::Test
       assert_includes snippet, "</mark>"
     end
   end
-
-  def test_with_snippet_and_score_together
+  it "with snippet and score together" do
     rows = search(:description)
              .matching_all("running shoes")
              .with_score
@@ -337,8 +296,7 @@ class ArelBehaviorIntegrationTest < Minitest::Test
   end
 
   # ---- facets ----
-
-  def test_facets_rating_from_search
+  it "facets rating from search" do
     facets = search(:description).matching_all("running").facets(:rating)
     assert_kind_of Hash, facets
     assert_includes facets, "rating"
@@ -346,14 +304,12 @@ class ArelBehaviorIntegrationTest < Minitest::Test
     rating_json = facets["rating"].to_json
     assert_match(/[245]/, rating_json)
   end
-
-  def test_facets_rating_match_all
+  it "facets rating match all" do
     facets = search(:id).match_all.facets(:rating)
     assert_kind_of Hash, facets
     assert_includes facets, "rating"
   end
-
-  def test_facets_returns_parseable_results
+  it "facets returns parseable results" do
     facets = search(:id).match_all.facets(:rating, size: 10)
     assert_kind_of Hash, facets
     assert_includes facets, "rating"
@@ -362,8 +318,7 @@ class ArelBehaviorIntegrationTest < Minitest::Test
   end
 
   # ---- with_facets ----
-
-  def test_with_facets_returns_rows_and_facets
+  it "with facets returns rows and facets" do
     rel = search(:description)
             .matching_all("running", "shoes")
             .with_facets(:rating, size: 10)
@@ -377,8 +332,7 @@ class ArelBehaviorIntegrationTest < Minitest::Test
     assert_kind_of Hash, f
     assert_includes f, "rating"
   end
-
-  def test_with_facets_with_match_all
+  it "with facets with match all" do
     rel = search(:id)
             .match_all
             .with_facets(:rating, size: 10)
@@ -389,8 +343,7 @@ class ArelBehaviorIntegrationTest < Minitest::Test
     assert_kind_of Hash, f
     assert_includes f, "rating"
   end
-
-  def test_with_facets_requires_order_and_limit
+  it "with facets requires order and limit" do
     rel = search(:description)
             .matching_all("running shoes")
             .with_facets(:category, size: 10)
@@ -400,8 +353,7 @@ class ArelBehaviorIntegrationTest < Minitest::Test
   end
 
   # ---- Arel builder executed via where(Arel.sql(...)) ----
-
-  def test_arel_builder_match_via_where
+  it "arel builder match via where" do
     builder = ParadeDB::Arel::Builder.new(:products)
     predicate = builder.match(:description, "running", "shoes")
     predicate_sql = ParadeDB::Arel.to_sql(predicate, ArelBehaviorProduct.connection)
@@ -409,8 +361,7 @@ class ArelBehaviorIntegrationTest < Minitest::Test
     ids = ArelBehaviorProduct.where(Arel.sql(predicate_sql)).order(:id).pluck(:id)
     assert_equal [1, 2], ids
   end
-
-  def test_arel_builder_regex_via_where
+  it "arel builder regex via where" do
     builder = ParadeDB::Arel::Builder.new(:products)
     predicate = builder.regex(:description, "run.*")
     predicate_sql = ParadeDB::Arel.to_sql(predicate, ArelBehaviorProduct.connection)
@@ -418,8 +369,7 @@ class ArelBehaviorIntegrationTest < Minitest::Test
     ids = ArelBehaviorProduct.where(Arel.sql(predicate_sql)).order(:id).pluck(:id)
     assert_equal [1, 2, 6], ids
   end
-
-  def test_arel_builder_boolean_composition_via_where
+  it "arel builder boolean composition via where" do
     builder = ParadeDB::Arel::Builder.new(:products)
     shoes = builder.match(:description, "shoes")
     cheap = builder.match(:description, "budget")
@@ -429,8 +379,7 @@ class ArelBehaviorIntegrationTest < Minitest::Test
     ids = ArelBehaviorProduct.where(Arel.sql(predicate_sql)).order(:id).pluck(:id)
     assert_equal [1, 2], ids
   end
-
-  def test_arel_builder_or_composition_via_where
+  it "arel builder or composition via where" do
     builder = ParadeDB::Arel::Builder.new(:products)
     wireless = builder.match(:description, "wireless")
     hiking = builder.match(:description, "hiking")
@@ -440,8 +389,7 @@ class ArelBehaviorIntegrationTest < Minitest::Test
     ids = ArelBehaviorProduct.where(Arel.sql(predicate_sql)).order(:id).pluck(:id)
     assert_equal [3, 5], ids
   end
-
-  def test_arel_builder_results_match_search_api
+  it "arel builder results match search api" do
     # Verify Arel builder produces identical results to the high-level API
     api_ids = search(:description).matching_all("running", "shoes").order(:id).pluck(:id)
 
@@ -454,8 +402,7 @@ class ArelBehaviorIntegrationTest < Minitest::Test
   end
 
   # ---- Complex real-world patterns ----
-
-  def test_search_with_where_filter
+  it "search with where filter" do
     ids = search(:description)
             .matching_all("running")
             .where(in_stock: true)
@@ -466,8 +413,7 @@ class ArelBehaviorIntegrationTest < Minitest::Test
     # Row 1 is $120 (excluded), row 2 is $90 (included), row 6 is $15 (included)
     assert_equal [2, 6], ids
   end
-
-  def test_search_or_composition
+  it "search or composition" do
     left = ArelBehaviorProduct.where(in_stock: true)
                               .search(:description)
                               .matching_all("earbuds")
@@ -480,13 +426,11 @@ class ArelBehaviorIntegrationTest < Minitest::Test
     # right: boots + rating >= 4 -> row 5
     assert_equal [3, 5], ids
   end
-
-  def test_search_with_limit_and_offset
+  it "search with limit and offset" do
     ids = search(:id).match_all.order(:id).limit(2).offset(2).pluck(:id)
     assert_equal [3, 4], ids
   end
-
-  def test_chained_search_fields
+  it "chained search fields" do
     ids = search(:description).matching_all("running")
             .search(:category).term("footwear")
             .order(:id)

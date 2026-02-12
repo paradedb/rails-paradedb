@@ -2,10 +2,9 @@
 
 require "spec_helper"
 
-class ArelNodeEqualityUnitTest < Minitest::Test
+RSpec.describe "ArelNodeEqualityUnitTest" do
   Nodes = ParadeDB::Arel::Nodes
-
-  def test_boost_cast_equality
+  it "boost cast equality" do
     node1 = Nodes::BoostCast.new("expr", 2.0)
     node2 = Nodes::BoostCast.new("expr", 2.0)
     node3 = Nodes::BoostCast.new("expr", 3.0)
@@ -16,8 +15,7 @@ class ArelNodeEqualityUnitTest < Minitest::Test
     refute_equal node1, node3
     refute_equal node1, node4
   end
-
-  def test_slop_cast_equality
+  it "slop cast equality" do
     node1 = Nodes::SlopCast.new("expr", 5)
     node2 = Nodes::SlopCast.new("expr", 5)
     node3 = Nodes::SlopCast.new("expr", 10)
@@ -26,8 +24,7 @@ class ArelNodeEqualityUnitTest < Minitest::Test
     assert_equal node1.hash, node2.hash
     refute_equal node1, node3
   end
-
-  def test_fuzzy_cast_equality
+  it "fuzzy cast equality" do
     node1 = Nodes::FuzzyCast.new("expr", 2, prefix: true)
     node2 = Nodes::FuzzyCast.new("expr", 2, prefix: true)
     node3 = Nodes::FuzzyCast.new("expr", 2, prefix: false)
@@ -38,8 +35,7 @@ class ArelNodeEqualityUnitTest < Minitest::Test
     refute_equal node1, node3
     refute_equal node1, node4
   end
-
-  def test_array_literal_equality
+  it "array literal equality" do
     node1 = Nodes::ArrayLiteral.new(["a", "b"])
     node2 = Nodes::ArrayLiteral.new(["a", "b"])
     node3 = Nodes::ArrayLiteral.new(["a", "c"])
@@ -48,8 +44,7 @@ class ArelNodeEqualityUnitTest < Minitest::Test
     assert_equal node1.hash, node2.hash
     refute_equal node1, node3
   end
-
-  def test_parse_node_equality
+  it "parse node equality" do
     node1 = Nodes::ParseNode.new("query", lenient: true)
     node2 = Nodes::ParseNode.new("query", lenient: true)
     node3 = Nodes::ParseNode.new("query", lenient: false)
@@ -60,8 +55,7 @@ class ArelNodeEqualityUnitTest < Minitest::Test
     refute_equal node1, node3
     refute_equal node1, node4
   end
-
-  def test_different_node_types_are_not_equal
+  it "different node types are not equal" do
     boost = Nodes::BoostCast.new("val", 1.0)
     slop = Nodes::SlopCast.new("val", 1.0)
 

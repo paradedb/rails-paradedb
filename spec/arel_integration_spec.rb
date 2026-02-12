@@ -2,16 +2,15 @@
 
 require "spec_helper"
 
-class ArelIntegrationTest < Minitest::Test
-  def setup
+RSpec.describe "ArelIntegrationTest" do
+  before do
     @builder = ParadeDB::Arel::Builder.new(:products)
   end
 
   def sql(node)
     ParadeDB::Arel.to_sql(node)
   end
-
-  def test_full_matrix_of_operators
+  it "full matrix of operators" do
     nodes = []
     nodes << @builder.match(:description, "running", "shoes")
     nodes << @builder.match_any(:description, "wireless", "bluetooth")
@@ -37,8 +36,7 @@ class ArelIntegrationTest < Minitest::Test
     assert_includes rendered, %("products"."id" @@@ pdb.more_like_this(5, ARRAY['description', 'category']))
     assert_includes rendered, %("products"."description" @@@ pdb.all())
   end
-
-  def test_boolean_chains
+  it "boolean chains" do
     base = @builder.match(:description, "running").and(
       @builder.phrase(:description, "trail shoes").not
     )

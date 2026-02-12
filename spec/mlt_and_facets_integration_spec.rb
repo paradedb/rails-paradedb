@@ -8,15 +8,14 @@ class MltFacetProduct < ActiveRecord::Base
   self.has_paradedb_index = true
 end
 
-class MltAndFacetsIntegrationTest < Minitest::Test
-  def setup
+RSpec.describe "MltAndFacetsIntegrationTest" do
+  before do
     skip "MLT/facets integration tests require PostgreSQL" unless postgresql?
 
     ensure_paradedb_setup!
     seed_products!
   end
-
-  def test_more_like_this_with_min_term_frequency_filters_all_terms
+  it "more like this with min term frequency filters all terms" do
     ids = MltFacetProduct.more_like_this(
       @earbuds_id,
       fields: [:description],
@@ -25,8 +24,7 @@ class MltAndFacetsIntegrationTest < Minitest::Test
 
     assert_equal [], ids
   end
-
-  def test_more_like_this_with_stopwords_executes
+  it "more like this with stopwords executes" do
     ids = MltFacetProduct.more_like_this(
       @earbuds_id,
       fields: [:description],
@@ -35,8 +33,7 @@ class MltAndFacetsIntegrationTest < Minitest::Test
 
     assert_kind_of Array, ids
   end
-
-  def test_facets_with_custom_agg_returns_single_payload
+  it "facets with custom agg returns single payload" do
     facets = MltFacetProduct.search(:description)
                             .matching_all("running")
                             .facets(agg: { "value_count" => { "field" => "id" } })
@@ -45,8 +42,7 @@ class MltAndFacetsIntegrationTest < Minitest::Test
     assert_includes facets, "agg"
     assert_operator facets["agg"]["value"].to_f, :>=, 1.0
   end
-
-  def test_with_facets_with_custom_agg_returns_rows_and_facets
+  it "with facets with custom agg returns rows and facets" do
     relation = MltFacetProduct.search(:description)
                              .matching_all("running")
                              .with_facets(agg: { "value_count" => { "field" => "id" } })
@@ -61,8 +57,7 @@ class MltAndFacetsIntegrationTest < Minitest::Test
     assert_includes facets, "agg"
     assert_operator facets["agg"]["value"].to_f, :>=, rows.length.to_f
   end
-
-  def test_with_facets_custom_agg_adds_match_all_for_non_paradedb_filters
+  it "with facets custom agg adds match all for non paradedb filters" do
     relation = MltFacetProduct.where(in_stock: true)
                              .extending(ParadeDB::SearchMethods)
                              .with_facets(agg: { "value_count" => { "field" => "id" } })

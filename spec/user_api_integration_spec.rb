@@ -14,8 +14,8 @@ class Category < ActiveRecord::Base
   self.has_paradedb_index = true
 end
 
-class UserApiIntegrationTest < Minitest::Test
-  def test_matching_all_with_filters
+RSpec.describe "UserApiIntegrationTest" do
+  it "matching all with filters" do
     sql = Product.search(:description)
                  .matching_all("running", "shoes")
                  .where(in_stock: true)
@@ -33,8 +33,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_closed_range_filter
+  it "closed range filter" do
     sql = Product.search(:description)
                  .matching_all("shoes")
                  .where(price: 10..100)
@@ -48,8 +47,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_exclusive_end_range_filter
+  it "exclusive end range filter" do
     sql = Product.search(:description)
                  .matching_all("shoes")
                  .where(price: 10...100)
@@ -63,8 +61,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_chain_multiple_search_fields_and
+  it "chain multiple search fields and" do
     sql = Product.search(:description).matching_all("running", "shoes")
                  .search(:category).phrase("Footwear")
                  .to_sql
@@ -76,13 +73,11 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_matching_any_or_semantics
+  it "matching any or semantics" do
     sql = Product.search(:description).matching_any("wireless", "bluetooth").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ||| 'wireless bluetooth')), sql
   end
-
-  def test_excluding_terms
+  it "excluding terms" do
     sql = Product.search(:description)
                  .matching_all("shoes")
                  .excluding("cheap", "budget")
@@ -95,53 +90,43 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_phrase_with_slop
+  it "phrase with slop" do
     sql = Product.search(:description).phrase("running shoes", slop: 2).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ### 'running shoes'::pdb.slop(2))), sql
   end
-
-  def test_fuzzy_with_prefix
+  it "fuzzy with prefix" do
     sql = Product.search(:description).fuzzy("runn", distance: 1, prefix: true).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" === 'runn'::pdb.fuzzy(1, "true"))), sql
   end
-
-  def test_regex
+  it "regex" do
     sql = Product.search(:description).regex("run.*shoes").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.regex('run.*shoes'))), sql
   end
-
-  def test_term_exact
+  it "term exact" do
     sql = Product.search(:description).term("shoes").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" === 'shoes')), sql
   end
-
-  def test_near_proximity
+  it "near proximity" do
     sql = Product.search(:description).near("sleek", "shoes", distance: 1).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('sleek' ## 1 ## 'shoes'))), sql
   end
-
-  def test_phrase_prefix
+  it "phrase prefix" do
     sql = Product.search(:description).phrase_prefix("run", "sh").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.phrase_prefix(ARRAY['run', 'sh']))), sql
   end
-
-  def test_parse_query
+  it "parse query" do
     sql = Product.search(:description).parse("running AND shoes", lenient: true).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.parse('running AND shoes', lenient => true))), sql
   end
-
-  def test_match_all_wrapper
+  it "match all wrapper" do
     sql = Product.search(:id).match_all.to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.all())), sql
   end
-
-  def test_more_like_this
+  it "more like this" do
     sql = Product.more_like_this(3, fields: [:description]).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.more_like_this(3, ARRAY['description']))), sql
   end
-
-  def test_with_score_and_order
+  it "with score and order" do
     sql = Product.search(:description)
                  .matching_all("running", "shoes")
                  .with_score
@@ -156,8 +141,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_with_snippet_default
+  it "with snippet default" do
     sql = Product.search(:description)
                  .matching_all("running shoes")
                  .with_snippet(:description)
@@ -170,8 +154,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_with_snippet_custom
+  it "with snippet custom" do
     sql = Product.search(:description)
                  .matching_all("running shoes")
                  .with_snippet(:description, start_tag: '<mark>', end_tag: '</mark>', max_chars: 100)
@@ -184,8 +167,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_with_score_then_with_snippet_keeps_both_projections
+  it "with score then with snippet keeps both projections" do
     sql = Product.search(:description)
                  .matching_all("shoes")
                  .with_score
@@ -199,8 +181,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_with_snippet_then_with_score_keeps_both_projections
+  it "with snippet then with score keeps both projections" do
     sql = Product.search(:description)
                  .matching_all("shoes")
                  .with_snippet(:description)
@@ -214,8 +195,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_or_across_fields
+  it "or across fields" do
     base = Product.where(in_stock: true).order(id: :desc).limit(10)
     left = base.search(:description).matching_all("shoes")
     right = base.search(:category).matching_all("footwear")
@@ -231,8 +211,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_facets_only
+  it "facets only" do
     facet_sql = Product.search(:description).matching_all("shoes")
                        .build_facet_query(fields: [:category, :brand], size: 10, order: "-count")
                        .sql
@@ -241,8 +220,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, facet_sql
   end
-
-  def test_with_facets_rows_plus_facets
+  it "with facets rows plus facets" do
     sql = Product.search(:description).matching_all("shoes")
                  .where(in_stock: true)
                  .with_facets(:category, :brand, size: 10)
@@ -261,8 +239,7 @@ class UserApiIntegrationTest < Minitest::Test
   end
 
   # ===== Tests combining ActiveRecord + ParadeDB features =====
-
-  def test_search_on_scoped_relation_preserves_scope
+  it "search on scoped relation preserves scope" do
     # Start with a scoped relation, then add search
     sql = Product.where(in_stock: true)
                  .where(price: 10..100)
@@ -279,8 +256,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_search_with_joins
+  it "search with joins" do
     # Search combined with JOIN
     sql = Product.joins("LEFT JOIN categories ON products.category_id = categories.id")
                  .search(:description)
@@ -297,8 +273,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_search_with_group_and_having
+  it "search with group and having" do
     # Search with GROUP BY and HAVING
     sql = Product.search(:description)
                  .matching_all("shoes")
@@ -316,8 +291,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_search_with_offset_and_limit
+  it "search with offset and limit" do
     # Pagination with search
     sql = Product.search(:description)
                  .matching_all("wireless")
@@ -338,8 +312,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_search_with_distinct
+  it "search with distinct" do
     # DISTINCT with search
     sql = Product.search(:description)
                  .matching_all("shoes")
@@ -353,8 +326,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_search_with_includes_reference
+  it "search with includes reference" do
     # Search with includes (generates JOIN)
     sql = Product.where(in_stock: true)
                  .references(:categories)
@@ -371,8 +343,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_search_with_multiple_orders
+  it "search with multiple orders" do
     # Multiple ORDER BY clauses
     sql = Product.search(:description)
                  .matching_all("shoes")
@@ -389,8 +360,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_complex_or_with_where_conditions
+  it "complex or with where conditions" do
     # Complex OR with different WHERE conditions on each side
     left = Product.where(price: 0..50)
                   .search(:description)
@@ -410,8 +380,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_search_with_not_conditions
+  it "search with not conditions" do
     # Search combined with NOT conditions
     sql = Product.search(:description)
                  .matching_all("shoes")
@@ -428,8 +397,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_search_with_in_condition
+  it "search with in condition" do
     # Search with IN clause
     sql = Product.search(:description)
                  .matching_all("wireless")
@@ -444,8 +412,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_search_with_like_pattern
+  it "search with like pattern" do
     # Search combined with LIKE
     sql = Product.search(:description)
                  .matching_all("shoes")
@@ -460,8 +427,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_search_with_null_checks
+  it "search with null checks" do
     # Search with NULL checks
     sql = Product.search(:description)
                  .matching_all("shoes")
@@ -478,8 +444,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_chained_search_fields_with_mixed_where
+  it "chained search fields with mixed where" do
     # Multiple search fields with WHERE clauses interspersed
     sql = Product.where(in_stock: true)
                  .search(:description)
@@ -501,8 +466,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_search_with_subquery_in_where
+  it "search with subquery in where" do
     # Search with subquery
     sql = Product.search(:description)
                  .matching_all("shoes")
@@ -517,8 +481,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_conditional_search_building
+  it "conditional search building" do
     # Simulating conditional query building (common pattern)
     query = Product.where(in_stock: true)
 
@@ -544,8 +507,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_search_with_readonly
+  it "search with readonly" do
     # Readonly doesn't affect SQL but ensures proper chaining
     sql = Product.search(:description)
                  .matching_all("shoes")
@@ -559,8 +521,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_search_on_relation_from_scope
+  it "search on relation from scope" do
     # Simulate a named scope returning a relation
     scoped = Product.where(in_stock: true).order(created_at: :desc)
 
@@ -579,8 +540,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_search_with_unscope
+  it "search with unscope" do
     # Unscope to remove certain conditions
     sql = Product.where(in_stock: true)
                  .order(created_at: :desc)
@@ -597,8 +557,7 @@ class UserApiIntegrationTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_search_with_rewhere
+  it "search with rewhere" do
     # Rewhere to replace existing condition
     sql = Product.where(in_stock: true)
                  .search(:description)
