@@ -46,7 +46,7 @@
 # Ruby
 *.gem
 *.rbc
-.ruby-*
+.ruby-lsp/
 /pkg
 /rdoc
 /.yardoc
