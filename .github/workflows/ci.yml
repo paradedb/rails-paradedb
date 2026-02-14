@@ -14,7 +14,7 @@ env:
 
 jobs:
   test:
-    name: rspec
+    name: tests
     runs-on: ubuntu-latest
     services:
       paradedb:
@@ -32,7 +32,7 @@ jobs:
           --health-retries 12
 
     env:
-      PARADEDB_TEST_DSN: postgresql://postgres@localhost:5432/postgres
+      PARADEDB_TEST_DSN: postgresql://postgres:postgres@localhost:5432/postgres
       PGPASSWORD: postgres
 
     steps:

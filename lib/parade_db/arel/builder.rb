@@ -59,7 +59,7 @@ module ParadeDB
       def phrase_prefix(column, *terms)
         flat = terms.flatten.compact
         raise ArgumentError, "phrase_prefix requires at least one term" if flat.empty?
-        array = Nodes::ArrayLiteral.new(flat.map { |term| quoted_value(term) })
+        array = Nodes::ArrayLiteral.new(flat.map { |t| quoted_value(t) })
         rhs = ::Arel::Nodes::NamedFunction.new("pdb.phrase_prefix", [array])
         infix("@@@", column_node(column), rhs)
       end
@@ -128,7 +128,7 @@ module ParadeDB
           if arel_table
             arel_table[column.to_sym]
           else
-            ::Arel::Nodes::SqlLiteral.new(::ActiveRecord::Base.connection.quote_column_name(column.to_s))
+            ::Arel::Nodes::SqlLiteral.new("\"#{column.to_s.gsub('"', '""')}\"")
           end
         else
           raise ArgumentError, "Unsupported column type: #{column.class}"

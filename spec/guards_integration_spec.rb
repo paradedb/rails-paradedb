@@ -20,57 +20,57 @@ class GuardsUnitTest < Minitest::Test
   end
 
   def test_matching_all_without_search_raises
-    error = assert_raises(RuntimeError) { bare_relation.matching_all("shoes") }
+    error = assert_raises(ArgumentError) { bare_relation.matching_all("shoes") }
     assert_includes error.message, "No search field set"
   end
 
   def test_matching_any_without_search_raises
-    error = assert_raises(RuntimeError) { bare_relation.matching_any("shoes") }
+    error = assert_raises(ArgumentError) { bare_relation.matching_any("shoes") }
     assert_includes error.message, "No search field set"
   end
 
   def test_excluding_without_search_raises
-    error = assert_raises(RuntimeError) { bare_relation.excluding("shoes") }
+    error = assert_raises(ArgumentError) { bare_relation.excluding("shoes") }
     assert_includes error.message, "No search field set"
   end
 
   def test_phrase_without_search_raises
-    error = assert_raises(RuntimeError) { bare_relation.phrase("running shoes") }
+    error = assert_raises(ArgumentError) { bare_relation.phrase("running shoes") }
     assert_includes error.message, "No search field set"
   end
 
   def test_fuzzy_without_search_raises
-    error = assert_raises(RuntimeError) { bare_relation.fuzzy("shoes", distance: 1) }
+    error = assert_raises(ArgumentError) { bare_relation.fuzzy("shoes", distance: 1) }
     assert_includes error.message, "No search field set"
   end
 
   def test_regex_without_search_raises
-    error = assert_raises(RuntimeError) { bare_relation.regex("run.*") }
+    error = assert_raises(ArgumentError) { bare_relation.regex("run.*") }
     assert_includes error.message, "No search field set"
   end
 
   def test_term_without_search_raises
-    error = assert_raises(RuntimeError) { bare_relation.term("shoes") }
+    error = assert_raises(ArgumentError) { bare_relation.term("shoes") }
     assert_includes error.message, "No search field set"
   end
 
   def test_near_without_search_raises
-    error = assert_raises(RuntimeError) { bare_relation.near("running", "shoes") }
+    error = assert_raises(ArgumentError) { bare_relation.near("running", "shoes") }
     assert_includes error.message, "No search field set"
   end
 
   def test_phrase_prefix_without_search_raises
-    error = assert_raises(RuntimeError) { bare_relation.phrase_prefix("run") }
+    error = assert_raises(ArgumentError) { bare_relation.phrase_prefix("run") }
     assert_includes error.message, "No search field set"
   end
 
   def test_parse_without_search_raises
-    error = assert_raises(RuntimeError) { bare_relation.parse("running AND shoes") }
+    error = assert_raises(ArgumentError) { bare_relation.parse("running AND shoes") }
     assert_includes error.message, "No search field set"
   end
 
   def test_match_all_without_search_raises
-    error = assert_raises(RuntimeError) { bare_relation.match_all }
+    error = assert_raises(ArgumentError) { bare_relation.match_all }
     assert_includes error.message, "No search field set"
   end
 

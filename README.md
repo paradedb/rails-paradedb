@@ -15,7 +15,7 @@ For complete ParadeDB documentation, see [docs.paradedb.com](https://docs.parade
 | Component  | Version                          |
 |------------|----------------------------------|
 | Ruby       | 3.2+                             |
-| Rails      | 8.0+                             |
+| Rails      | 8.1+                             |
 | ParadeDB   | 0.21.* (tested on 0.21.4)        |
 | PostgreSQL | 17, 18 (with ParadeDB extension) |
 
@@ -108,8 +108,8 @@ Product.search(:description).phrase("running shoes", slop: 2)
 Match terms with typo tolerance (Levenshtein distance):
 
 ```ruby
-# Fuzzy match with distance 1 (default)
-Product.search(:description).fuzzy("shoez")
+# Fuzzy match with distance 1
+Product.search(:description).fuzzy("shoez", distance: 1)
 
 # Fuzzy match with distance 2, prefix matching, and boost
 Product.search(:description).fuzzy("runing", distance: 2, prefix: true, boost: 1.5)
@@ -446,7 +446,7 @@ Product.search(:description).matching_all("shoes")
 
 ## Arel Layer
 
-The user API is built on top of a dedicated Arel layer that provides an AST and SQL renderer for ParadeDB operators. This is useful for building complex queries in case the ActiveRecord Syntax is not enough. All of the ActiveRecord syntax is available in the Arel layer as well. 
+The user API is built on top of a dedicated Arel layer that provides an AST and SQL renderer for ParadeDB operators. This is useful for building complex queries in case the ActiveRecord syntax is not enough. All of the ActiveRecord syntax is available in the Arel layer as well.
 
 ### Quickstart
 

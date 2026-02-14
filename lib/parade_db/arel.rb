@@ -24,5 +24,3 @@ module ParadeDB
     end
   end
 end
-
-ParadeDB::Arel::Visitor.install!

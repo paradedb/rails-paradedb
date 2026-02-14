@@ -7,6 +7,8 @@ require_relative "../lib/parade_db"
 ActiveRecord::Base.logger = nil
 
 def establish_test_connection
+  return if ActiveRecord::Base.connected?
+
   dsn = ENV["PARADEDB_TEST_DSN"].to_s
   if dsn.empty?
     raise "PARADEDB_TEST_DSN is required for all tests. Example: postgres://postgres:postgres@localhost:5432/postgres"
@@ -18,6 +20,8 @@ end
 
 def setup_test_schema
   return if defined?($paradedb_schema_loaded) && $paradedb_schema_loaded
+
+  establish_test_connection
 
   ActiveRecord::Schema.define do
     suppress_messages do
