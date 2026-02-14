@@ -16,8 +16,8 @@ For complete ParadeDB documentation, see [docs.paradedb.com](https://docs.parade
 |------------|----------------------------------|
 | Ruby       | 3.2+                             |
 | Rails      | 8.1+                             |
-| ParadeDB   | 0.21.* (tested on 0.21.4)        |
-| PostgreSQL | 17, 18 (with ParadeDB extension) |
+| ParadeDB   | 0.21.0+                          |
+| PostgreSQL | 17+    (with ParadeDB extension) |
 
 **Note**: This gem requires ActiveRecord with PostgreSQL. The DSL and Arel layer delegate SQL value quoting to `ActiveRecord::Base.connection.quote` for type safety and proper escaping.
 
