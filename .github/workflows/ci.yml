@@ -13,9 +13,19 @@ env:
   POSTGRES_DB: postgres
 
 jobs:
-  test:
-    name: tests
+  matrix-tests:
+    name: Ruby ${{ matrix.ruby-version }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Rails 8.1 supports Ruby 3.2+
+          - ruby-version: "3.2"
+          - ruby-version: "3.3"
+          - ruby-version: "3.4"
+          - ruby-version: "4.0"
+
     services:
       paradedb:
         image: paradedb/paradedb:0.21.4-pg18
@@ -39,10 +49,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set up Ruby
+      - name: Set up Ruby ${{ matrix.ruby-version }}
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: .ruby-version
+          ruby-version: ${{ matrix.ruby-version }}
           bundler-cache: true
 
       - name: Run unit tests
