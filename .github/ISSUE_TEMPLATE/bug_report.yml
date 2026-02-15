@@ -30,7 +30,7 @@ body:
         Please provide details about your environment:
         - Ruby version
         - Rails version
-        - paradedb-rails version
+        - rails-paradedb version
         - PostgreSQL version
         - pg_search extension version
     validations:

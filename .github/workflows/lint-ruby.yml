@@ -21,7 +21,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: "4.0"
+          ruby-version: .ruby-version
 
       - name: Install RuboCop
         run: gem install rubocop --no-document

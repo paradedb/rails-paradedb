@@ -22,7 +22,7 @@ typos, but we do not accept generic "documentation improvement" PRs.
 
 This repository supports self-assignment:
 
-1. Confirm the issue is unassigned and not already being worked.
+1. Confirm the issue is unassigned and not already being worked on.
 2. Comment `/take` to assign it to yourself.
 
 If you can no longer work on it, remove yourself from assignees.

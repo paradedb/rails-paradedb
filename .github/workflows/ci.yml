@@ -13,9 +13,19 @@ env:
   POSTGRES_DB: postgres
 
 jobs:
-  test:
-    name: rspec
+  matrix-tests:
+    name: Ruby ${{ matrix.ruby-version }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Rails 8.1 supports Ruby 3.2+
+          - ruby-version: "3.2"
+          - ruby-version: "3.3"
+          - ruby-version: "3.4"
+          - ruby-version: "4.0"
+
     services:
       paradedb:
         image: paradedb/paradedb:0.21.4-pg18
@@ -32,17 +42,17 @@ jobs:
           --health-retries 12
 
     env:
-      PARADEDB_TEST_DSN: postgresql://postgres@localhost:5432/postgres
+      PARADEDB_TEST_DSN: postgresql://postgres:postgres@localhost:5432/postgres
       PGPASSWORD: postgres
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set up Ruby
+      - name: Set up Ruby ${{ matrix.ruby-version }}
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: "4.0"
+          ruby-version: ${{ matrix.ruby-version }}
           bundler-cache: true
 
       - name: Run unit tests
