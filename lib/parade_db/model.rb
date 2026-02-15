@@ -7,8 +7,9 @@ module ParadeDB
   module Model
     extend ActiveSupport::Concern
 
-    included do
-      class_attribute :has_paradedb_index, default: false
+    def self.included(base)
+      base.extend(ClassMethods)
+      base.class_attribute :has_paradedb_index, default: false
     end
 
     module ClassMethods

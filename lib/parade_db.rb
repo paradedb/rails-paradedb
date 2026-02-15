@@ -18,12 +18,4 @@ module ParadeDB
     raise UnsupportedAdapterError,
           "#{context} only supports PostgreSQL. Current adapter: #{adapter_name.inspect}"
   end
-
-  def parse_facet_value(value)
-    case value
-    when nil then nil
-    when String then JSON.parse(value)
-    else value
-    end
-  end
 end

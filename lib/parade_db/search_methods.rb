@@ -102,7 +102,7 @@ module ParadeDB
     end
 
     def primary_key
-      klass.primary_key || "id"
+      klass.primary_key || :id
     end
 
     # ---- ParadeDB search entrypoints ----
@@ -113,72 +113,72 @@ module ParadeDB
     end
 
     def matching_all(*terms, boost: nil)
-      raise ArgumentError, "No search field set. Call .search(column) first." unless _paradedb_current_field
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
       node = builder.match(_paradedb_current_field, *terms, boost: boost)
       where(grouped(node))
     end
 
     def matching_any(*terms)
-      raise ArgumentError, "No search field set. Call .search(column) first." unless _paradedb_current_field
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
       node = builder.match_any(_paradedb_current_field, *terms)
       where(grouped(node))
     end
 
     def excluding(*terms)
-      raise ArgumentError, "No search field set. Call .search(column) first." unless _paradedb_current_field
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
       neg = builder.match(_paradedb_current_field, *terms)
       where(grouped(neg.not))
     end
 
     def phrase(text, slop: nil)
-      raise ArgumentError, "No search field set. Call .search(column) first." unless _paradedb_current_field
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
       node = builder.phrase(_paradedb_current_field, text, slop: slop)
       where(grouped(node))
     end
 
     def fuzzy(term, distance:, prefix: nil, boost: nil)
-      raise ArgumentError, "No search field set. Call .search(column) first." unless _paradedb_current_field
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
       node = builder.fuzzy(_paradedb_current_field, term, distance: distance, prefix: prefix, boost: boost)
       where(grouped(node))
     end
 
     def regex(pattern)
-      raise ArgumentError, "No search field set. Call .search(column) first." unless _paradedb_current_field
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
       node = builder.regex(_paradedb_current_field, pattern)
       where(grouped(node))
     end
 
     def term(value, boost: nil)
-      raise ArgumentError, "No search field set. Call .search(column) first." unless _paradedb_current_field
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
       node = builder.term(_paradedb_current_field, value, boost: boost)
       where(grouped(node))
     end
 
     def near(left_term, right_term, distance: 1)
-      raise ArgumentError, "No search field set. Call .search(column) first." unless _paradedb_current_field
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
       node = builder.near(_paradedb_current_field, left_term, right_term, distance: distance)
       where(grouped(node))
     end
 
     def phrase_prefix(*terms)
-      raise ArgumentError, "No search field set. Call .search(column) first." unless _paradedb_current_field
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
       node = builder.phrase_prefix(_paradedb_current_field, *terms)
       where(grouped(node))
     end
 
     # Parse query-string syntax into ParadeDB query AST (e.g. "running AND shoes").
-    # Wraps ParadeDB's query-string syntax into the relation-style Ruby DSL.
+    # Mirrors Django's Parse convenience helper using relation-style Ruby DSL.
     def parse(query, lenient: nil)
-      raise ArgumentError, "No search field set. Call .search(column) first." unless _paradedb_current_field
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
       node = builder.parse(_paradedb_current_field, query, lenient: lenient)
       where(grouped(node))
     end
@@ -186,7 +186,7 @@ module ParadeDB
     # Match-all wrapper for APIs that need an explicit ParadeDB predicate.
     # Use with `.search(:id)` (or any indexed field): `Product.search(:id).match_all`.
     def match_all
-      raise ArgumentError, "No search field set. Call .search(column) first." unless _paradedb_current_field
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
       where(grouped(builder.match_all(_paradedb_current_field)))
     end
@@ -308,7 +308,7 @@ module ParadeDB
     end
 
     def facet_json(field, opts)
-      size = opts[:size]
+      size = opts.key?(:size) ? opts[:size] : 10
       order_key, order_direction = facet_order(opts[:order])
 
       payload = {
@@ -519,11 +519,22 @@ module ParadeDB
         row.each do |key, value|
           if key.end_with?("_facet")
             field_name = key.delete_suffix("_facet")
-            parsed = ParadeDB.parse_facet_value(value)
+            parsed = parse_facet_value(value)
             facets[field_name] = parsed unless parsed.nil?
           end
         end
         facets
+      end
+
+      def parse_facet_value(value)
+        case value
+        when nil
+          nil
+        when String
+          JSON.parse(value)
+        else
+          value
+        end
       end
     end
 
@@ -564,11 +575,22 @@ module ParadeDB
           facet_col = "_#{field}_facet"
           if first_row.respond_to?(facet_col)
             value = first_row.public_send(facet_col)
-            parsed = ParadeDB.parse_facet_value(value)
+            parsed = parse_facet_value(value)
             facets[field.to_s] = parsed unless parsed.nil?
           end
         end
         facets
+      end
+
+      def parse_facet_value(value)
+        case value
+        when nil
+          nil
+        when String
+          JSON.parse(value)
+        else
+          value
+        end
       end
     end
   end
