@@ -15,7 +15,13 @@ class PendingFeaturesUnitTest < Minitest::Test
 
   def teardown
     ParadeDB.index_validation_mode = @previous_mode
-    cleanup_constants("AutoIndexedProduct", "AutoIndexedProductIndex", "SchemaDumpProductIndex", "DriftProduct", "DriftProductIndex")
+    cleanup_constants(
+      "AutoIndexedProduct", "AutoIndexedProductIndex",
+      "SchemaDumpProductIndex",
+      "DriftProduct", "DriftProductIndex",
+      "ExplicitProduct", "CustomProductIndex",
+      "MultiIndexProduct", "MultiProductIndexV1", "MultiProductIndexV2"
+    )
   end
 
   def test_key_field_sql_is_escaped
@@ -159,19 +165,108 @@ class PendingFeaturesUnitTest < Minitest::Test
     assert_includes conn.paradedb_schema_index_references, "SchemaDumpProductIndex"
   end
 
-  def test_schema_dump_contains_paradedb_index_dsl_reference
-    Object.const_set("SchemaDumpProductIndex", Class.new(ParadeDB::Index) do
+  def test_schema_dump_from_catalog_without_in_memory_state
+    conn = ActiveRecord::Base.connection
+    conn.add_bm25_index(:products, fields: [:id, :description], key_field: :id, if_not_exists: true)
+
+    conn.instance_variable_set(:@paradedb_schema_index_references, [])
+
+    stream = StringIO.new
+    ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection_pool, stream)
+    assert_includes stream.string, "add_bm25_index"
+    assert_includes stream.string, "products"
+    assert_includes stream.string, "key_field"
+  end
+
+  def test_schema_dump_does_not_duplicate_bm25_as_add_index
+    conn = ActiveRecord::Base.connection
+    conn.add_bm25_index(:products, fields: [:id, :description], key_field: :id, if_not_exists: true)
+
+    stream = StringIO.new
+    ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection_pool, stream)
+    schema = stream.string
+
+    assert_includes schema, "add_bm25_index"
+    refute_match(/add_index.*products_bm25_idx/, schema)
+    refute_match(/t\.index.*products_bm25_idx/, schema)
+  end
+
+  def test_paradedb_index_macro_overrides_convention
+    Object.const_set("CustomProductIndex", Class.new(ParadeDB::Index) do
       self.table_name = :products
       self.key_field = :id
       self.fields = [:id, :description]
     end)
 
+    Object.const_set("ExplicitProduct", Class.new(ActiveRecord::Base) do
+      self.table_name = :products
+      paradedb_index CustomProductIndex
+    end)
+
+    assert_equal CustomProductIndex, ExplicitProduct.paradedb_index_class
+    assert_equal [CustomProductIndex], ExplicitProduct.paradedb_index_classes
+  end
+
+  def test_paradedb_index_macro_supports_multiple_indexes
+    Object.const_set("MultiProductIndexV1", Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.index_name = :products_v1_idx
+      self.fields = [:id, :description]
+    end)
+
+    Object.const_set("MultiProductIndexV2", Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.index_name = :products_v2_idx
+      self.fields = [:id, :description, :category]
+    end)
+
+    Object.const_set("MultiIndexProduct", Class.new(ActiveRecord::Base) do
+      self.table_name = :products
+      paradedb_index MultiProductIndexV1
+      paradedb_index MultiProductIndexV2
+    end)
+
+    assert_equal [MultiProductIndexV1, MultiProductIndexV2], MultiIndexProduct.paradedb_index_classes
+    assert_equal MultiProductIndexV1, MultiIndexProduct.paradedb_index_class
+  end
+
+  def test_paradedb_index_macro_does_not_duplicate
+    Object.const_set("CustomProductIndex", Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.fields = [:id, :description]
+    end)
+
+    Object.const_set("ExplicitProduct", Class.new(ActiveRecord::Base) do
+      self.table_name = :products
+      paradedb_index CustomProductIndex
+      paradedb_index CustomProductIndex
+    end)
+
+    assert_equal [CustomProductIndex], ExplicitProduct.paradedb_index_classes
+  end
+
+  def test_schema_dump_with_tokenized_fields
+    Object.const_set("SchemaDumpProductIndex", Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.fields = [
+        :id,
+        { description: :simple }
+      ]
+    end)
+
     conn = ActiveRecord::Base.connection
-    conn.create_paradedb_index(SchemaDumpProductIndex)
+    conn.create_paradedb_index(SchemaDumpProductIndex, if_not_exists: true)
 
     stream = StringIO.new
     ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection_pool, stream)
-    assert_includes stream.string, %(create_paradedb_index "SchemaDumpProductIndex")
+    schema = stream.string
+
+    assert_includes schema, "add_bm25_index"
+    assert_includes schema, "pdb.simple"
   end
 
   private

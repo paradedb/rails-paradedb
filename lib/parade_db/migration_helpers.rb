@@ -49,17 +49,22 @@ module ParadeDB
     end
 
     def dump_paradedb_indexes(stream)
-      refs = paradedb_schema_index_references
-      return if refs.empty?
+      rows = paradedb_bm25_index_rows
+      return if rows.empty?
 
       stream.puts
-      refs.each do |index_class_name|
-        stream.puts %(  create_paradedb_index "#{index_class_name}")
+      rows.each do |row|
+        ruby_stmt = bm25_index_to_ruby(row)
+        stream.puts "  #{ruby_stmt}"
       end
     end
 
     def paradedb_schema_index_references
       (@paradedb_schema_index_references || []).uniq.sort
+    end
+
+    def paradedb_bm25_index_names
+      paradedb_bm25_index_rows.map { |r| r["index_name"] }
     end
 
     private
@@ -166,6 +171,130 @@ module ParadeDB
 
       false
     end
+
+    def paradedb_bm25_index_rows
+      sql = <<~SQL
+        SELECT
+          c.relname  AS index_name,
+          t.relname  AS table_name,
+          pg_get_indexdef(c.oid) AS indexdef
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        JOIN pg_index i ON i.indexrelid = c.oid
+        JOIN pg_class t ON t.oid = i.indrelid
+        JOIN pg_am am ON am.oid = c.relam
+        WHERE n.nspname = current_schema()
+          AND am.amname = 'bm25'
+        ORDER BY t.relname, c.relname
+      SQL
+      select_all(sql).to_a
+    rescue => e
+      Kernel.warn("ParadeDB: unable to query bm25 indexes from catalog: #{e.message}")
+      []
+    end
+
+    def bm25_index_to_ruby(row)
+      indexdef = row["indexdef"]
+      table = row["table_name"]
+      name = row["index_name"]
+
+      key_field = extract_bm25_key_field(indexdef)
+      fields_sql = extract_bm25_fields_sql(indexdef)
+
+      if key_field && fields_sql
+        field_names = split_bm25_top_level(fields_sql).map { |f| f.strip }
+        fields_ruby = field_names.map { |f| bm25_field_to_ruby(f) }
+        "add_bm25_index #{table.to_sym.inspect}, " \
+          "fields: [#{fields_ruby.join(', ')}], " \
+          "key_field: #{key_field.to_sym.inspect}, " \
+          "name: #{name.inspect}"
+      else
+        "execute #{indexdef.inspect}"
+      end
+    end
+
+    def extract_bm25_key_field(indexdef)
+      quoted = indexdef.match(/WITH\s*\([^)]*key_field\s*=\s*'((?:[^']|'')*)'/i)
+      return quoted[1].gsub("''", "'") if quoted
+
+      unquoted = indexdef.match(/WITH\s*\([^)]*key_field\s*=\s*([a-zA-Z_][a-zA-Z0-9_]*)/i)
+      return unquoted[1] if unquoted
+
+      nil
+    end
+
+    def extract_bm25_fields_sql(indexdef)
+      match = indexdef.match(/USING\s+bm25\s*\(/im)
+      return nil unless match
+
+      start = match.end(0)
+      depth = 1
+      pos = start
+      while pos < indexdef.length && depth > 0
+        case indexdef[pos]
+        when "(" then depth += 1
+        when ")" then depth -= 1
+        end
+        pos += 1
+      end
+      return nil if depth != 0
+
+      indexdef[start..pos - 2]
+    end
+
+    def split_bm25_top_level(str)
+      parts = []
+      current = +""
+      depth = 0
+      str.each_char do |ch|
+        case ch
+        when "(" then depth += 1; current << ch
+        when ")" then depth -= 1; current << ch
+        when ","
+          if depth == 0
+            parts << current
+            current = +""
+          else
+            current << ch
+          end
+        else
+          current << ch
+        end
+      end
+      parts << current unless current.strip.empty?
+      parts
+    end
+
+    def bm25_field_to_ruby(field_sql)
+      stripped = field_sql.strip
+
+      if stripped.start_with?("(") && stripped.end_with?(")")
+        inner = stripped[1..-2].strip
+
+        if (cast_match = inner.match(/\A(.+?)::(.*)\z/m))
+          source_sql = cast_match[1].strip
+          tokenizer_sql_str = cast_match[2].strip
+
+          source_sql = source_sql[1..-2].strip if source_sql.start_with?("(") && source_sql.end_with?(")")
+
+          source = unquote_identifier(source_sql)
+          "{ #{source.to_sym.inspect} => #{tokenizer_sql_str.inspect} }"
+        else
+          inner.inspect
+        end
+      else
+        name = unquote_identifier(stripped)
+        name.to_sym.inspect
+      end
+    end
+
+    def unquote_identifier(str)
+      if str.start_with?('"') && str.end_with?('"')
+        str[1..-2].gsub('""', '"')
+      else
+        str
+      end
+    end
   end
 end
 
@@ -178,13 +307,37 @@ if defined?(ActiveRecord::SchemaDumper)
     module SchemaDumperPatch
       def tables(stream)
         super
-        conn =
-          if instance_variable_defined?(:@connection)
-            instance_variable_get(:@connection)
-          elsif respond_to?(:connection_pool)
-            connection_pool.connection
+        paradedb_connection&.dump_paradedb_indexes(stream)
+      end
+
+      private
+
+      def indexes_in_create(table, stream)
+        conn = paradedb_connection
+        if conn
+          bm25_names = conn.paradedb_bm25_index_names
+          original_indexes = conn.method(:indexes)
+
+          conn.define_singleton_method(:indexes) do |tbl|
+            original_indexes.call(tbl).reject { |idx| bm25_names.include?(idx.name) }
           end
-        conn.dump_paradedb_indexes(stream) if conn&.respond_to?(:dump_paradedb_indexes)
+
+          begin
+            super
+          ensure
+            conn.define_singleton_method(:indexes, original_indexes)
+          end
+        else
+          super
+        end
+      end
+
+      def paradedb_connection
+        if instance_variable_defined?(:@connection)
+          conn = instance_variable_get(:@connection)
+          return conn if conn&.respond_to?(:dump_paradedb_indexes)
+        end
+        nil
       end
     end
   end

@@ -18,7 +18,7 @@ module ParadeDB
   module_function
 
   def index_validation_mode
-    @index_validation_mode ||= :warn
+    @index_validation_mode ||= :off
   end
 
   def index_validation_mode=(mode)

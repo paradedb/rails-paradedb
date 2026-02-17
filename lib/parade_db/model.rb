@@ -13,7 +13,9 @@ module ParadeDB
       :with_facets,
       :facets,
       :paradedb_arel,
+      :paradedb_index,
       :paradedb_index_class,
+      :paradedb_index_classes,
       :paradedb_indexed_fields,
       :paradedb_key_field,
       :paradedb_index_name,
@@ -75,10 +77,27 @@ module ParadeDB
         @paradedb_arel ||= ParadeDB::Arel::Builder.new(table_name)
       end
 
+      def paradedb_index(index_class)
+        @paradedb_explicit_index_classes ||= []
+        @paradedb_explicit_index_classes << index_class unless @paradedb_explicit_index_classes.include?(index_class)
+        remove_instance_variable(:@paradedb_index_class) if instance_variable_defined?(:@paradedb_index_class)
+        remove_instance_variable(:@paradedb_index_definition) if instance_variable_defined?(:@paradedb_index_definition)
+        index_class
+      end
+
+      def paradedb_index_classes
+        if instance_variable_defined?(:@paradedb_explicit_index_classes) && !@paradedb_explicit_index_classes.empty?
+          @paradedb_explicit_index_classes.dup
+        else
+          klass = resolve_paradedb_index_class
+          klass ? [klass] : []
+        end
+      end
+
       def paradedb_index_class
         return @paradedb_index_class if instance_variable_defined?(:@paradedb_index_class)
 
-        @paradedb_index_class = resolve_paradedb_index_class
+        @paradedb_index_class = paradedb_index_classes.first
       end
 
       def paradedb_indexed_fields
@@ -99,25 +118,26 @@ module ParadeDB
       end
 
       def paradedb_validate_index!
-        definition = paradedb_index_definition
-        return true if definition.nil?
         return true if ParadeDB.index_validation_mode == :off
 
-        if paradedb_catalog_index_valid?(definition)
-          @paradedb_index_validated = true
-          return true
-        end
+        classes = paradedb_index_classes
+        return true if classes.empty?
 
-        message = "ParadeDB index drift detected for #{name}: expected #{definition.index_name} on #{definition.table_name} with bm25."
-        case ParadeDB.index_validation_mode
-        when :warn
-          Kernel.warn(message)
-          false
-        when :raise
-          raise ParadeDB::IndexDriftError, message
-        else
-          false
+        all_valid = true
+        classes.each do |klass|
+          definition = klass.compiled_definition
+          next if paradedb_catalog_index_valid?(definition)
+
+          all_valid = false
+          message = "ParadeDB index drift detected for #{name}: expected #{definition.index_name} on #{definition.table_name} with bm25."
+          case ParadeDB.index_validation_mode
+          when :warn
+            Kernel.warn(message)
+          when :raise
+            raise ParadeDB::IndexDriftError, message
+          end
         end
+        all_valid
       end
 
       private

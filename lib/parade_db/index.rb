@@ -39,9 +39,72 @@ module ParadeDB
       end
     end
 
+    class TokenizerParser
+      TOKENIZER_EXPRESSION = /\A[a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\s*[a-zA-Z0-9_'".,\s]*\s*\))?\z/.freeze
+
+      class << self
+        def parse(source_name, tokenizer_spec)
+          case tokenizer_spec
+          when Symbol, String
+            [build_tokenized_entry(source_name, tokenizer_spec.to_s, {})]
+          when Hash
+            tokenizer_spec.map do |tokenizer, opts|
+              case opts
+              when Hash
+                build_tokenized_entry(source_name, tokenizer.to_s, normalize_options(opts))
+              when Symbol, String
+                build_tokenized_entry(source_name, tokenizer.to_s, normalize_positional_option(opts))
+              else
+                raise InvalidIndexDefinition,
+                      "tokenizer options for #{source_name}.#{tokenizer} must be a Hash, Symbol, or String"
+              end
+            end
+          else
+            raise InvalidIndexDefinition,
+                  "invalid tokenizer definition for #{source_name}: #{tokenizer_spec.inspect}"
+          end
+        end
+
+        private
+
+        def normalize_options(opts)
+          opts.each_with_object({}) do |(key, value), memo|
+            memo[key.to_sym] = value
+          end
+        end
+
+        def normalize_positional_option(option)
+          { __positional: [option.to_s] }
+        end
+
+        def build_tokenized_entry(source_name, tokenizer, options)
+          validate_tokenizer_name!(source_name, tokenizer) unless tokenizer.nil?
+          key = options[:alias]&.to_s || source_name
+          DefinitionCompiler::Entry.new(
+            source: source_name,
+            expression: expression?(source_name),
+            tokenizer: tokenizer,
+            options: options,
+            query_key: key
+          )
+        end
+
+        def validate_tokenizer_name!(source_name, tokenizer)
+          return if TOKENIZER_EXPRESSION.match?(tokenizer)
+
+          raise InvalidIndexDefinition,
+                "invalid tokenizer name #{tokenizer.inspect} for #{source_name}. " \
+                "Expected identifier form like simple, pdb::simple, or pdb::ngram(2, 5)."
+        end
+
+        def expression?(value)
+          value.match?(/[^a-zA-Z0-9_]/)
+        end
+      end
+    end
+
     # Consumed by migration helpers; validates and normalizes the DSL class
     class DefinitionCompiler
-      TOKENIZER_EXPRESSION = /\A[a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\s*[a-zA-Z0-9_'".,\s]*\s*\))?\z/.freeze
       Compiled = Struct.new(:table_name, :key_field, :index_name, :entries, keyword_init: true)
       Entry = Struct.new(:source, :expression, :tokenizer, :options, :query_key, keyword_init: true)
 
@@ -98,64 +161,12 @@ module ParadeDB
 
               source, tokenizer_spec = entry.first
               source_name = source.to_s
-              entries.concat(expand_tokenizer_entries(source_name, tokenizer_spec))
+              entries.concat(TokenizerParser.parse(source_name, tokenizer_spec))
             else
               raise InvalidIndexDefinition, "unsupported field entry type: #{entry.class}"
             end
           end
           entries
-        end
-
-        def expand_tokenizer_entries(source_name, tokenizer_spec)
-          case tokenizer_spec
-          when Symbol, String
-            [build_tokenized_entry(source_name, tokenizer_spec.to_s, {})]
-          when Hash
-            tokenizer_spec.map do |tokenizer, opts|
-              case opts
-              when Hash
-                build_tokenized_entry(source_name, tokenizer.to_s, normalize_options(opts))
-              when Symbol, String
-                build_tokenized_entry(source_name, tokenizer.to_s, normalize_positional_option(opts))
-              else
-                raise InvalidIndexDefinition,
-                      "tokenizer options for #{source_name}.#{tokenizer} must be a Hash, Symbol, or String"
-              end
-            end
-          else
-            raise InvalidIndexDefinition,
-                  "invalid tokenizer definition for #{source_name}: #{tokenizer_spec.inspect}"
-          end
-        end
-
-        def normalize_options(opts)
-          opts.each_with_object({}) do |(key, value), memo|
-            memo[key.to_sym] = value
-          end
-        end
-
-        def normalize_positional_option(option)
-          { __positional: [option.to_s] }
-        end
-
-        def build_tokenized_entry(source_name, tokenizer, options)
-          validate_tokenizer_name!(source_name, tokenizer) unless tokenizer.nil?
-          key = options[:alias]&.to_s || source_name
-          Entry.new(
-            source: source_name,
-            expression: expression?(source_name),
-            tokenizer: tokenizer,
-            options: options,
-            query_key: key
-          )
-        end
-
-        def validate_tokenizer_name!(source_name, tokenizer)
-          return if TOKENIZER_EXPRESSION.match?(tokenizer)
-
-          raise InvalidIndexDefinition,
-                "invalid tokenizer name #{tokenizer.inspect} for #{source_name}. " \
-                "Expected identifier form like simple, pdb::simple, or pdb::ngram(2, 5)."
         end
 
         def expression?(value)

@@ -92,7 +92,7 @@ class AddProductBm25Index < ActiveRecord::Migration[8.0]
   end
 
   def down
-    remove_bm25_index :products
+    remove_bm25_index :products, name: ProductIndex.index_name
   end
 end
 ```
