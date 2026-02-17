@@ -61,9 +61,6 @@ jobs:
       - name: Run integration tests
         run: bundle exec rake test:integration
 
-      - name: Install example dependencies
-        run: BUNDLE_GEMFILE=examples/Gemfile bundle install
-
       # NOTE: Examples temporarily disabled until index creation DSL/migrations are implemented.
       # The examples require proper BM25 index setup which is not yet available via the Rails API.
       # TODO: Re-enable examples once index creation DSL is implemented (see feedback.md).
