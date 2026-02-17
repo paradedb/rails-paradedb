@@ -1,5 +1,19 @@
 # frozen_string_literal: true
 
+require "logger"
+require "rails"
+require "active_record"
+require_relative "../../lib/parade_db"
+
+class FacetedSearchExampleApp < Rails::Application
+  config.root = File.expand_path("../..", __dir__)
+  config.eager_load = false
+  config.logger = Logger.new(nil)
+  config.secret_key_base = "paradedb_examples_secret_key_base"
+end
+
+FacetedSearchExampleApp.initialize!
+
 require_relative "model"
 
 module FacetedSearchSetup
@@ -32,9 +46,10 @@ module FacetedSearchSetup
     conn.execute(
       "CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');"
     )
-    conn.execute("DROP INDEX IF EXISTS mock_items_bm25_idx;")
+    conn.execute("DROP TABLE IF EXISTS mock_items_faceted_search CASCADE;")
+    conn.execute("CREATE TABLE mock_items_faceted_search AS TABLE mock_items;")
     conn.execute(<<~SQL)
-      CREATE INDEX mock_items_bm25_idx ON mock_items USING bm25 (
+      CREATE INDEX mock_items_faceted_search_bm25_idx ON mock_items_faceted_search USING bm25 (
         id,
         description,
         rating,

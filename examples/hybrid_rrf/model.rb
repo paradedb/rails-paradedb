@@ -12,7 +12,7 @@ require_relative "../../lib/parade_db"
 class MockItem < ActiveRecord::Base
   include ParadeDB::Model
 
-  self.table_name = "mock_items"
+  self.table_name = "mock_items_hybrid_rrf"
   self.primary_key = "id"
   self.has_paradedb_index = true
 

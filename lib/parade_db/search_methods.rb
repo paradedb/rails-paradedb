@@ -294,7 +294,6 @@ module ParadeDB
 
     def ensure_paradedb_runtime!
       ParadeDB.ensure_postgresql_adapter!(connection, context: "ParadeDB search")
-      ParadeDB::Arel::Visitor.install!
     end
 
     def grouped(node)

@@ -2,6 +2,20 @@
 # frozen_string_literal: true
 
 require "json"
+require "logger"
+require "rails"
+require "active_record"
+require_relative "../../lib/parade_db"
+
+class HybridRrfExampleApp < Rails::Application
+  config.root = File.expand_path("../..", __dir__)
+  config.eager_load = false
+  config.logger = Logger.new(nil)
+  config.secret_key_base = "paradedb_examples_secret_key_base"
+end
+
+HybridRrfExampleApp.initialize!
+
 require_relative "model"
 
 module HybridRrfSetup
@@ -40,9 +54,10 @@ module HybridRrfSetup
     conn.execute(
       "CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');"
     )
-    conn.execute("DROP INDEX IF EXISTS mock_items_bm25_idx;")
+    conn.execute("DROP TABLE IF EXISTS mock_items_hybrid_rrf CASCADE;")
+    conn.execute("CREATE TABLE mock_items_hybrid_rrf AS TABLE mock_items;")
     conn.execute(<<~SQL)
-      CREATE INDEX mock_items_bm25_idx ON mock_items USING bm25 (
+      CREATE INDEX mock_items_hybrid_rrf_bm25_idx ON mock_items_hybrid_rrf USING bm25 (
         id,
         description,
         rating,
@@ -93,16 +108,16 @@ module HybridRrfSetup
       BEGIN
         IF NOT EXISTS (
           SELECT 1 FROM information_schema.columns
-          WHERE table_name = 'mock_items' AND column_name = 'embedding'
+          WHERE table_name = '#{MockItem.table_name}' AND column_name = 'embedding'
         ) THEN
-          ALTER TABLE mock_items ADD COLUMN embedding vector(384);
+          ALTER TABLE #{MockItem.table_name} ADD COLUMN embedding vector(384);
         END IF;
       END $$;
     SQL
 
     MockItem.reset_column_information
 
-    existing = conn.select_value("SELECT COUNT(*) FROM mock_items WHERE embedding IS NOT NULL").to_i
+    existing = conn.select_value("SELECT COUNT(*) FROM #{MockItem.table_name} WHERE embedding IS NOT NULL").to_i
     if existing.positive?
       puts "+ #{existing} items already have embeddings"
       return count
@@ -121,7 +136,7 @@ module HybridRrfSetup
 
     embeddings.each_with_index do |(id, vector_literal), index|
       conn.execute(
-        "UPDATE mock_items SET embedding = #{conn.quote(vector_literal)}::vector WHERE id = #{id.to_i};"
+        "UPDATE #{MockItem.table_name} SET embedding = #{conn.quote(vector_literal)}::vector WHERE id = #{id.to_i};"
       )
 
       current = index + 1

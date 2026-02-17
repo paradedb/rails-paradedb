@@ -1,8 +1,21 @@
 # frozen_string_literal: true
 
 require "rspec"
+require "logger"
+require "rails"
 require "active_record"
 require_relative "../lib/parade_db"
+
+unless defined?(ParadeDBTestApp)
+  class ParadeDBTestApp < Rails::Application
+    config.root = File.expand_path("..", __dir__)
+    config.eager_load = false
+    config.logger = Logger.new(nil)
+    config.secret_key_base = "paradedb_test_secret_key_base"
+  end
+
+  ParadeDBTestApp.initialize!
+end
 
 ActiveRecord::Base.logger = nil
 

@@ -1,6 +1,20 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+require "logger"
+require "rails"
+require "active_record"
+require_relative "../../lib/parade_db"
+
+class AutocompleteExampleApp < Rails::Application
+  config.root = File.expand_path("../..", __dir__)
+  config.eager_load = false
+  config.logger = Logger.new(nil)
+  config.secret_key_base = "paradedb_examples_secret_key_base"
+end
+
+AutocompleteExampleApp.initialize!
+
 require_relative "model"
 
 module AutocompleteSetup
@@ -33,17 +47,6 @@ module AutocompleteSetup
     conn.execute(
       "CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');"
     )
-    conn.execute("DROP INDEX IF EXISTS mock_items_bm25_idx;")
-    conn.execute(<<~SQL)
-      CREATE INDEX mock_items_bm25_idx ON mock_items USING bm25 (
-        id,
-        description,
-        rating,
-        (category::pdb.literal('alias=category')),
-        ((metadata->>'color')::pdb.literal('alias=metadata_color')),
-        ((metadata->>'location')::pdb.literal('alias=metadata_location'))
-      ) WITH (key_field='id');
-    SQL
 
     MockItem.reset_column_information
     MockItem.count
@@ -67,15 +70,15 @@ module AutocompleteSetup
     SQL
     puts "  + Table created"
 
-    puts "\nCopying data from mock_items..."
+    puts "\nCopying data from #{MockItem.table_name}..."
     conn.execute(<<~SQL)
       INSERT INTO autocomplete_items (id, description, category, rating, in_stock, created_at)
       SELECT id, description, category, rating, in_stock, created_at
-      FROM mock_items;
+      FROM #{MockItem.table_name};
     SQL
 
     count = conn.select_value("SELECT COUNT(*) FROM autocomplete_items").to_i
-    puts "  + Copied #{count} products from mock_items"
+    puts "  + Copied #{count} products from #{MockItem.table_name}"
 
     puts "\nCreating autocomplete-optimized BM25 index..."
     conn.execute("DROP INDEX IF EXISTS autocomplete_items_idx;")

@@ -88,17 +88,17 @@ def hybrid_search(query, top_k: 20, limit: 5, rrf_k: 60, bm25_weight: 1.0, seman
             hybrid_scores: scores_cte
           )
           .from("hybrid_scores")
-          .joins("JOIN mock_items ON mock_items.id = hybrid_scores.id")
+          .joins("JOIN #{MockItem.table_name} ON #{MockItem.table_name}.id = hybrid_scores.id")
           .select(
-            "mock_items.id",
-            "mock_items.description",
+            "#{MockItem.table_name}.id",
+            "#{MockItem.table_name}.description",
             "hybrid_scores.bm25_rank",
             "hybrid_scores.semantic_rank",
             "hybrid_scores.bm25_rrf",
             "hybrid_scores.semantic_rrf",
             "hybrid_scores.hybrid_score"
           )
-          .order("hybrid_scores.hybrid_score DESC, mock_items.id ASC")
+          .order("hybrid_scores.hybrid_score DESC, #{MockItem.table_name}.id ASC")
           .limit(limit)
 end
 
