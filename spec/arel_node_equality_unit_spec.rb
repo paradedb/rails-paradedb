@@ -2,8 +2,9 @@
 
 require "spec_helper"
 
+Nodes = ParadeDB::Arel::Nodes
+
 RSpec.describe "ArelNodeEqualityUnitTest" do
-  Nodes = ParadeDB::Arel::Nodes
   it "boost cast equality" do
     node1 = Nodes::BoostCast.new("expr", 2.0)
     node2 = Nodes::BoostCast.new("expr", 2.0)

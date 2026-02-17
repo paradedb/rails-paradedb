@@ -25,7 +25,7 @@ module LegacyAssertions
   end
 
   def assert(value, _message = nil)
-    expect(value).to be(true)
+    expect(value).to be_truthy
   end
 
   def assert_nil(value, _message = nil)
@@ -57,7 +57,7 @@ module LegacyAssertions
   end
 
   def assert_not(value, _message = nil)
-    expect(value).to be(false)
+    expect(value).to be_falsy
   end
 
   def assert_in_delta(expected, actual, delta = 0.001, _message = nil)
