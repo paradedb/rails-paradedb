@@ -8,29 +8,26 @@ class ErrorHandlingProduct < ActiveRecord::Base
   self.has_paradedb_index = true
 end
 
-class ErrorHandlingIntegrationTest < Minitest::Test
-  def setup
+RSpec.describe "ErrorHandlingIntegrationTest" do
+  before do
     skip "Error-handling integration tests require PostgreSQL" unless postgresql?
 
     ensure_paradedb_setup!
     seed_products!
   end
-
-  def test_invalid_parse_query_raises_statement_invalid
+  it "invalid parse query raises statement invalid" do
     error = assert_raises(ActiveRecord::StatementInvalid) do
       ErrorHandlingProduct.search(:description).parse("AND AND invalid").to_a
     end
     assert_match(/parse|syntax|query/i, error.message)
   end
-
-  def test_invalid_regex_query_raises_statement_invalid
+  it "invalid regex query raises statement invalid" do
     error = assert_raises(ActiveRecord::StatementInvalid) do
       ErrorHandlingProduct.search(:description).regex("[invalid(regex").to_a
     end
     assert_match(/regex|invalid/i, error.message)
   end
-
-  def test_more_like_this_nonexistent_id_returns_empty
+  it "more like this nonexistent id returns empty" do
     ids = ErrorHandlingProduct.more_like_this(999_999, fields: [:description]).order(:id).pluck(:id)
     assert_equal [], ids
   end

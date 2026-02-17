@@ -12,15 +12,14 @@ class BehaviorCategory < ActiveRecord::Base
   self.table_name = :categories
 end
 
-class UserApiBehaviorIntegrationTest < Minitest::Test
-  def setup
+RSpec.describe "UserApiBehaviorIntegrationTest" do
+  before do
     skip "Behavior integration tests require PostgreSQL" unless postgresql?
 
     ensure_paradedb_setup!
     seed_products!
   end
-
-  def test_matching_all_executes_and_returns_rows
+  it "matching all executes and returns rows" do
     ids = BehaviorProduct.search(:description)
                          .matching_all("running", "shoes")
                          .order(:id)
@@ -28,8 +27,7 @@ class UserApiBehaviorIntegrationTest < Minitest::Test
 
     assert_equal [1, 2], ids
   end
-
-  def test_matching_any_executes_and_returns_rows
+  it "matching any executes and returns rows" do
     ids = BehaviorProduct.search(:description)
                          .matching_any("wireless", "hiking")
                          .order(:id)
@@ -37,8 +35,7 @@ class UserApiBehaviorIntegrationTest < Minitest::Test
 
     assert_equal [3, 5], ids
   end
-
-  def test_phrase_near_and_phrase_prefix_execute
+  it "phrase near and phrase prefix execute" do
     phrase_ids = BehaviorProduct.search(:description).phrase("running shoes").order(:id).pluck(:id)
     near_ids = BehaviorProduct.search(:description).near("running", "shoes", distance: 1).order(:id).pluck(:id)
     prefix_ids = BehaviorProduct.search(:category).phrase_prefix("foot").order(:id).pluck(:id)
@@ -47,8 +44,7 @@ class UserApiBehaviorIntegrationTest < Minitest::Test
     assert_equal [1, 2], near_ids
     assert_equal [1, 2, 5], prefix_ids
   end
-
-  def test_parse_and_match_all_wrappers_execute
+  it "parse and match all wrappers execute" do
     parse_ids = BehaviorProduct.search(:description)
                                .parse("running AND shoes", lenient: true)
                                .order(:id)
@@ -58,8 +54,7 @@ class UserApiBehaviorIntegrationTest < Minitest::Test
     assert_equal [1, 2], parse_ids
     assert_equal [1, 2, 3], all_ids
   end
-
-  def test_term_regex_and_fuzzy_execute
+  it "term regex and fuzzy execute" do
     term_ids = BehaviorProduct.search(:category).term("audio").order(:id).pluck(:id)
     regex_ids = BehaviorProduct.search(:description).regex("run.*").order(:id).pluck(:id)
     fuzzy_ids = BehaviorProduct.search(:description).fuzzy("shose", distance: 2).order(:id).pluck(:id)
@@ -68,38 +63,33 @@ class UserApiBehaviorIntegrationTest < Minitest::Test
     assert_equal [1, 2, 6], regex_ids
     assert_equal [1, 2], fuzzy_ids
   end
-
-  def test_more_like_this_with_id_executes_and_returns_similar_rows
+  it "more like this with id executes and returns similar rows" do
     ids = BehaviorProduct.more_like_this(3, fields: [:description]).limit(5).pluck(:id)
 
     assert_includes ids, 4
   end
-
-  def test_more_like_this_with_json_single_field_executes
+  it "more like this with json single field executes" do
     json_doc = { description: "running shoes" }.to_json
     ids = BehaviorProduct.more_like_this(json_doc).order(:id).pluck(:id)
 
     assert_includes ids, 1
     assert_includes ids, 2
   end
-
-  def test_more_like_this_with_json_multiple_fields_executes
+  it "more like this with json multiple fields executes" do
     json_doc = { description: "running shoes", category: "footwear" }.to_json
     ids = BehaviorProduct.more_like_this(json_doc).order(:id).pluck(:id)
 
     assert_includes ids, 1
     assert_includes ids, 2
   end
-
-  def test_more_like_this_with_json_category_only_executes
+  it "more like this with json category only executes" do
     json_doc = { category: "audio" }.to_json
     ids = BehaviorProduct.more_like_this(json_doc).order(:id).pluck(:id)
 
     assert_includes ids, 3
     assert_includes ids, 4
   end
-
-  def test_more_like_this_with_json_combined_with_filters_executes
+  it "more like this with json combined with filters executes" do
     json_doc = { description: "running" }.to_json
     ids = BehaviorProduct.more_like_this(json_doc)
                           .where(in_stock: true)
@@ -110,8 +100,7 @@ class UserApiBehaviorIntegrationTest < Minitest::Test
     assert_includes ids, 1
     assert_includes ids, 2
   end
-
-  def test_with_score_and_with_snippet_materialize_columns
+  it "with score and with snippet materialize columns" do
     rows = BehaviorProduct.search(:description)
                           .matching_all("running shoes")
                           .with_score
@@ -125,8 +114,7 @@ class UserApiBehaviorIntegrationTest < Minitest::Test
       refute_nil row.description_snippet
     end
   end
-
-  def test_facets_and_with_facets_execute_and_parse_results
+  it "facets and with facets execute and parse results" do
     facet_hash = BehaviorProduct.search(:description).matching_all("earbuds").facets(:rating)
     assert_kind_of Hash, facet_hash
     assert_includes facet_hash, "rating"
@@ -145,14 +133,12 @@ class UserApiBehaviorIntegrationTest < Minitest::Test
     assert_includes rel_facets, "rating"
     assert_match(/[45]/, rel_facets["rating"].to_json)
   end
-
-  def test_with_facets_without_topn_shape_raises_friendly_error
+  it "with facets without topn shape raises friendly error" do
     rel = BehaviorProduct.search(:description).matching_all("running shoes").with_facets(:rating, size: 10)
     error = assert_raises(ParadeDB::FacetQueryError) { rel.to_a }
     assert_includes error.message, "ORDER BY and LIMIT"
   end
-
-  def test_facets_with_standard_where_binds_executes
+  it "facets with standard where binds executes" do
     facets = BehaviorProduct.where(in_stock: true)
                             .extending(ParadeDB::SearchMethods)
                             .facets(:rating)
@@ -160,8 +146,7 @@ class UserApiBehaviorIntegrationTest < Minitest::Test
     assert_kind_of Hash, facets
     assert_includes facets, "rating"
   end
-
-  def test_matching_all_with_filters_matches_raw_sql
+  it "matching all with filters matches raw sql" do
     raw_sql = <<~SQL
       SELECT id
       FROM products
@@ -179,8 +164,7 @@ class UserApiBehaviorIntegrationTest < Minitest::Test
 
     assert_ids_match_sql(raw_sql, relation)
   end
-
-  def test_search_with_join_matches_raw_sql
+  it "search with join matches raw sql" do
     raw_sql = <<~SQL
       SELECT products.id
       FROM products
@@ -198,8 +182,7 @@ class UserApiBehaviorIntegrationTest < Minitest::Test
 
     assert_ids_match_sql(raw_sql, relation)
   end
-
-  def test_search_with_or_scope_matches_raw_sql
+  it "search with or scope matches raw sql" do
     raw_sql = <<~SQL
       SELECT id
       FROM products
@@ -219,8 +202,7 @@ class UserApiBehaviorIntegrationTest < Minitest::Test
 
     assert_ids_match_sql(raw_sql, relation)
   end
-
-  def test_search_with_group_and_having_matches_raw_sql
+  it "search with group and having matches raw sql" do
     raw_sql = <<~SQL
       SELECT category, COUNT(*)::int AS docs
       FROM products
@@ -239,8 +221,7 @@ class UserApiBehaviorIntegrationTest < Minitest::Test
 
     assert_rows_match_sql(raw_sql, actual)
   end
-
-  def test_search_with_subquery_filter_matches_raw_sql
+  it "search with subquery filter matches raw sql" do
     raw_sql = <<~SQL
       SELECT id
       FROM products
@@ -258,8 +239,7 @@ class UserApiBehaviorIntegrationTest < Minitest::Test
 
     assert_ids_match_sql(raw_sql, relation)
   end
-
-  def test_full_text_escape_hatch_matches_raw_sql
+  it "full text escape hatch matches raw sql" do
     raw_sql = <<~SQL
       SELECT id
       FROM products

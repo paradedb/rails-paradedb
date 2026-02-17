@@ -1,19 +1,60 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require_relative "../common"
+require "logger"
+require "rails"
+require "active_record"
+require_relative "../../lib/parade_db"
+
+class AutocompleteExampleApp < Rails::Application
+  config.root = File.expand_path("../..", __dir__)
+  config.eager_load = false
+  config.logger = Logger.new(nil)
+  config.secret_key_base = "paradedb_examples_secret_key_base"
+end
+
+AutocompleteExampleApp.initialize!
+
+require_relative "model"
 
 module AutocompleteSetup
   module_function
 
-  def setup_autocomplete_table!
-    ExampleCommon.connect!
-    conn = ActiveRecord::Base.connection
+  def database_url
+    return ENV["DATABASE_URL"] if ENV["DATABASE_URL"]
 
+    host = ENV.fetch("PGHOST", "localhost")
+    port = ENV.fetch("PGPORT", "5432")
+    user = ENV.fetch("PGUSER", "postgres")
+    password = ENV.fetch("PGPASSWORD", "postgres")
+    database = ENV.fetch("PGDATABASE", "postgres")
+
+    "postgresql://#{user}:#{password}@#{host}:#{port}/#{database}"
+  end
+
+  def connect!
+    return if ActiveRecord::Base.connected?
+
+    ActiveRecord::Base.establish_connection(database_url)
+    ActiveRecord::Base.logger = nil
+  end
+
+  def setup_mock_items!
+    connect!
+
+    conn = ActiveRecord::Base.connection
     conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search;")
     conn.execute(
       "CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');"
     )
+
+    MockItem.reset_column_information
+    MockItem.count
+  end
+
+  def setup_autocomplete_table!
+    setup_mock_items!
+    conn = ActiveRecord::Base.connection
 
     puts "\nCreating autocomplete_items table..."
     conn.execute("DROP TABLE IF EXISTS autocomplete_items CASCADE;")
@@ -29,15 +70,15 @@ module AutocompleteSetup
     SQL
     puts "  + Table created"
 
-    puts "\nCopying data from mock_items..."
+    puts "\nCopying data from #{MockItem.table_name}..."
     conn.execute(<<~SQL)
       INSERT INTO autocomplete_items (id, description, category, rating, in_stock, created_at)
       SELECT id, description, category, rating, in_stock, created_at
-      FROM mock_items;
+      FROM #{MockItem.table_name};
     SQL
 
     count = conn.select_value("SELECT COUNT(*) FROM autocomplete_items").to_i
-    puts "  + Copied #{count} products from mock_items"
+    puts "  + Copied #{count} products from #{MockItem.table_name}"
 
     puts "\nCreating autocomplete-optimized BM25 index..."
     conn.execute("DROP INDEX IF EXISTS autocomplete_items_idx;")
@@ -71,5 +112,5 @@ if $PROGRAM_NAME == __FILE__
   puts "\n" + "=" * 60
   puts "+ Setup complete! Created autocomplete_items with #{count} products"
   puts "=" * 60
-  puts "\nRun: bundle exec ruby examples/autocomplete/autocomplete.rb"
+  puts "\nRun: BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/autocomplete/autocomplete.rb"
 end

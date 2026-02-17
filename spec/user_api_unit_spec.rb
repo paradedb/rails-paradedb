@@ -14,8 +14,8 @@ class UnitCategory < ActiveRecord::Base
   self.has_paradedb_index = true
 end
 
-class UserApiUnitTest < Minitest::Test
-  def test_matching_all_and_filters
+RSpec.describe "UserApiUnitTest" do
+  it "matching all and filters" do
     sql = UnitProduct.search(:description)
                      .matching_all("running", "shoes")
                      .where(in_stock: true)
@@ -24,84 +24,68 @@ class UserApiUnitTest < Minitest::Test
     assert_sql_equal %(SELECT products.* FROM products
       WHERE ("products"."description" &&& 'running shoes') AND "products"."in_stock" = TRUE), sql
   end
-
-  def test_matching_any
+  it "matching any" do
     sql = UnitProduct.search(:description).matching_any("wireless", "bluetooth").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ||| 'wireless bluetooth')), sql
   end
-
-  def test_phrase_slop
+  it "phrase slop" do
     sql = UnitProduct.search(:description).phrase("running shoes", slop: 2).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ### 'running shoes'::pdb.slop(2))), sql
   end
-
-  def test_fuzzy_prefix_boost
+  it "fuzzy prefix boost" do
     sql = UnitProduct.search(:description).fuzzy("shose", distance: 2, prefix: false, boost: 2).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" === 'shose'::pdb.fuzzy(2)::pdb.boost(2))), sql
   end
-
-  def test_term_exact
+  it "term exact" do
     sql = UnitProduct.search(:description).term("literal").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" === 'literal')), sql
   end
-
-  def test_regex
+  it "regex" do
     sql = UnitProduct.search(:description).regex("run.*").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.regex('run.*'))), sql
   end
-
-  def test_near
+  it "near" do
     sql = UnitProduct.search(:description).near("sleek", "shoes", distance: 1).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('sleek' ## 1 ## 'shoes'))), sql
   end
-
-  def test_phrase_prefix
+  it "phrase prefix" do
     sql = UnitProduct.search(:description).phrase_prefix("run", "sh").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.phrase_prefix(ARRAY['run', 'sh']))), sql
   end
-
-  def test_parse_query_with_lenient
+  it "parse query with lenient" do
     sql = UnitProduct.search(:description).parse("running AND shoes", lenient: true).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.parse('running AND shoes', lenient => true))), sql
   end
-
-  def test_parse_query_without_options
+  it "parse query without options" do
     sql = UnitProduct.search(:description).parse("running AND shoes").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.parse('running AND shoes'))), sql
   end
-
-  def test_parse_query_with_lenient_false
+  it "parse query with lenient false" do
     sql = UnitProduct.search(:description).parse("running AND shoes", lenient: false).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.parse('running AND shoes', lenient => false))), sql
   end
-
-  def test_match_all_wrapper
+  it "match all wrapper" do
     sql = UnitProduct.search(:id).match_all.to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.all())), sql
   end
-
-  def test_more_like_this_with_id
+  it "more like this with id" do
     sql = UnitProduct.more_like_this(5, fields: [:description]).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.more_like_this(5, ARRAY['description']))), sql
   end
-
-  def test_more_like_this_with_json_string
+  it "more like this with json string" do
     sql = UnitProduct.more_like_this('{"description": "running shoes"}').to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.more_like_this('{"description": "running shoes"}'))), sql
   end
-
-  def test_more_like_this_with_json_and_fields
+  it "more like this with json and fields" do
     sql = UnitProduct.more_like_this('{"description": "running shoes", "category": "footwear"}', fields: [:description, :category]).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.more_like_this('{"description": "running shoes", "category": "footwear"}', ARRAY['description', 'category']))), sql
   end
-
-  def test_more_like_this_with_json_hash
+  it "more like this with json hash" do
     json_doc = { description: "running shoes", category: "footwear" }.to_json
     sql = UnitProduct.more_like_this(json_doc).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.more_like_this('{"description":"running shoes","category":"footwear"}'))), sql
   end
-
-  def test_more_like_this_with_advanced_options
+  it "more like this with advanced options" do
     sql = UnitProduct.more_like_this(
       5,
       fields: [:description],
@@ -118,39 +102,33 @@ class UserApiUnitTest < Minitest::Test
     expected = %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.more_like_this(5, ARRAY['description'], min_term_frequency => 2, max_query_terms => 10, min_doc_frequency => 1, max_term_frequency => 20, max_doc_frequency => 200, min_word_length => 3, max_word_length => 15, stopwords => ARRAY['the', 'a'])))
     assert_sql_equal expected, sql
   end
-
-  def test_excluding
+  it "excluding" do
     sql = UnitProduct.search(:description).matching_all("shoes").excluding("cheap").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" &&& 'shoes') AND (NOT ("products"."description" &&& 'cheap'))), sql
   end
-
-  def test_or_composition
+  it "or composition" do
     base = UnitProduct.where(in_stock: true).order(id: :desc).limit(10)
     left = base.search(:description).matching_all("shoes")
     right = base.search(:category).matching_all("footwear")
     sql = left.or(right).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE "products"."in_stock" = TRUE AND ("products"."description" &&& 'shoes' OR "products"."category" &&& 'footwear') ORDER BY "products"."id" DESC LIMIT 10), sql
   end
-
-  def test_with_score
+  it "with score" do
     sql = UnitProduct.search(:description).matching_all("shoes").with_score.to_sql
     assert_sql_equal %(SELECT products.*, pdb.score("products"."id") AS search_score FROM products
       WHERE ("products"."description" &&& 'shoes')), sql
   end
-
-  def test_with_snippet_default
+  it "with snippet default" do
     sql = UnitProduct.search(:description).matching_all("shoes").with_snippet(:description).to_sql
     assert_sql_equal %(SELECT products.*, pdb.snippet("products"."description") AS description_snippet FROM products
       WHERE ("products"."description" &&& 'shoes')), sql
   end
-
-  def test_with_snippet_custom
+  it "with snippet custom" do
     sql = UnitProduct.search(:description).matching_all("shoes").with_snippet(:description, start_tag: "<b>", end_tag: "</b>", max_chars: 50).to_sql
     assert_sql_equal %(SELECT products.*, pdb.snippet("products"."description", '<b>', '</b>', 50) AS description_snippet FROM products
       WHERE ("products"."description" &&& 'shoes')), sql
   end
-
-  def test_with_score_then_with_snippet_keeps_both_projections
+  it "with score then with snippet keeps both projections" do
     sql = UnitProduct.search(:description)
                      .matching_all("shoes")
                      .with_score
@@ -160,8 +138,7 @@ class UserApiUnitTest < Minitest::Test
     assert_sql_equal %(SELECT products.*, pdb.score("products"."id") AS search_score, pdb.snippet("products"."description") AS description_snippet FROM products
       WHERE ("products"."description" &&& 'shoes')), sql
   end
-
-  def test_with_snippet_then_with_score_keeps_both_projections
+  it "with snippet then with score keeps both projections" do
     sql = UnitProduct.search(:description)
                      .matching_all("shoes")
                      .with_snippet(:description)
@@ -171,8 +148,7 @@ class UserApiUnitTest < Minitest::Test
     assert_sql_equal %(SELECT products.*, pdb.snippet("products"."description") AS description_snippet, pdb.score("products"."id") AS search_score FROM products
       WHERE ("products"."description" &&& 'shoes')), sql
   end
-
-  def test_facets_only
+  it "facets only" do
     facet_sql = UnitProduct.search(:description).matching_all("shoes")
                            .build_facet_query(fields: [:category, :brand], size: 10, order: "-count")
                            .sql
@@ -181,8 +157,7 @@ class UserApiUnitTest < Minitest::Test
 
     assert_sql_equal expected, facet_sql
   end
-
-  def test_facets_with_custom_agg_without_fields_still_projects_aggregate
+  it "facets with custom agg without fields still projects aggregate" do
     facet_sql = UnitProduct.search(:description).matching_all("shoes")
                            .build_facet_query(
                              fields: [],
@@ -198,8 +173,7 @@ class UserApiUnitTest < Minitest::Test
     refute_includes facet_sql, %("size":)
     refute_includes facet_sql, %("_count")
   end
-
-  def test_facets_without_paradedb_predicates
+  it "facets without paradedb predicates" do
     facet_sql = UnitProduct.where(in_stock: true)
                            .extending(ParadeDB::SearchMethods)
                            .build_facet_query(fields: [:category], size: 10, order: nil)
@@ -209,8 +183,7 @@ class UserApiUnitTest < Minitest::Test
 
     assert_sql_equal expected, facet_sql
   end
-
-  def test_facets_with_no_predicates
+  it "facets with no predicates" do
     facet_sql = UnitProduct.all
                            .extending(ParadeDB::SearchMethods)
                            .build_facet_query(fields: [:category], size: 5, order: nil)
@@ -220,8 +193,7 @@ class UserApiUnitTest < Minitest::Test
 
     assert_sql_equal expected, facet_sql
   end
-
-  def test_facets_with_size_nil_omits_size_clause
+  it "facets with size nil omits size clause" do
     facet_sql = UnitProduct.search(:description).matching_all("shoes")
                            .build_facet_query(fields: [:category], size: nil, order: nil)
                            .sql
@@ -229,8 +201,7 @@ class UserApiUnitTest < Minitest::Test
     expected = %(SELECT pdb.agg('{"terms":{"field":"category"}}') AS category_facet FROM (SELECT products.* FROM products WHERE ("products"."description" &&& 'shoes')) paradedb_facet_source)
     assert_sql_equal expected, facet_sql
   end
-
-  def test_facets_with_raw_paradedb_sql_predicate_does_not_append_match_all
+  it "facets with raw paradedb sql predicate does not append match all" do
     facet_sql = UnitProduct.where(Arel.sql(%("products"."description" @@@ pdb.regex('run.*'))))
                            .extending(ParadeDB::SearchMethods)
                            .build_facet_query(fields: [:category], size: 10, order: nil)
@@ -239,8 +210,7 @@ class UserApiUnitTest < Minitest::Test
     assert_includes facet_sql, %("products"."description" @@@ pdb.regex('run.*'))
     refute_includes facet_sql, %("products"."id" @@@ pdb.all())
   end
-
-  def test_facets_with_non_paradedb_sql_predicate_appends_match_all
+  it "facets with non paradedb sql predicate appends match all" do
     facet_sql = UnitProduct.where(Arel.sql(%("products"."price" > 50)))
                            .extending(ParadeDB::SearchMethods)
                            .build_facet_query(fields: [:category], size: 10, order: nil)
@@ -249,8 +219,7 @@ class UserApiUnitTest < Minitest::Test
     assert_includes facet_sql, %("products"."price" > 50)
     assert_includes facet_sql, %("products"."id" @@@ pdb.all())
   end
-
-  def test_facets_with_mixed_paradedb_and_standard_predicates_keeps_existing_paradedb_predicate
+  it "facets with mixed paradedb and standard predicates keeps existing paradedb predicate" do
     facet_sql = UnitProduct.where(in_stock: true)
                            .search(:description)
                            .matching_all("shoes")
@@ -261,8 +230,7 @@ class UserApiUnitTest < Minitest::Test
     assert_includes facet_sql, %("products"."description" &&& 'shoes')
     refute_includes facet_sql, %("products"."id" @@@ pdb.all())
   end
-
-  def test_with_facets_without_paradedb_predicates
+  it "with facets without paradedb predicates" do
     sql = UnitProduct.where(in_stock: true)
                      .extending(ParadeDB::SearchMethods)
                      .with_facets(:category, size: 10)
@@ -275,8 +243,7 @@ class UserApiUnitTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_with_facets_default_order_is_desc_count
+  it "with facets default order is desc count" do
     sql = UnitProduct.search(:description)
                      .matching_all("shoes")
                      .with_facets(:category, size: 10)
@@ -285,8 +252,7 @@ class UserApiUnitTest < Minitest::Test
     expected = %(SELECT products.*, pdb.agg('{"terms":{"field":"category","size":10,"order":{"_count":"desc"}}}') OVER () AS _category_facet FROM products WHERE ("products"."description" &&& 'shoes'))
     assert_sql_equal expected, sql
   end
-
-  def test_with_facets_uses_custom_agg_and_ignores_field_size_order_missing
+  it "with facets uses custom agg and ignores field size order missing" do
     sql = UnitProduct.search(:description)
                      .matching_all("shoes")
                      .with_facets(
@@ -304,8 +270,7 @@ class UserApiUnitTest < Minitest::Test
     refute_includes sql, %("size": 20)
     refute_includes sql, %("missing":)
   end
-
-  def test_with_facets_load_requires_order_and_limit
+  it "with facets load requires order and limit" do
     rel = UnitProduct.search(:description)
                      .matching_all("shoes")
                      .with_facets(:category, size: 10)
@@ -313,8 +278,7 @@ class UserApiUnitTest < Minitest::Test
     error = assert_raises(ParadeDB::FacetQueryError) { rel.load }
     assert_includes error.message, "ORDER BY and LIMIT"
   end
-
-  def test_with_facets_load_requires_limit
+  it "with facets load requires limit" do
     rel = UnitProduct.search(:description)
                      .matching_all("shoes")
                      .with_facets(:category, size: 10)
@@ -323,8 +287,7 @@ class UserApiUnitTest < Minitest::Test
     error = assert_raises(ParadeDB::FacetQueryError) { rel.load }
     assert_includes error.message, "LIMIT"
   end
-
-  def test_with_facets_load_requires_order
+  it "with facets load requires order" do
     rel = UnitProduct.search(:description)
                      .matching_all("shoes")
                      .with_facets(:category, size: 10)
@@ -333,8 +296,7 @@ class UserApiUnitTest < Minitest::Test
     error = assert_raises(ParadeDB::FacetQueryError) { rel.load }
     assert_includes error.message, "ORDER BY"
   end
-
-  def test_search_on_relation_preserves_where
+  it "search on relation preserves where" do
     # Verify .search() works on relations and preserves WHERE clauses
     sql = UnitProduct.where(in_stock: true)
                      .search(:description)
@@ -348,8 +310,7 @@ class UserApiUnitTest < Minitest::Test
 
     assert_sql_equal expected, sql
   end
-
-  def test_search_on_relation_preserves_order_and_limit
+  it "search on relation preserves order and limit" do
     # Verify .search() preserves ORDER BY and LIMIT
     sql = UnitProduct.where(price: 0..100)
                      .order(rating: :desc)

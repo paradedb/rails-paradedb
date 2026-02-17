@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require_relative "../common"
+require_relative "setup"
 
 def demo_basic_search
   puts "\n--- Basic Search: 'shoes' ---"
@@ -61,7 +61,7 @@ if $PROGRAM_NAME == __FILE__
   puts "rails-paradedb Quickstart Example"
   puts "=" * 60
 
-  count = ExampleCommon.setup_mock_items!
+  count = QuickstartSetup.setup_mock_items!
   puts "Loaded #{count} mock items"
 
   demo_basic_search

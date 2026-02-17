@@ -17,17 +17,15 @@ class GuardProduct < ActiveRecord::Base
   end
 end
 
-class PostgreSQLGuardUnitTest < Minitest::Test
+RSpec.describe "PostgreSQLGuardUnitTest" do
   def teardown
     GuardProduct._mock_adapter_name = nil
   end
-
-  def test_helper_allows_postgresql
+  it "helper allows postgresql" do
     mock_connection = Struct.new(:adapter_name).new("PostgreSQL")
     ParadeDB.ensure_postgresql_adapter!(mock_connection, context: "test helper")
   end
-
-  def test_helper_rejects_non_postgresql
+  it "helper rejects non postgresql" do
     mock_connection = Struct.new(:adapter_name).new("SQLite")
     error = assert_raises(ParadeDB::UnsupportedAdapterError) do
       ParadeDB.ensure_postgresql_adapter!(mock_connection, context: "test helper")
@@ -35,22 +33,19 @@ class PostgreSQLGuardUnitTest < Minitest::Test
     assert_includes error.message, "PostgreSQL"
     assert_includes error.message, "SQLite"
   end
-
-  def test_model_search_rejects_non_postgresql
+  it "model search rejects non postgresql" do
     GuardProduct._mock_adapter_name = "SQLite"
 
     error = assert_raises(ParadeDB::UnsupportedAdapterError) { GuardProduct.search(:description) }
     assert_includes error.message, "PostgreSQL"
   end
-
-  def test_model_paradedb_arel_rejects_non_postgresql
+  it "model paradedb arel rejects non postgresql" do
     GuardProduct._mock_adapter_name = "SQLite"
 
     error = assert_raises(ParadeDB::UnsupportedAdapterError) { GuardProduct.paradedb_arel }
     assert_includes error.message, "PostgreSQL"
   end
-
-  def test_relation_search_methods_reject_non_postgresql
+  it "relation search methods reject non postgresql" do
     GuardProduct._mock_adapter_name = "SQLite"
 
     relation = GuardProduct.all.extending(ParadeDB::SearchMethods)

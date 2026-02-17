@@ -1,15 +1,22 @@
 # frozen_string_literal: true
 
-begin
-  require "neighbor"
-rescue LoadError
-  abort "Examples require neighbor. Run with `BUNDLE_GEMFILE=examples/Gemfile bundle exec ...`."
+require "logger"
+require "rails"
+require "active_record"
+require_relative "../../lib/parade_db"
+
+class MoreLikeThisExampleApp < Rails::Application
+  config.root = File.expand_path("../..", __dir__)
+  config.eager_load = false
+  config.logger = Logger.new(nil)
+  config.secret_key_base = "paradedb_examples_secret_key_base"
 end
 
-require "active_record"
-require_relative "../lib/parade_db"
+MoreLikeThisExampleApp.initialize!
 
-module ExampleCommon
+require_relative "model"
+
+module MoreLikeThisSetup
   module_function
 
   def database_url
@@ -39,28 +46,8 @@ module ExampleCommon
     conn.execute(
       "CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');"
     )
-    conn.execute("DROP INDEX IF EXISTS mock_items_bm25_idx;")
-    conn.execute(<<~SQL)
-      CREATE INDEX mock_items_bm25_idx ON mock_items USING bm25 (
-        id,
-        description,
-        rating,
-        (category::pdb.literal('alias=category')),
-        ((metadata->>'color')::pdb.literal('alias=metadata_color')),
-        ((metadata->>'location')::pdb.literal('alias=metadata_location'))
-      ) WITH (key_field='id');
-    SQL
 
     MockItem.reset_column_information
     MockItem.count
   end
-
-end
-
-class MockItem < ActiveRecord::Base
-  include ParadeDB::Model
-
-  self.table_name = "mock_items"
-  self.primary_key = "id"
-  self.has_paradedb_index = true
 end

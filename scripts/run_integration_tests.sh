@@ -20,7 +20,7 @@ export PARADEDB_TEST_DSN="postgres://${USER}:${PASSWORD}@localhost:${PORT}/${DB}
 export PGPASSWORD="${PASSWORD}"
 
 if [[ $# -gt 0 ]]; then
-  bundle exec ruby -Ilib -Ispec "$@"
+  bundle exec rspec "$@"
 else
-  bundle exec ruby -Ilib -Ispec -e 'Dir["spec/*_integration_spec.rb", "spec/*integration*_spec.rb"].sort.each { |f| require File.expand_path(f) }'
+  bundle exec rspec spec --pattern '**/*_integration_spec.rb,**/*integration*_spec.rb'
 fi

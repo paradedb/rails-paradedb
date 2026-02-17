@@ -12,7 +12,6 @@ module ParadeDB
     def self.to_sql(node, connection = nil)
       conn = connection || ::ActiveRecord::Base.connection
       ParadeDB.ensure_postgresql_adapter!(conn, context: "ParadeDB::Arel.to_sql")
-      Visitor.install!
 
       collector = ::Arel::Collectors::SQLString.new
       conn.visitor.accept(node, collector).value
@@ -24,5 +23,3 @@ module ParadeDB
     end
   end
 end
-
-ParadeDB::Arel::Visitor.install!

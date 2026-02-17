@@ -1,16 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require_relative "../common"
 require_relative "setup"
-
-class AutocompleteItem < ActiveRecord::Base
-  include ParadeDB::Model
-
-  self.table_name = "autocomplete_items"
-  self.primary_key = "id"
-  self.has_paradedb_index = true
-end
 
 def demo_autocomplete
   puts "\n#{"=" * 60}"

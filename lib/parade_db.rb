@@ -4,6 +4,7 @@ require_relative "parade_db/version"
 require_relative "parade_db/arel"
 require_relative "parade_db/model"
 require_relative "parade_db/search_methods"
+require_relative "parade_db/railtie"
 
 module ParadeDB
   class FacetQueryError < ArgumentError; end

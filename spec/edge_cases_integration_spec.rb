@@ -8,8 +8,8 @@ class EdgeProduct < ActiveRecord::Base
   self.has_paradedb_index = true
 end
 
-class EdgeCasesIntegrationTest < Minitest::Test
-  def setup
+RSpec.describe "EdgeCasesIntegrationTest" do
+  before do
     skip "Edge-case integration tests require PostgreSQL" unless postgresql?
 
     ensure_paradedb_setup!
@@ -19,15 +19,13 @@ class EdgeCasesIntegrationTest < Minitest::Test
   # ──────────────────────────────────────────────
   # 1. NULLs
   # ──────────────────────────────────────────────
-
-  def test_null_description_invisible_to_text_search
+  it "null description invisible to text search" do
     ids = search(:description).matching_all("alpha").order(:id).pluck(:id)
     assert_includes ids, @p_null_cat.id
     refute_includes ids, @p_null_desc.id
     refute_includes ids, @p_both_null.id
   end
-
-  def test_null_description_invisible_to_phrase_and_fuzzy
+  it "null description invisible to phrase and fuzzy" do
     phrase_ids = search(:description).phrase("alpha beta").order(:id).pluck(:id)
     fuzzy_ids  = search(:description).fuzzy("alph", distance: 1, prefix: true).order(:id).pluck(:id)
     regex_ids  = search(:description).regex("alpha.*").order(:id).pluck(:id)
@@ -37,21 +35,18 @@ class EdgeCasesIntegrationTest < Minitest::Test
       refute_includes ids, @p_both_null.id
     end
   end
-
-  def test_match_all_returns_null_rows
+  it "match all returns null rows" do
     ids = search(:id).match_all.order(:id).pluck(:id)
     assert_includes ids, @p_null_desc.id
     assert_includes ids, @p_null_cat.id
     assert_includes ids, @p_both_null.id
   end
-
-  def test_facets_with_missing_counts_null_categories
+  it "facets with missing counts null categories" do
     facets = search(:id).match_all.facets(:category, size: 100, missing: "N/A")
     assert_kind_of Hash, facets
     assert_includes facets, "category"
   end
-
-  def test_more_like_this_on_null_description_raises
+  it "more like this on null description raises" do
     assert_raises(ActiveRecord::StatementInvalid) do
       EdgeProduct.more_like_this(@p_null_desc.id, fields: [:description]).limit(5).pluck(:id)
     end
@@ -60,21 +55,18 @@ class EdgeCasesIntegrationTest < Minitest::Test
   # ──────────────────────────────────────────────
   # 2. Empty strings
   # ──────────────────────────────────────────────
-
-  def test_empty_string_description_not_matched_by_text_queries
+  it "empty string description not matched by text queries" do
     term_ids  = search(:description).term("anything").order(:id).pluck(:id)
     regex_ids = search(:description).regex(".*").order(:id).pluck(:id)
 
     refute_includes term_ids, @p_empty_desc.id
     refute_includes regex_ids, @p_empty_desc.id
   end
-
-  def test_empty_string_returned_by_match_all
+  it "empty string returned by match all" do
     ids = search(:id).match_all.order(:id).pluck(:id)
     assert_includes ids, @p_empty_desc.id
   end
-
-  def test_empty_string_with_snippet_does_not_crash
+  it "empty string with snippet does not crash" do
     rows = search(:id).match_all
              .with_snippet(:description)
              .order(:id).limit(50).to_a
@@ -86,36 +78,30 @@ class EdgeCasesIntegrationTest < Minitest::Test
   # ──────────────────────────────────────────────
   # 3. Long text (1000+ words)
   # ──────────────────────────────────────────────
-
-  def test_long_text_phrase_finds_unique_needle
+  it "long text phrase finds unique needle" do
     ids = search(:description).phrase("ultra rare needlephrase").order(:id).pluck(:id)
     assert_equal [@p_long.id], ids
   end
-
-  def test_long_text_phrase_prefix_finds_needle
+  it "long text phrase prefix finds needle" do
     ids = search(:description).phrase_prefix("ultra", "rare", "needle").order(:id).pluck(:id)
     assert_includes ids, @p_long.id
   end
-
-  def test_long_text_fuzzy_finds_misspelled_needle
+  it "long text fuzzy finds misspelled needle" do
     ids = search(:description).fuzzy("needlephras", distance: 2).order(:id).pluck(:id)
     assert_includes ids, @p_long.id
   end
-
-  def test_long_text_near_finds_needle_terms
+  it "long text near finds needle terms" do
     ids = search(:description).near("ultra", "needlephrase", distance: 5).order(:id).pluck(:id)
     assert_includes ids, @p_long.id
   end
-
-  def test_long_text_with_score_ranks_unique_term_higher
+  it "long text with score ranks unique term higher" do
     rows = search(:description).matching_any("needlephrase")
              .with_score.order(search_score: :desc).limit(10).to_a
     refute_empty rows
     assert_equal @p_long.id, rows.first.id
     assert rows.first.search_score.to_f > 0
   end
-
-  def test_long_text_snippet_is_bounded_and_highlights
+  it "long text snippet is bounded and highlights" do
     rows = search(:description).matching_all("needlephrase")
              .with_snippet(:description, start_tag: "<b>", end_tag: "</b>", max_chars: 200)
              .order(:id).to_a
@@ -125,8 +111,7 @@ class EdgeCasesIntegrationTest < Minitest::Test
     assert snippet.length < rows.first.description.length,
            "Snippet should be shorter than full long text"
   end
-
-  def test_long_text_more_like_this_prefers_similar_doc
+  it "long text more like this prefers similar doc" do
     ids = EdgeProduct.more_like_this(@p_long.id, fields: [:description]).limit(5).pluck(:id)
     assert_includes ids, @p_long_similar.id
   end
@@ -134,36 +119,30 @@ class EdgeCasesIntegrationTest < Minitest::Test
   # ──────────────────────────────────────────────
   # 4. Unicode (CJK, emoji, accented)
   # ──────────────────────────────────────────────
-
-  def test_unicode_accented_matching
+  it "unicode accented matching" do
     ids = search(:description).matching_any("café").order(:id).pluck(:id)
     assert_includes ids, @p_unicode.id
   end
-
-  def test_unicode_cjk_matching
+  it "unicode cjk matching" do
     ids = search(:description).matching_any("漢字").order(:id).pluck(:id)
     assert_includes ids, @p_unicode.id
   end
-
-  def test_unicode_phrase_with_accents
+  it "unicode phrase with accents" do
     ids = search(:description).phrase("café naïve").order(:id).pluck(:id)
     assert_includes ids, @p_unicode.id
   end
-
-  def test_unicode_regex_accented_does_not_crash
+  it "unicode regex accented does not crash" do
     ids = search(:description).regex("résum.").order(:id).pluck(:id)
     assert_kind_of Array, ids
   end
-
-  def test_unicode_term_case_sensitivity
+  it "unicode term case sensitivity" do
     lower_ids = search(:description).term("mixedcasetoken").order(:id).pluck(:id)
     upper_ids = search(:description).term("MiXeDCaSeToken").order(:id).pluck(:id)
 
     assert_includes lower_ids, @p_unicode.id
     refute_includes upper_ids, @p_unicode.id
   end
-
-  def test_unicode_with_snippet_does_not_produce_invalid_output
+  it "unicode with snippet does not produce invalid output" do
     rows = search(:description).matching_any("café")
              .with_snippet(:description, start_tag: "<b>", end_tag: "</b>")
              .order(:id).to_a
@@ -174,8 +153,7 @@ class EdgeCasesIntegrationTest < Minitest::Test
       assert snippet.valid_encoding?, "Snippet must be valid UTF-8"
     end
   end
-
-  def test_unicode_category_appears_in_facets
+  it "unicode category appears in facets" do
     facets = search(:id).match_all.facets(:category, size: 200)
     assert_kind_of Hash, facets
     assert_includes facets, "category"
@@ -186,29 +164,25 @@ class EdgeCasesIntegrationTest < Minitest::Test
   # ──────────────────────────────────────────────
   # 5. Punctuation-heavy text
   # ──────────────────────────────────────────────
-
-  def test_punctuation_tokenized_at_word_boundaries
+  it "punctuation tokenized at word boundaries" do
     # "end" is a token in both: @p_punct has {c,end,to,end,foo.bar,can't,json,xml,test}
     # @p_plain has {end,to,end,foo,bar,cant,json,xml,test,plain}
     ids = search(:description).matching_any("end").order(:id).pluck(:id)
     assert_includes ids, @p_punct.id
     assert_includes ids, @p_plain.id
   end
-
-  def test_punctuation_parse_does_not_choke
+  it "punctuation parse does not choke" do
     ids = search(:description).parse("test AND end", lenient: true).order(:id).pluck(:id)
     assert_kind_of Array, ids
     assert_includes ids, @p_punct.id
     assert_includes ids, @p_plain.id
   end
-
-  def test_punctuation_regex_with_escaped_special_chars
+  it "punctuation regex with escaped special chars" do
     ids = search(:description).regex("json").order(:id).pluck(:id)
     assert_includes ids, @p_punct.id
     assert_includes ids, @p_plain.id
   end
-
-  def test_punctuation_excluding_works
+  it "punctuation excluding works" do
     # "plain" only exists in @p_plain, so excluding "plain" should remove @p_plain
     ids = search(:description).matching_all("test")
             .excluding("plain")
@@ -220,15 +194,13 @@ class EdgeCasesIntegrationTest < Minitest::Test
   # ──────────────────────────────────────────────
   # 6. Duplicated tokens
   # ──────────────────────────────────────────────
-
-  def test_duplicated_tokens_both_matched
+  it "duplicated tokens both matched" do
     ids = search(:description).matching_any("spam").order(:id).pluck(:id)
     assert_includes ids, @p_dupe_tokens.id
     assert_includes ids, @p_single_spam.id
     refute_includes ids, @p_no_spam.id
   end
-
-  def test_duplicated_tokens_score_higher_for_more_occurrences
+  it "duplicated tokens score higher for more occurrences" do
     rows = search(:description).matching_any("spam")
              .with_score.order(search_score: :desc).to_a
 
@@ -240,22 +212,19 @@ class EdgeCasesIntegrationTest < Minitest::Test
     assert_operator dupe_row.search_score.to_f, :>, single_row.search_score.to_f,
                     "Document with more 'spam' occurrences should score higher"
   end
-
-  def test_duplicated_tokens_phrase_matches_repeated_adjacent
+  it "duplicated tokens phrase matches repeated adjacent" do
     ids = search(:description).phrase("spam spam").order(:id).pluck(:id)
     assert_includes ids, @p_dupe_tokens.id
     refute_includes ids, @p_single_spam.id
   end
-
-  def test_duplicated_tokens_excluding_removes_correctly
+  it "duplicated tokens excluding removes correctly" do
     ids = search(:description).matching_all("spam")
             .excluding("eggs")
             .order(:id).pluck(:id)
 
     refute_includes ids, @p_single_spam.id
   end
-
-  def test_duplicated_tokens_more_like_this_prefers_overlap
+  it "duplicated tokens more like this prefers overlap" do
     ids = EdgeProduct.more_like_this(@p_dupe_tokens.id, fields: [:description]).limit(5).pluck(:id)
     assert_includes ids, @p_single_spam.id
   end
@@ -263,15 +232,13 @@ class EdgeCasesIntegrationTest < Minitest::Test
   # ──────────────────────────────────────────────
   # 7. Skewed cardinality
   # ──────────────────────────────────────────────
-
-  def test_skewed_facets_reflect_counts
+  it "skewed facets reflect counts" do
     facets = search(:id).match_all.facets(:category, size: 200)
     assert_kind_of Hash, facets
     json = facets["category"].to_json
     assert_match(/bulk/, json)
   end
-
-  def test_skewed_matching_all_within_bulk_category
+  it "skewed matching all within bulk category" do
     ids = search(:description).matching_all("bulkneedle")
             .where(category: "bulk")
             .order(:id).pluck(:id)
@@ -281,8 +248,7 @@ class EdgeCasesIntegrationTest < Minitest::Test
       assert_includes @bulk_ids, id
     end
   end
-
-  def test_skewed_excluding_noop_term
+  it "skewed excluding noop term" do
     all_ids = search(:description).matching_all("bulkneedle").order(:id).pluck(:id)
     exc_ids = search(:description).matching_all("bulkneedle")
                 .excluding("zzzneverexists")
@@ -294,8 +260,7 @@ class EdgeCasesIntegrationTest < Minitest::Test
   # ──────────────────────────────────────────────
   # 8. High bucket cardinality facets (60 categories)
   # ──────────────────────────────────────────────
-
-  def test_high_cardinality_facets_returns_all_buckets
+  it "high cardinality facets returns all buckets" do
     facets = search(:description).matching_any("facetneedle")
                .facets(:category, size: 200)
 
@@ -307,8 +272,7 @@ class EdgeCasesIntegrationTest < Minitest::Test
     assert unique_cats.length >= 60,
            "Expected at least 60 unique category buckets, got #{unique_cats.length}"
   end
-
-  def test_high_cardinality_facets_respects_size_limit
+  it "high cardinality facets respects size limit" do
     facets = search(:description).matching_any("facetneedle")
                .facets(:category, size: 5)
 
@@ -317,8 +281,7 @@ class EdgeCasesIntegrationTest < Minitest::Test
     assert result_keys.length <= 5,
            "Expected at most 5 buckets with size: 5, got #{result_keys.length}"
   end
-
-  def test_high_cardinality_facets_with_where_filter
+  it "high cardinality facets with where filter" do
     facets = search(:description).matching_any("facetneedle")
                .where("price > ?", 25)
                .facets(:category, size: 200)

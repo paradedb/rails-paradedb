@@ -1,27 +1,17 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require "neighbor"
-
-require_relative "../common"
 require_relative "setup"
 
-class MockItem < ActiveRecord::Base
-  has_neighbors :embedding
-end
-
-# Only keep helpers for SQL that Rails DSL genuinely cannot express
 module RrfHelpers
   module_function
 
-  # RRF score formula - the core calculation that repeats
   def rrf_score(weight:, rrf_k:, rank_column:)
     "#{weight.to_f}::float8 / (#{rrf_k.to_f}::float8 + #{rank_column}.rank_position)"
   end
 end
 
 def fulltext_ranked_cte(query, top_k:)
-  # ParadeDB DSL branch: parse + score + rank.
   fulltext_source = MockItem.search(:description)
                             .parse(query, lenient: true)
                             .with_score
@@ -34,7 +24,6 @@ def fulltext_ranked_cte(query, top_k:)
 end
 
 def semantic_ranked_cte(query_embedding, top_k:)
-  # Neighbor DSL branch: nearest neighbors + rank by neighbor_distance.
   semantic_source = MockItem.nearest_neighbors(:embedding, query_embedding, distance: "cosine")
                             .limit(top_k)
 
@@ -99,17 +88,17 @@ def hybrid_search(query, top_k: 20, limit: 5, rrf_k: 60, bm25_weight: 1.0, seman
             hybrid_scores: scores_cte
           )
           .from("hybrid_scores")
-          .joins("JOIN mock_items ON mock_items.id = hybrid_scores.id")
+          .joins("JOIN #{MockItem.table_name} ON #{MockItem.table_name}.id = hybrid_scores.id")
           .select(
-            "mock_items.id",
-            "mock_items.description",
+            "#{MockItem.table_name}.id",
+            "#{MockItem.table_name}.description",
             "hybrid_scores.bm25_rank",
             "hybrid_scores.semantic_rank",
             "hybrid_scores.bm25_rrf",
             "hybrid_scores.semantic_rrf",
             "hybrid_scores.hybrid_score"
           )
-          .order("hybrid_scores.hybrid_score DESC, mock_items.id ASC")
+          .order("hybrid_scores.hybrid_score DESC, #{MockItem.table_name}.id ASC")
           .limit(limit)
 end
 

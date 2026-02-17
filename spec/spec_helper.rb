@@ -1,10 +1,105 @@
 # frozen_string_literal: true
 
-require "minitest/autorun"
+require "rspec"
+require "logger"
+require "rails"
 require "active_record"
 require_relative "../lib/parade_db"
 
+unless defined?(ParadeDBTestApp)
+  class ParadeDBTestApp < Rails::Application
+    config.root = File.expand_path("..", __dir__)
+    config.eager_load = false
+    config.logger = Logger.new(nil)
+    config.secret_key_base = "paradedb_test_secret_key_base"
+  end
+
+  ParadeDBTestApp.initialize!
+end
+
 ActiveRecord::Base.logger = nil
+
+module LegacyAssertions
+  def assert_equal(expected, actual, _message = nil)
+    expect(actual).to eq(expected)
+  end
+
+  def assert(value, _message = nil)
+    expect(value).to be_truthy
+  end
+
+  def assert_nil(value, _message = nil)
+    expect(value).to be_nil
+  end
+
+  def assert_instance_of(klass, value, _message = nil)
+    expect(value).to be_instance_of(klass)
+  end
+
+  def assert_match(pattern, value, _message = nil)
+    expect(value).to match(pattern)
+  end
+
+  def assert_includes(collection, member, _message = nil)
+    expect(collection).to include(member)
+  end
+
+  def assert_kind_of(klass, value, _message = nil)
+    expect(value).to be_a(klass)
+  end
+
+  def assert_empty(collection, _message = nil)
+    expect(collection).to be_empty
+  end
+
+  def assert_operator(lhs, operator, rhs, _message = nil)
+    expect(lhs.public_send(operator, rhs)).to be(true)
+  end
+
+  def assert_not(value, _message = nil)
+    expect(value).to be_falsy
+  end
+
+  def assert_in_delta(expected, actual, delta = 0.001, _message = nil)
+    expect(actual).to be_within(delta).of(expected)
+  end
+
+  def assert_raises(*error_classes)
+    begin
+      yield
+    rescue StandardError => e
+      return e if error_classes.any? { |klass| e.is_a?(klass) }
+
+      expected = error_classes.map(&:name).join(", ")
+      raise RSpec::Expectations::ExpectationNotMetError,
+            "Expected #{expected}, but got #{e.class}: #{e.message}"
+    end
+
+    expected = error_classes.map(&:name).join(", ")
+    raise RSpec::Expectations::ExpectationNotMetError, "Expected #{expected}, but nothing was raised"
+  end
+
+  def refute_equal(unexpected, actual, _message = nil)
+    expect(actual).not_to eq(unexpected)
+  end
+
+  def refute_nil(value, _message = nil)
+    expect(value).not_to be_nil
+  end
+
+  def refute_empty(collection, _message = nil)
+    expect(collection).not_to be_empty
+  end
+
+  def refute_includes(collection, member, _message = nil)
+    expect(collection).not_to include(member)
+  end
+end
+
+RSpec.configure do |config|
+  config.include LegacyAssertions
+  config.disable_monkey_patching!
+end
 
 def establish_test_connection
   dsn = ENV["PARADEDB_TEST_DSN"].to_s
