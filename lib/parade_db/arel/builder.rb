@@ -122,7 +122,7 @@ module ParadeDB
 
       def column_node(column)
         case column
-        when ::Arel::Attributes::Attribute, ::Arel::Nodes::Node
+        when ::Arel::Attributes::Attribute, ::Arel::Nodes::Node, ::Arel::Nodes::SqlLiteral
           column
         when Symbol, String
           if arel_table
@@ -142,8 +142,9 @@ module ParadeDB
       def mlt_option_node(name, value)
         key = ::Arel::Nodes::SqlLiteral.new(name.to_s)
         rendered_value =
-          if value.is_a?(Array)
-            Nodes::ArrayLiteral.new(Array(value).map { |term| quoted_value(term.to_s) })
+          if name.to_sym == :stopwords
+            stopwords = Array(value).map { |term| quoted_value(term.to_s) }
+            Nodes::ArrayLiteral.new(stopwords)
           else
             quoted_value(value)
           end
