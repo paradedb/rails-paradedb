@@ -79,7 +79,7 @@ module ParadeDB
         options.each do |name, value|
           key_node = ::Arel::Nodes::SqlLiteral.new(name.to_s)
           rendered_value =
-            if name.to_sym == :stopwords
+            if value.is_a?(Array)
               Nodes::ArrayLiteral.new(Array(value).map { |term| pdb_quoted(term.to_s) })
             else
               pdb_quoted(value)

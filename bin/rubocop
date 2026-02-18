@@ -4,10 +4,17 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)"
 
-source "${SCRIPT_DIR}/rbenv_bootstrap.sh"
+"${SCRIPT_DIR}/rbenv_bootstrap.sh"
 
-if ! gem list -i rubocop >/dev/null 2>&1; then
-  gem install rubocop --no-document
+ruby_runner=()
+if ! ruby --version | grep -qE "ruby 4\.(0|1)"; then
+  if command -v rbenv >/dev/null 2>&1; then
+    ruby_runner=(rbenv exec)
+  fi
 fi
 
-rubocop --lint lib spec rails-paradedb.gemspec Rakefile "$@"
+if ! "${ruby_runner[@]}" gem list -i rubocop >/dev/null 2>&1; then
+  "${ruby_runner[@]}" gem install rubocop --no-document
+fi
+
+"${ruby_runner[@]}" rubocop --lint lib spec rails-paradedb.gemspec Rakefile "$@"

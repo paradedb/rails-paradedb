@@ -142,9 +142,8 @@ module ParadeDB
       def mlt_option_node(name, value)
         key = ::Arel::Nodes::SqlLiteral.new(name.to_s)
         rendered_value =
-          if name.to_sym == :stopwords
-            stopwords = Array(value).map { |term| quoted_value(term.to_s) }
-            Nodes::ArrayLiteral.new(stopwords)
+          if value.is_a?(Array)
+            Nodes::ArrayLiteral.new(Array(value).map { |term| quoted_value(term.to_s) })
           else
             quoted_value(value)
           end

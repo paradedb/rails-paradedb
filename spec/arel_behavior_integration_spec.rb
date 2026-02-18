@@ -389,6 +389,31 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
     ids = ArelBehaviorProduct.where(Arel.sql(predicate_sql)).order(:id).pluck(:id)
     assert_equal [3, 5], ids
   end
+  it "arel builder more like this with stopwords options via where" do
+    builder = ParadeDB::Arel::Builder.new(:products)
+    predicate = builder.more_like_this(
+      :id,
+      @earbuds_id,
+      fields: [:description],
+      options: { stopwords: %w[wireless earbuds] }
+    )
+    predicate_sql = ParadeDB::Arel.to_sql(predicate, ArelBehaviorProduct.connection)
+
+    ids = ArelBehaviorProduct.where(Arel.sql(predicate_sql)).order(:id).pluck(:id)
+    assert_kind_of Array, ids
+  end
+  it "arel predications more like this with stopwords options via where" do
+    table = ::Arel::Table.new(:products)
+    predicate = table[:id].pdb_more_like_this(
+      @earbuds_id,
+      fields: [:description],
+      options: { stopwords: %w[wireless earbuds] }
+    )
+    predicate_sql = ParadeDB::Arel.to_sql(predicate, ArelBehaviorProduct.connection)
+
+    ids = ArelBehaviorProduct.where(Arel.sql(predicate_sql)).order(:id).pluck(:id)
+    assert_kind_of Array, ids
+  end
   it "arel builder results match search api" do
     # Verify Arel builder produces identical results to the high-level API
     api_ids = search(:description).matching_all("running", "shoes").order(:id).pluck(:id)
@@ -471,7 +496,7 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
 
     ArelBehaviorProduct.create!(description: "running shoes lightweight", category: "footwear", rating: 5, in_stock: true, price: 120)
     ArelBehaviorProduct.create!(description: "trail running shoes grip", category: "footwear", rating: 4, in_stock: true, price: 90)
-    ArelBehaviorProduct.create!(description: "wireless bluetooth earbuds", category: "audio", rating: 5, in_stock: true, price: 80)
+    @earbuds_id = ArelBehaviorProduct.create!(description: "wireless bluetooth earbuds", category: "audio", rating: 5, in_stock: true, price: 80).id
     ArelBehaviorProduct.create!(description: "budget wired earbuds", category: "audio", rating: 3, in_stock: false, price: 20)
     ArelBehaviorProduct.create!(description: "hiking boots waterproof", category: "footwear", rating: 4, in_stock: true, price: 110)
     ArelBehaviorProduct.create!(description: "running socks breathable", category: "apparel", rating: 2, in_stock: true, price: 15)

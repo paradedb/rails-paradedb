@@ -61,6 +61,22 @@ jobs:
       - name: Run integration tests
         run: bundle exec rake test:integration
 
+      - name: Generate coverage report
+        env:
+          COVERAGE: "1"
+          COVERAGE_COMMAND_NAME: ci-rspec
+        run: bundle exec rspec spec
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage/coverage.xml
+          flags: rails-paradedb,rb${{ matrix.ruby-version }}
+          fail_ci_if_error: false
+          verbose: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
       # NOTE: Examples temporarily disabled until index creation DSL/migrations are implemented.
       # The examples require proper BM25 index setup which is not yet available via the Rails API.
       # TODO: Re-enable examples once index creation DSL is implemented (see feedback.md).
