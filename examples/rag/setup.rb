@@ -46,6 +46,8 @@ module RagSetup
     conn.execute(
       "CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');"
     )
+    conn.remove_bm25_index(:mock_items, if_exists: true)
+    conn.create_paradedb_index(MockItemIndex, if_not_exists: true)
 
     MockItem.reset_column_information
     MockItem.count

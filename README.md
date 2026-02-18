@@ -62,9 +62,42 @@ Check out some examples:
 
 ## BM25 Index
 
-> **Note:** This gem does not yet provide a Rails DSL for BM25 index creation or migrations. This feature will be added in a future version.
->
-> For now, please refer to the [ParadeDB documentation](https://docs.paradedb.com/) for index creation, migrations, tokenizers, and stemmers configuration.
+Define an index class:
+
+```ruby
+class ProductIndex < ParadeDB::Index
+  self.table_name = :products
+  self.key_field = :id
+  self.fields = [
+    :id,
+    :description,
+    { category: { literal: { alias: "category" } } },
+    { "metadata->>'color'" => { literal: { alias: "metadata_color" } } }
+  ]
+end
+```
+
+Create/remove it in a migration:
+
+```ruby
+class AddProductBm25Index < ActiveRecord::Migration[8.1]
+  def up
+    create_paradedb_index(ProductIndex, if_not_exists: true)
+  end
+
+  def down
+    remove_bm25_index :products, name: :products_bm25_idx, if_exists: true
+  end
+end
+```
+
+Available migration helpers:
+
+- `create_paradedb_index(index_class_or_name, if_not_exists: false)`
+- `replace_paradedb_index(index_class_or_name)`
+- `add_bm25_index(table, fields:, key_field:, name: nil, if_not_exists: false)`
+- `remove_bm25_index(table, name: nil, if_exists: false)`
+- `reindex_bm25(table, name: nil, concurrently: false)`
 
 ## Query Types
 
@@ -518,6 +551,7 @@ rails-paradedb uses **ActiveRecord's quoting** for all search terms:
 **Implementation Details:**
 
 All values flow through ActiveRecord's connection adapter quoting, which handles:
+
 - String escaping (`'` → `''`)
 - Type coercion (booleans, numbers)
 - NULL handling
