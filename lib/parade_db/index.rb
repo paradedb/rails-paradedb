@@ -103,7 +103,16 @@ module ParadeDB
 
     # Consumed by migration helpers; validates and normalizes the DSL class
     class DefinitionCompiler
-      Compiled = Struct.new(:table_name, :key_field, :index_name, :entries, keyword_init: true)
+      class Compiled
+        attr_reader :table_name, :key_field, :index_name, :entries
+
+        def initialize(table_name:, key_field:, index_name:, entries:)
+          @table_name = table_name
+          @key_field = key_field
+          @index_name = index_name
+          @entries = entries
+        end
+      end
       Entry = Struct.new(:source, :expression, :tokenizer, :options, :query_key, keyword_init: true)
 
       class << self

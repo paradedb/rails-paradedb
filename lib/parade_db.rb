@@ -26,7 +26,10 @@ module ParadeDB
   def index_validation_mode=(mode)
     normalized = mode.to_sym
     valid_modes = %i[warn raise off]
-    return @index_validation_mode = normalized if valid_modes.include?(normalized)
+    if valid_modes.include?(normalized)
+      @index_validation_mode = normalized
+      return
+    end
 
     raise ArgumentError, "index_validation_mode must be one of: #{valid_modes.join(', ')}"
   end

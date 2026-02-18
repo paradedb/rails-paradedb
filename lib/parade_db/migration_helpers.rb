@@ -335,7 +335,7 @@ if defined?(ActiveRecord::SchemaDumper)
       def paradedb_connection
         if instance_variable_defined?(:@connection)
           conn = instance_variable_get(:@connection)
-          return conn if conn&.respond_to?(:dump_paradedb_indexes)
+          return conn if conn.respond_to?(:dump_paradedb_indexes)
         end
         nil
       end
