@@ -48,16 +48,8 @@ module FacetedSearchSetup
     )
     conn.execute("DROP TABLE IF EXISTS mock_items_faceted_search CASCADE;")
     conn.execute("CREATE TABLE mock_items_faceted_search AS TABLE mock_items;")
-    conn.execute(<<~SQL)
-      CREATE INDEX mock_items_faceted_search_bm25_idx ON mock_items_faceted_search USING bm25 (
-        id,
-        description,
-        rating,
-        (category::pdb.literal('alias=category')),
-        ((metadata->>'color')::pdb.literal('alias=metadata_color')),
-        ((metadata->>'location')::pdb.literal('alias=metadata_location'))
-      ) WITH (key_field='id');
-    SQL
+    conn.remove_bm25_index(:mock_items_faceted_search, name: :mock_items_faceted_search_bm25_idx, if_exists: true)
+    conn.create_paradedb_index(MockItemIndex, if_not_exists: true)
 
     MockItem.reset_column_information
     MockItem.count

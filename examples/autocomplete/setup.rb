@@ -47,6 +47,8 @@ module AutocompleteSetup
     conn.execute(
       "CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');"
     )
+    conn.remove_bm25_index(:mock_items, if_exists: true)
+    conn.create_paradedb_index(MockItemIndex, if_not_exists: true)
 
     MockItem.reset_column_information
     MockItem.count
@@ -81,17 +83,8 @@ module AutocompleteSetup
     puts "  + Copied #{count} products from #{MockItem.table_name}"
 
     puts "\nCreating autocomplete-optimized BM25 index..."
-    conn.execute("DROP INDEX IF EXISTS autocomplete_items_idx;")
-    conn.execute(<<~SQL)
-      CREATE INDEX autocomplete_items_idx ON autocomplete_items
-      USING bm25 (
-        id,
-        description,
-        (description::pdb.ngram(3,8,'alias=description_ngram')),
-        (category::pdb.literal('alias=category'))
-      )
-      WITH (key_field='id');
-    SQL
+    conn.remove_bm25_index(:autocomplete_items, name: :autocomplete_items_idx, if_exists: true)
+    conn.create_paradedb_index(AutocompleteItemIndex, if_not_exists: true)
 
     puts "  + Created BM25 index with:"
     puts "    - description (standard tokenizer)"
