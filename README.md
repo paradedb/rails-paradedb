@@ -99,6 +99,17 @@ Available migration helpers:
 - `remove_bm25_index(table, name: nil, if_exists: false)`
 - `reindex_bm25(table, name: nil, concurrently: false)`
 
+### Index Validation Mode
+
+Runtime index drift validation is controlled by `ParadeDB.index_validation_mode`.
+Default is `:off` (no runtime drift checks).
+
+```ruby
+ParadeDB.index_validation_mode = :warn  # log drift warnings
+ParadeDB.index_validation_mode = :raise # raise ParadeDB::IndexDriftError on drift
+ParadeDB.index_validation_mode = :off   # disable drift checks (default)
+```
+
 ## Query Types
 
 For a full list of supported query types and advanced options, please refer to the [ParadeDB Query Builder Documentation](https://docs.paradedb.com/documentation/query-builder/overview).

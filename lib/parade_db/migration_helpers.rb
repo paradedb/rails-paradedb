@@ -271,20 +271,346 @@ module ParadeDB
       if stripped.start_with?("(") && stripped.end_with?(")")
         inner = stripped[1..-2].strip
 
-        if (cast_match = inner.match(/\A(.+?)::(.*)\z/m))
-          source_sql = cast_match[1].strip
-          tokenizer_sql_str = cast_match[2].strip
+        if (source_sql, tokenizer_sql_str = split_tokenized_cast(inner))
+          normalized_source = unwrap_surrounding_groupings(source_sql)
+          source_ruby =
+            if identifier_sql?(normalized_source)
+              unquote_identifier(normalized_source).to_sym.inspect
+            else
+              normalized_source.inspect
+            end
 
-          source_sql = source_sql[1..-2].strip if source_sql.start_with?("(") && source_sql.end_with?(")")
-
-          source = unquote_identifier(source_sql)
-          "{ #{source.to_sym.inspect} => #{tokenizer_sql_str.inspect} }"
+          tokenizer_spec_ruby = tokenizer_sql_to_ruby(tokenizer_sql_str)
+          "{ #{source_ruby} => #{tokenizer_spec_ruby} }"
         else
           inner.inspect
         end
       else
-        name = unquote_identifier(stripped)
-        name.to_sym.inspect
+        if identifier_sql?(stripped)
+          name = unquote_identifier(stripped)
+          name.to_sym.inspect
+        else
+          stripped.inspect
+        end
+      end
+    end
+
+    def split_tokenized_cast(sql)
+      top_level_cast_positions(sql).reverse_each do |position|
+        source = sql[0...position].strip
+        tokenizer = sql[(position + 2)..].strip
+        next unless tokenizer_like?(tokenizer)
+
+        return [source, tokenizer]
+      end
+
+      nil
+    end
+
+    def top_level_cast_positions(sql)
+      positions = []
+      depth = 0
+      in_single_quote = false
+      in_double_quote = false
+
+      i = 0
+      while i < sql.length - 1
+        ch = sql[i]
+        nxt = sql[i + 1]
+
+        if in_single_quote
+          if ch == "'" && nxt == "'"
+            i += 2
+            next
+          end
+
+          in_single_quote = false if ch == "'"
+          i += 1
+          next
+        end
+
+        if in_double_quote
+          if ch == '"' && nxt == '"'
+            i += 2
+            next
+          end
+
+          in_double_quote = false if ch == '"'
+          i += 1
+          next
+        end
+
+        case ch
+        when "'"
+          in_single_quote = true
+        when '"'
+          in_double_quote = true
+        when "("
+          depth += 1
+        when ")"
+          depth -= 1 if depth.positive?
+        when ":"
+          if nxt == ":" && depth.zero?
+            positions << i
+            i += 2
+            next
+          end
+        end
+
+        i += 1
+      end
+
+      positions
+    end
+
+    def tokenizer_like?(tokenizer_sql)
+      return false if tokenizer_sql.empty?
+
+      tokenizer_sql.match?(ParadeDB::Index::TokenizerParser::TOKENIZER_EXPRESSION)
+    rescue NameError
+      tokenizer_sql.match?(/\A[a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\s*[a-zA-Z0-9_'".,=\s:-]*\s*\))?\z/)
+    end
+
+    def unwrap_surrounding_groupings(sql)
+      value = sql.strip
+      while wrapped_by_grouping?(value)
+        value = value[1..-2].strip
+      end
+      value
+    end
+
+    def wrapped_by_grouping?(sql)
+      return false unless sql.start_with?("(") && sql.end_with?(")")
+
+      depth = 0
+      in_single_quote = false
+      in_double_quote = false
+
+      i = 0
+      while i < sql.length
+        ch = sql[i]
+        nxt = i + 1 < sql.length ? sql[i + 1] : nil
+
+        if in_single_quote
+          if ch == "'" && nxt == "'"
+            i += 2
+            next
+          end
+
+          in_single_quote = false if ch == "'"
+          i += 1
+          next
+        end
+
+        if in_double_quote
+          if ch == '"' && nxt == '"'
+            i += 2
+            next
+          end
+
+          in_double_quote = false if ch == '"'
+          i += 1
+          next
+        end
+
+        case ch
+        when "'"
+          in_single_quote = true
+        when '"'
+          in_double_quote = true
+        when "("
+          depth += 1
+        when ")"
+          depth -= 1
+          return false if depth.zero? && i < sql.length - 1
+        end
+
+        i += 1
+      end
+
+      depth.zero?
+    end
+
+    def identifier_sql?(sql)
+      sql.match?(/\A[a-zA-Z_][a-zA-Z0-9_]*\z/) || sql.match?(/\A"(?:[^"]|"")+"\z/)
+    end
+
+    def tokenizer_sql_to_ruby(tokenizer_sql)
+      match = tokenizer_sql.strip.match(/\A([a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*)(?:\((.*)\))?\z/m)
+      return tokenizer_sql.inspect unless match
+
+      tokenizer_name = match[1]
+      args_sql = match[2]
+      tokenizer_name_ruby = tokenizer_name_to_ruby(tokenizer_name)
+      return tokenizer_name_ruby if args_sql.nil? || args_sql.strip.empty?
+
+      parsed_args = parse_tokenizer_arguments(split_sql_arguments(args_sql))
+      return tokenizer_sql.inspect if parsed_args.nil?
+
+      positional = parsed_args[:positional].dup
+      named = parsed_args[:named].dup
+      options = {}
+
+      if tokenizer_name.end_with?("ngram") &&
+         positional.length >= 2 &&
+         positional[0].is_a?(Integer) &&
+         positional[1].is_a?(Integer)
+        options[:min] = positional.shift
+        options[:max] = positional.shift
+      end
+
+      options[:__positional] = positional unless positional.empty?
+      named.each { |k, v| options[k.to_sym] = v }
+
+      return tokenizer_name_ruby if options.empty?
+
+      "{ #{tokenizer_name_ruby} => #{ruby_hash_literal(options)} }"
+    end
+
+    def tokenizer_name_to_ruby(tokenizer_name)
+      if tokenizer_name.match?(/\A[a-zA-Z_][a-zA-Z0-9_]*\z/)
+        tokenizer_name.to_sym.inspect
+      elsif tokenizer_name.start_with?("pdb.") && tokenizer_name[4..].match?(/\A[a-zA-Z_][a-zA-Z0-9_]*\z/)
+        tokenizer_name[4..].to_sym.inspect
+      else
+        tokenizer_name.inspect
+      end
+    end
+
+    def split_sql_arguments(args_sql)
+      parts = []
+      current = +""
+      depth = 0
+      in_single_quote = false
+      in_double_quote = false
+
+      i = 0
+      while i < args_sql.length
+        ch = args_sql[i]
+        nxt = i + 1 < args_sql.length ? args_sql[i + 1] : nil
+
+        if in_single_quote
+          current << ch
+          if ch == "'" && nxt == "'"
+            current << nxt
+            i += 2
+            next
+          end
+
+          in_single_quote = false if ch == "'"
+          i += 1
+          next
+        end
+
+        if in_double_quote
+          current << ch
+          if ch == '"' && nxt == '"'
+            current << nxt
+            i += 2
+            next
+          end
+
+          in_double_quote = false if ch == '"'
+          i += 1
+          next
+        end
+
+        case ch
+        when "'"
+          in_single_quote = true
+          current << ch
+        when '"'
+          in_double_quote = true
+          current << ch
+        when "("
+          depth += 1
+          current << ch
+        when ")"
+          depth -= 1 if depth.positive?
+          current << ch
+        when ","
+          if depth.zero?
+            parts << current.strip unless current.strip.empty?
+            current = +""
+          else
+            current << ch
+          end
+        else
+          current << ch
+        end
+
+        i += 1
+      end
+
+      parts << current.strip unless current.strip.empty?
+      parts
+    end
+
+    def parse_tokenizer_arguments(arguments)
+      positional = []
+      named = {}
+
+      arguments.each do |argument|
+        key, value = split_assignment(argument)
+        if key
+          named[key] = parse_sql_literal(value)
+          next
+        end
+
+        literal = parse_sql_literal(argument)
+        if literal.is_a?(String) && literal.include?("=")
+          config_parts = literal.split(",").map(&:strip).reject(&:empty?)
+          parsed_all = config_parts.all? { |part| split_assignment(part).is_a?(Array) }
+          if parsed_all
+            config_parts.each do |part|
+              config_key, config_value = split_assignment(part)
+              named[config_key] = parse_sql_literal(config_value)
+            end
+            next
+          end
+        end
+
+        positional << literal
+      end
+
+      { positional: positional, named: named }
+    rescue
+      nil
+    end
+
+    def split_assignment(argument)
+      match = argument.strip.match(/\A([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)\z/m)
+      return nil unless match
+
+      [match[1], match[2]]
+    end
+
+    def parse_sql_literal(value_sql)
+      value = value_sql.strip
+      return value[1..-2].gsub("''", "'") if value.start_with?("'") && value.end_with?("'")
+      return value[1..-2].gsub('""', '"') if value.start_with?('"') && value.end_with?('"')
+      return true if value.casecmp("true").zero?
+      return false if value.casecmp("false").zero?
+      return nil if value.casecmp("null").zero?
+      return Integer(value, 10) if value.match?(/\A[-+]?\d+\z/)
+      return Float(value) if value.match?(/\A[-+]?\d+\.\d+\z/)
+
+      value
+    end
+
+    def ruby_hash_literal(hash)
+      pairs = hash.map { |k, v| "#{k.inspect} => #{ruby_literal(v)}" }
+      "{ #{pairs.join(', ')} }"
+    end
+
+    def ruby_literal(value)
+      case value
+      when Array
+        "[#{value.map { |item| ruby_literal(item) }.join(', ')}]"
+      when Hash
+        ruby_hash_literal(value)
+      else
+        value.inspect
       end
     end
 

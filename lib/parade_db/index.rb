@@ -38,7 +38,7 @@ module ParadeDB
     end
 
     class TokenizerParser
-      TOKENIZER_EXPRESSION = /\A[a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\s*[a-zA-Z0-9_'".,\s]*\s*\))?\z/.freeze
+      TOKENIZER_EXPRESSION = /\A[a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\s*[a-zA-Z0-9_'".,=\s:-]*\s*\))?\z/.freeze
 
       class << self
         def parse(source_name, tokenizer_spec)
@@ -92,7 +92,7 @@ module ParadeDB
 
           raise InvalidIndexDefinition,
                 "invalid tokenizer name #{tokenizer.inspect} for #{source_name}. " \
-                "Expected identifier form like simple, pdb::simple, or pdb::ngram(2, 5)."
+                "Expected identifier form like simple, pdb::simple, or pdb::ngram(2, 5, alias=field_alias)."
         end
 
         def expression?(value)

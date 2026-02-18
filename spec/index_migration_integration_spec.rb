@@ -207,6 +207,65 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     assert_includes indexdef, "pdb.simple"
   end
 
+  it "round-trips schema dump/load for tokenized fields with named tokenizer options" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_bm25_index(:books, if_exists: true)
+
+    conn.add_bm25_index(
+      :books,
+      fields: [
+        :id,
+        { title: { simple: { alias: "title_simple" } } }
+      ],
+      key_field: :id,
+      if_not_exists: true
+    )
+
+    stream = StringIO.new
+    ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection_pool, stream)
+    schema = stream.string
+    add_stmt = schema.each_line.find do |line|
+      line.include?("add_bm25_index :books") && line.include?("title_simple")
+    end
+
+    refute_nil add_stmt
+
+    conn.remove_bm25_index(:books, if_exists: true)
+    expect { conn.instance_eval(add_stmt.strip) }.not_to raise_error
+    assert index_exists?("books_bm25_idx")
+  end
+
+  it "round-trips schema dump/load for tokenized expression fields with casts" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_bm25_index(:books, if_exists: true)
+
+    conn.add_bm25_index(
+      :books,
+      fields: [
+        :id,
+        { "(metadata->>'title')::text" => { simple: { alias: "metadata_title_text" } } }
+      ],
+      key_field: :id,
+      if_not_exists: true
+    )
+
+    stream = StringIO.new
+    ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection_pool, stream)
+    schema = stream.string
+    add_stmt = schema.each_line.find do |line|
+      line.include?("add_bm25_index :books") && line.include?("metadata_title_text")
+    end
+
+    refute_nil add_stmt
+    assert_includes add_stmt, "metadata"
+    assert_includes add_stmt, "title"
+    assert_includes add_stmt, "::text"
+
+    conn.remove_bm25_index(:books, if_exists: true)
+    expect { conn.instance_eval(add_stmt.strip) }.not_to raise_error
+    assert index_exists?("books_bm25_idx")
+  end
+
   private
 
   def postgresql?
