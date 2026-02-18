@@ -1,5 +1,25 @@
 # frozen_string_literal: true
 
+if ENV["COVERAGE"] == "1"
+  require "simplecov"
+  require "simplecov-cobertura"
+
+  SimpleCov.start do
+    command_name ENV.fetch("COVERAGE_COMMAND_NAME", "rspec")
+    enable_coverage :branch
+    track_files "lib/**/*.rb"
+    add_filter "/spec/"
+    add_filter "/vendor/"
+    add_filter "/examples/"
+    formatter SimpleCov::Formatter::MultiFormatter.new(
+      [
+        SimpleCov::Formatter::HTMLFormatter,
+        SimpleCov::Formatter::CoberturaFormatter
+      ]
+    )
+  end
+end
+
 require "rspec"
 require "logger"
 require "rails"

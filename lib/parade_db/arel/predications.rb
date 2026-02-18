@@ -1,0 +1,145 @@
+# frozen_string_literal: true
+
+module ParadeDB
+  module Arel
+    module Predications
+      def pdb_match(*terms, boost: nil)
+        rhs = pdb_apply_boost(pdb_quoted(pdb_join_terms(terms)), boost)
+        ::Arel::Nodes::InfixOperation.new("&&&", self, rhs)
+      end
+
+      def pdb_match_any(*terms)
+        ::Arel::Nodes::InfixOperation.new("|||", self, pdb_quoted(pdb_join_terms(terms)))
+      end
+
+      def pdb_full_text(expression)
+        rhs = expression.is_a?(::Arel::Nodes::Node) ? expression : ::Arel.sql(expression.to_s)
+        ::Arel::Nodes::InfixOperation.new("@@@", self, rhs)
+      end
+
+      def pdb_phrase(text, slop: nil)
+        rhs = pdb_apply_slop(pdb_quoted(text), slop)
+        ::Arel::Nodes::InfixOperation.new("###", self, rhs)
+      end
+
+      def pdb_fuzzy(term, distance: 1, prefix: nil, boost: nil)
+        pdb_validate_numeric!(distance, :distance)
+        rhs = Nodes::FuzzyCast.new(pdb_quoted(term), pdb_quoted(distance), prefix: prefix)
+        rhs = pdb_apply_boost(rhs, boost)
+        ::Arel::Nodes::InfixOperation.new("===", self, rhs)
+      end
+
+      def pdb_term(term, boost: nil)
+        rhs = pdb_apply_boost(pdb_quoted(term), boost)
+        ::Arel::Nodes::InfixOperation.new("===", self, rhs)
+      end
+
+      def pdb_regex(pattern)
+        rhs = ::Arel::Nodes::NamedFunction.new("pdb.regex", [pdb_quoted(pattern)])
+        ::Arel::Nodes::InfixOperation.new("@@@", self, rhs)
+      end
+
+      def pdb_near(left_term, right_term, distance: 1)
+        pdb_validate_numeric!(distance, :distance)
+        near_chain = ::Arel::Nodes::InfixOperation.new(
+          "##",
+          ::Arel::Nodes::InfixOperation.new("##", pdb_quoted(left_term), pdb_quoted(distance)),
+          pdb_quoted(right_term)
+        )
+        ::Arel::Nodes::InfixOperation.new("@@@", self, ::Arel::Nodes::Grouping.new(near_chain))
+      end
+
+      def pdb_phrase_prefix(*terms)
+        flat = terms.flatten.compact
+        raise ArgumentError, "phrase_prefix requires at least one term" if flat.empty?
+
+        array = Nodes::ArrayLiteral.new(flat.map { |term| pdb_quoted(term) })
+        rhs = ::Arel::Nodes::NamedFunction.new("pdb.phrase_prefix", [array])
+        ::Arel::Nodes::InfixOperation.new("@@@", self, rhs)
+      end
+
+      def pdb_parse(query, lenient: nil)
+        rhs = Nodes::ParseNode.new(pdb_quoted(query), lenient: lenient)
+        ::Arel::Nodes::InfixOperation.new("@@@", self, rhs)
+      end
+
+      def pdb_all
+        rhs = ::Arel::Nodes::NamedFunction.new("pdb.all", [])
+        ::Arel::Nodes::InfixOperation.new("@@@", self, rhs)
+      end
+
+      def pdb_more_like_this(key, fields: nil, options: {})
+        args = [pdb_quoted(key)]
+
+        unless fields.nil?
+          field_values = Array(fields).map { |field| pdb_quoted(field.to_s) }
+          args << Nodes::ArrayLiteral.new(field_values)
+        end
+
+        options.each do |name, value|
+          key_node = ::Arel::Nodes::SqlLiteral.new(name.to_s)
+          rendered_value =
+            if value.is_a?(Array)
+              Nodes::ArrayLiteral.new(Array(value).map { |term| pdb_quoted(term.to_s) })
+            else
+              pdb_quoted(value)
+            end
+          args << ::Arel::Nodes::InfixOperation.new("=>", key_node, rendered_value)
+        end
+
+        rhs = ::Arel::Nodes::NamedFunction.new("pdb.more_like_this", args)
+        ::Arel::Nodes::InfixOperation.new("@@@", self, rhs)
+      end
+
+      def pdb_score
+        ::Arel::Nodes::NamedFunction.new("pdb.score", [self])
+      end
+
+      def pdb_snippet(*args)
+        ::Arel::Nodes::NamedFunction.new("pdb.snippet", [self] + args.map { |arg| pdb_quoted(arg) })
+      end
+
+      private
+
+      def pdb_apply_boost(node, boost)
+        return node if boost.nil?
+
+        pdb_validate_numeric!(boost, :boost)
+        Nodes::BoostCast.new(node, pdb_quoted(boost))
+      end
+
+      def pdb_apply_slop(node, slop)
+        return node if slop.nil?
+
+        pdb_validate_numeric!(slop, :slop)
+        Nodes::SlopCast.new(node, pdb_quoted(slop))
+      end
+
+      def pdb_quoted(value)
+        ::Arel::Nodes.build_quoted(value)
+      end
+
+      def pdb_join_terms(terms)
+        joined = terms.flatten.compact.map(&:to_s).join(" ")
+        raise ArgumentError, "at least one search term is required" if joined.strip.empty?
+
+        joined
+      end
+
+      def pdb_validate_numeric!(value, name)
+        return if value.nil?
+        return if value.is_a?(Numeric)
+
+        raise ArgumentError, "#{name} must be numeric, got #{value.class}"
+      end
+
+      module_function
+
+      def install!
+        return if ::Arel::Predications.ancestors.include?(ParadeDB::Arel::Predications)
+
+        ::Arel::Predications.include(ParadeDB::Arel::Predications)
+      end
+    end
+  end
+end
