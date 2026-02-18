@@ -7,6 +7,7 @@ module ParadeDB
     initializer "parade_db.install_arel_visitor" do
       ActiveSupport.on_load(:active_record) do
         ParadeDB::Arel::Visitor.install!
+        ParadeDB::Arel::Predications.install!
       end
     end
   end

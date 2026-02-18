@@ -5,6 +5,7 @@ require "active_record"
 require_relative "arel/nodes"
 require_relative "arel/visitor"
 require_relative "arel/builder"
+require_relative "arel/predications"
 
 module ParadeDB
   module Arel

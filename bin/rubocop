@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)"
+
+source "${SCRIPT_DIR}/rbenv_bootstrap.sh"
+
+if ! gem list -i rubocop >/dev/null 2>&1; then
+  gem install rubocop --no-document
+fi
+
+rubocop --lint lib spec rails-paradedb.gemspec Rakefile "$@"
