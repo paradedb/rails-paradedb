@@ -46,6 +46,10 @@ RSpec.describe "GuardsUnitTest" do
     error = assert_raises(RuntimeError) { bare_relation.term("shoes") }
     assert_includes error.message, "No search field set"
   end
+  it "term set without search raises" do
+    error = assert_raises(RuntimeError) { bare_relation.term_set("shoes") }
+    assert_includes error.message, "No search field set"
+  end
   it "near without search raises" do
     error = assert_raises(RuntimeError) { bare_relation.near("running", "shoes") }
     assert_includes error.message, "No search field set"
@@ -60,6 +64,14 @@ RSpec.describe "GuardsUnitTest" do
   end
   it "match all without search raises" do
     error = assert_raises(RuntimeError) { bare_relation.match_all }
+    assert_includes error.message, "No search field set"
+  end
+  it "exists without search raises" do
+    error = assert_raises(RuntimeError) { bare_relation.exists }
+    assert_includes error.message, "No search field set"
+  end
+  it "range without search raises" do
+    error = assert_raises(RuntimeError) { bare_relation.range(3..5) }
     assert_includes error.message, "No search field set"
   end
 
@@ -106,6 +118,10 @@ RSpec.describe "GuardsUnitTest" do
     error = assert_raises(ArgumentError) { builder.term(:description, "shoes", boost: [1]) }
     assert_includes error.message, "boost must be numeric"
   end
+  it "term set empty values raises" do
+    error = assert_raises(ArgumentError) { builder.term_set(:description, []) }
+    assert_includes error.message, "term_set requires at least one value"
+  end
   it "near distance rejects non numeric" do
     error = assert_raises(ArgumentError) { builder.near(:description, "a", "b", distance: "close") }
     assert_includes error.message, "distance must be numeric"
@@ -113,6 +129,22 @@ RSpec.describe "GuardsUnitTest" do
   it "near distance accepts integer" do
     node = builder.near(:description, "a", "b", distance: 3)
     refute_nil node
+  end
+  it "range with no bounds raises" do
+    error = assert_raises(ArgumentError) { builder.range(:rating) }
+    assert_includes error.message, "range requires at least one bound"
+  end
+  it "range with conflicting lower bounds raises" do
+    error = assert_raises(ArgumentError) { builder.range(:rating, nil, gte: 2, gt: 3) }
+    assert_includes error.message, "gte and gt"
+  end
+  it "range with conflicting upper bounds raises" do
+    error = assert_raises(ArgumentError) { builder.range(:rating, nil, lte: 5, lt: 4) }
+    assert_includes error.message, "lte and lt"
+  end
+  it "range with explicit unknown type raises" do
+    error = assert_raises(ArgumentError) { builder.range(:rating, 1..2, type: :bad) }
+    assert_includes error.message, "Unknown range type"
   end
 
   # ──────────────────────────────────────────────
@@ -133,6 +165,10 @@ RSpec.describe "GuardsUnitTest" do
   it "match any with no terms raises" do
     error = assert_raises(ArgumentError) { builder.match_any(:description) }
     assert_includes error.message, "at least one search term"
+  end
+  it "term set with no terms raises" do
+    error = assert_raises(ArgumentError) { builder.term_set(:description) }
+    assert_includes error.message, "term_set requires at least one value"
   end
   it "phrase prefix with no terms raises" do
     error = assert_raises(ArgumentError) { builder.phrase_prefix(:description) }
@@ -164,6 +200,60 @@ RSpec.describe "GuardsUnitTest" do
                           .matching_all("shoes")
                           .with_snippet(:description, max_chars: 100)
     refute_nil rel.to_sql
+  end
+  it "with snippets max chars rejects non integer" do
+    error = assert_raises(ArgumentError) do
+      GuardTestProduct.search(:description)
+                      .matching_all("shoes")
+                      .with_snippets(:description, max_chars: "abc")
+    end
+    assert_includes error.message, "max_chars must be an integer"
+  end
+  it "with snippets limit rejects non integer" do
+    error = assert_raises(ArgumentError) do
+      GuardTestProduct.search(:description)
+                      .matching_all("shoes")
+                      .with_snippets(:description, limit: "abc")
+    end
+    assert_includes error.message, "limit must be an integer"
+  end
+  it "with snippets offset rejects non integer" do
+    error = assert_raises(ArgumentError) do
+      GuardTestProduct.search(:description)
+                      .matching_all("shoes")
+                      .with_snippets(:description, offset: "abc")
+    end
+    assert_includes error.message, "offset must be an integer"
+  end
+  it "with snippets sort by validates values" do
+    error = assert_raises(ArgumentError) do
+      GuardTestProduct.search(:description)
+                      .matching_all("shoes")
+                      .with_snippets(:description, sort_by: :unknown)
+    end
+    assert_includes error.message, "sort_by must be one of: score, position"
+  end
+  it "with snippets as rejects blank aliases" do
+    error = assert_raises(ArgumentError) do
+      GuardTestProduct.search(:description)
+                      .matching_all("shoes")
+                      .with_snippets(:description, as: "   ")
+    end
+    assert_includes error.message, "as cannot be blank"
+  end
+  it "with snippet positions as rejects blank aliases" do
+    error = assert_raises(ArgumentError) do
+      GuardTestProduct.search(:description)
+                      .matching_all("shoes")
+                      .with_snippet_positions(:description, as: "")
+    end
+    assert_includes error.message, "as cannot be blank"
+  end
+  it "term set relation rejects empty values" do
+    error = assert_raises(ArgumentError) do
+      GuardTestProduct.search(:category).term_set
+    end
+    assert_includes error.message, "term_set requires at least one value"
   end
   it "facets size rejects non integer string" do
     error = assert_raises(ArgumentError) do
@@ -301,6 +391,24 @@ RSpec.describe "GuardsUnitTest" do
                       .facets(:category, agg: Object.new)
     end
     assert_includes error.message, "agg must be a Hash or JSON String"
+  end
+  it "with agg rejects empty payload" do
+    error = assert_raises(ArgumentError) do
+      GuardTestProduct.search(:description)
+                      .matching_all("shoes")
+                      .with_agg
+    end
+    assert_includes error.message, "at least one named aggregation"
+  end
+  it "with agg rejects multi-key aggregation specs" do
+    error = assert_raises(ArgumentError) do
+      GuardTestProduct.search(:description)
+                      .matching_all("shoes")
+                      .with_agg(
+                        broken: { value_count: { field: "id" }, avg: { field: "rating" } }
+                      )
+    end
+    assert_includes error.message, "exactly one top-level key"
   end
 
   # ──────────────────────────────────────────────

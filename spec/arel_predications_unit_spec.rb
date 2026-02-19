@@ -73,6 +73,10 @@ RSpec.describe "ArelPredicationsUnitTest" do
     node = @t[:rating].pdb_term(5)
     assert_equal %("products"."rating" === 5), sql(node)
   end
+  it "pdb_term_set" do
+    node = @t[:category].pdb_term_set(%w[audio footwear])
+    assert_equal %("products"."category" @@@ pdb.term_set(ARRAY['audio', 'footwear'])), sql(node)
+  end
 
   # ---- pdb_fuzzy ----
   it "pdb_fuzzy distance only" do
@@ -148,6 +152,18 @@ RSpec.describe "ArelPredicationsUnitTest" do
     node = @t[:id].pdb_all
     assert_equal %("products"."id" @@@ pdb.all()), sql(node)
   end
+  it "pdb_exists" do
+    node = @t[:id].pdb_exists
+    assert_equal %("products"."id" @@@ pdb.exists()), sql(node)
+  end
+  it "pdb_range with Ruby range" do
+    node = @t[:rating].pdb_range(3..5)
+    assert_equal %("products"."rating" @@@ pdb.range(int4range(3, 5, '[]'))), sql(node)
+  end
+  it "pdb_range with bound options" do
+    node = @t[:rating].pdb_range(gte: 3, lt: 5)
+    assert_equal %q{"products"."rating" @@@ pdb.range(int4range(3, 5, '[)'))}, sql(node)
+  end
 
   # ---- pdb_more_like_this ----
   it "pdb_more_like_this with integer key" do
@@ -189,6 +205,21 @@ RSpec.describe "ArelPredicationsUnitTest" do
   it "pdb_snippet with tags" do
     node = @t[:description].pdb_snippet("<b>", "</b>")
     assert_equal %(pdb.snippet("products"."description", '<b>', '</b>')), sql(node)
+  end
+  it "pdb_snippets with named args" do
+    node = @t[:description].pdb_snippets(
+      start_tag: "<em>",
+      end_tag: "</em>",
+      max_num_chars: 15,
+      limit: 1,
+      offset: 0,
+      sort_by: "position"
+    )
+    assert_equal %(pdb.snippets("products"."description", start_tag => '<em>', end_tag => '</em>', max_num_chars => 15, "limit" => 1, "offset" => 0, sort_by => 'position')), sql(node)
+  end
+  it "pdb_snippet_positions" do
+    node = @t[:description].pdb_snippet_positions
+    assert_equal %(pdb.snippet_positions("products"."description")), sql(node)
   end
 
   # ---- Boolean composition with standard AR predicates ----

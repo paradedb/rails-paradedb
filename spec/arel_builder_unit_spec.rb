@@ -108,6 +108,18 @@ RSpec.describe "ArelBuilderUnitTest" do
     node = @builder.term(:rating, 5)
     assert_equal %("products"."rating" === 5), sql(node)
   end
+  it "term set with strings" do
+    node = @builder.term_set(:category, %w[audio footwear])
+    assert_equal %("products"."category" @@@ pdb.term_set(ARRAY['audio', 'footwear'])), sql(node)
+  end
+  it "term set with integers" do
+    node = @builder.term_set(:rating, [4, 5])
+    assert_equal %("products"."rating" @@@ pdb.term_set(ARRAY[4, 5])), sql(node)
+  end
+  it "term set with empty values raises" do
+    error = assert_raises(ArgumentError) { @builder.term_set(:category, []) }
+    assert_includes error.message, "term_set requires at least one value"
+  end
 
   # ---- fuzzy ----
   it "fuzzy distance only" do
@@ -174,6 +186,22 @@ RSpec.describe "ArelBuilderUnitTest" do
     node = @builder.phrase_prefix(:description, "trail", "running", "sh")
     assert_equal %("products"."description" @@@ pdb.phrase_prefix(ARRAY['trail', 'running', 'sh'])), sql(node)
   end
+  it "exists wrapper" do
+    node = @builder.exists(:id)
+    assert_equal %("products"."id" @@@ pdb.exists()), sql(node)
+  end
+  it "range wrapper with Ruby range" do
+    node = @builder.range(:rating, 3..5)
+    assert_equal %("products"."rating" @@@ pdb.range(int4range(3, 5, '[]'))), sql(node)
+  end
+  it "range wrapper with exclusive end range" do
+    node = @builder.range(:rating, 3...5)
+    assert_equal %q{"products"."rating" @@@ pdb.range(int4range(3, 5, '[)'))}, sql(node)
+  end
+  it "range wrapper with bound options" do
+    node = @builder.range(:rating, nil, gte: 3, lt: 5)
+    assert_equal %q{"products"."rating" @@@ pdb.range(int4range(3, 5, '[)'))}, sql(node)
+  end
 
   # ---- more_like_this ----
   it "more like this with integer key" do
@@ -230,6 +258,22 @@ RSpec.describe "ArelBuilderUnitTest" do
   it "snippet with tags and max chars" do
     node = @builder.snippet(:description, "<b>", "</b>", 100)
     assert_equal %(pdb.snippet("products"."description", '<b>', '</b>', 100)), sql(node)
+  end
+  it "snippets with named args" do
+    node = @builder.snippets(
+      :description,
+      start_tag: "<em>",
+      end_tag: "</em>",
+      max_num_chars: 15,
+      limit: 1,
+      offset: 0,
+      sort_by: "position"
+    )
+    assert_equal %(pdb.snippets("products"."description", start_tag => '<em>', end_tag => '</em>', max_num_chars => 15, "limit" => 1, "offset" => 0, sort_by => 'position')), sql(node)
+  end
+  it "snippet positions" do
+    node = @builder.snippet_positions(:description)
+    assert_equal %(pdb.snippet_positions("products"."description")), sql(node)
   end
   it "agg json string" do
     node = @builder.agg('{"terms":{"field":"category","size":10}}')

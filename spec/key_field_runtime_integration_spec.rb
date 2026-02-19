@@ -10,11 +10,11 @@ end
 class RuntimeKeyDocIndex < ParadeDB::Index
   self.table_name = :runtime_key_docs
   self.key_field = :external_id
-  self.fields = [
-    :external_id,
-    { body: :simple },
-    :tag
-  ]
+  self.fields = {
+    external_id: {},
+    body: { tokenizer: :simple },
+    tag: {}
+  }
 end
 
 RSpec.describe "KeyFieldRuntimeIntegrationTest" do

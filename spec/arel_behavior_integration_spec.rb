@@ -104,6 +104,10 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
     ids = search(:category).term("footwear").order(:id).pluck(:id)
     assert_equal [1, 2, 5], ids
   end
+  it "term set on category" do
+    ids = search(:category).term_set(%w[audio footwear]).order(:id).pluck(:id)
+    assert_equal [1, 2, 3, 4, 5], ids
+  end
 
   # ---- fuzzy ----
   it "fuzzy corrects typo" do
@@ -368,6 +372,14 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
 
     ids = ArelBehaviorProduct.where(Arel.sql(predicate_sql)).order(:id).pluck(:id)
     assert_equal [1, 2, 6], ids
+  end
+  it "arel builder term_set via where" do
+    builder = ParadeDB::Arel::Builder.new(:products)
+    predicate = builder.term_set(:category, %w[audio footwear])
+    predicate_sql = ParadeDB::Arel.to_sql(predicate, ArelBehaviorProduct.connection)
+
+    ids = ArelBehaviorProduct.where(Arel.sql(predicate_sql)).order(:id).pluck(:id)
+    assert_equal [1, 2, 3, 4, 5], ids
   end
   it "arel builder boolean composition via where" do
     builder = ParadeDB::Arel::Builder.new(:products)

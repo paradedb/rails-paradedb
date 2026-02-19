@@ -26,6 +26,10 @@ RSpec.describe "ArelVisitorTest" do
     node = @builder.term(:description, "shoes")
     assert_equal %("products"."description" === 'shoes'), sql(node)
   end
+  it "term set" do
+    node = @builder.term_set(:category, %w[audio footwear])
+    assert_equal %("products"."category" @@@ pdb.term_set(ARRAY['audio', 'footwear'])), sql(node)
+  end
   it "term with boost" do
     node = @builder.term(:description, "shoes", boost: 2)
     assert_equal %("products"."description" === 'shoes'::pdb.boost(2)), sql(node)
@@ -82,6 +86,14 @@ RSpec.describe "ArelVisitorTest" do
   it "snippet" do
     node = @builder.snippet(:description, "<b>", "</b>", 50)
     assert_equal %(pdb.snippet("products"."description", '<b>', '</b>', 50)), sql(node)
+  end
+  it "snippets" do
+    node = @builder.snippets(:description, max_num_chars: 15, limit: 1, offset: 0, sort_by: "position")
+    assert_equal %(pdb.snippets("products"."description", max_num_chars => 15, "limit" => 1, "offset" => 0, sort_by => 'position')), sql(node)
+  end
+  it "snippet positions" do
+    node = @builder.snippet_positions(:description)
+    assert_equal %(pdb.snippet_positions("products"."description")), sql(node)
   end
   it "agg" do
     node = @builder.agg('{"terms":{"field":"category"}}')

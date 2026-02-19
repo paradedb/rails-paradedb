@@ -34,6 +34,10 @@ module ParadeDB
         ::Arel::Nodes::InfixOperation.new("===", self, rhs)
       end
 
+      def pdb_term_set(*terms)
+        ParadeDB::Arel::Builder.new.term_set(self, *terms)
+      end
+
       def pdb_regex(pattern)
         rhs = ::Arel::Nodes::NamedFunction.new("pdb.regex", [pdb_quoted(pattern)])
         ::Arel::Nodes::InfixOperation.new("@@@", self, rhs)
@@ -68,6 +72,15 @@ module ParadeDB
         ::Arel::Nodes::InfixOperation.new("@@@", self, rhs)
       end
 
+      def pdb_exists
+        rhs = ::Arel::Nodes::NamedFunction.new("pdb.exists", [])
+        ::Arel::Nodes::InfixOperation.new("@@@", self, rhs)
+      end
+
+      def pdb_range(value = nil, gte: nil, gt: nil, lte: nil, lt: nil, type: nil)
+        ParadeDB::Arel::Builder.new.range(self, value, gte: gte, gt: gt, lte: lte, lt: lt, type: type)
+      end
+
       def pdb_more_like_this(key, fields: nil, options: {})
         args = [pdb_quoted(key)]
 
@@ -97,6 +110,29 @@ module ParadeDB
 
       def pdb_snippet(*args)
         ::Arel::Nodes::NamedFunction.new("pdb.snippet", [self] + args.map { |arg| pdb_quoted(arg) })
+      end
+
+      def pdb_snippets(
+        start_tag: nil,
+        end_tag: nil,
+        max_num_chars: nil,
+        limit: nil,
+        offset: nil,
+        sort_by: nil
+      )
+        ParadeDB::Arel::Builder.new.snippets(
+          self,
+          start_tag: start_tag,
+          end_tag: end_tag,
+          max_num_chars: max_num_chars,
+          limit: limit,
+          offset: offset,
+          sort_by: sort_by
+        )
+      end
+
+      def pdb_snippet_positions
+        ::Arel::Nodes::NamedFunction.new("pdb.snippet_positions", [self])
       end
 
       private

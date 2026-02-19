@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+require "json"
 
 module ParadeDB
   module MigrationHelpers
@@ -19,13 +20,14 @@ module ParadeDB
       remember_schema_index_reference(resolved)
     end
 
-    def add_bm25_index(table, fields:, key_field:, name: nil, if_not_exists: false)
+    def add_bm25_index(table, fields:, key_field:, name: nil, index_options: nil, if_not_exists: false)
       ensure_postgresql_adapter!
       anonymous = Class.new(ParadeDB::Index)
       anonymous.table_name = table
       anonymous.key_field = key_field
       anonymous.index_name = name unless name.nil?
       anonymous.fields = fields
+      anonymous.index_options = index_options unless index_options.nil?
 
       create_paradedb_index(anonymous, if_not_exists: if_not_exists)
     end
@@ -76,13 +78,100 @@ module ParadeDB
     def build_create_sql(compiled, if_not_exists:)
       prefix = if_not_exists ? "IF NOT EXISTS " : ""
       fields_sql = compiled.entries.map { |entry| bm25_entry_sql(entry) }.join(", ")
-      escaped_key_field = quote_string(compiled.key_field.to_s)
+      with_options_sql = bm25_with_options_sql(compiled)
 
       <<~SQL.strip.gsub(/\s+/, " ")
         CREATE INDEX #{prefix}#{quote_table_name(compiled.index_name)} ON #{quote_table_name(compiled.table_name)}
         USING bm25 (#{fields_sql})
-        WITH (key_field='#{escaped_key_field}')
+        WITH (#{with_options_sql})
       SQL
+    end
+
+    def bm25_with_options_sql(compiled)
+      options = []
+      options << "key_field=#{quote(compiled.key_field.to_s)}"
+
+      compiled.index_options.each do |key, value|
+        case key.to_sym
+        when :target_segment_count
+          options << "target_segment_count=#{Integer(value)}"
+        else
+          raise ParadeDB::InvalidIndexDefinition, "unsupported index option #{key.inspect}"
+        end
+      end
+
+      bm25_field_option_groups(compiled).each do |param_name, value_hash|
+        options << "#{param_name}=#{quote(JSON.generate(value_hash))}"
+      end
+
+      options.join(", ")
+    end
+
+    def bm25_field_option_groups(compiled)
+      field_options = compiled.field_options || {}
+      return {} if field_options.empty?
+
+      columns_by_name = columns(compiled.table_name.to_s).each_with_object({}) { |col, memo| memo[col.name] = col }
+      grouped = {}
+
+      field_options.each do |source, opts|
+        next unless source.match?(/\A[a-zA-Z_][a-zA-Z0-9_]*\z/)
+
+        column = columns_by_name[source.to_s]
+        next unless column
+
+        param_name = bm25_field_option_param_for_column(column)
+        next if param_name.nil?
+
+        normalized = normalize_field_options_for_param(opts, param_name)
+        next if normalized.empty?
+
+        grouped[param_name] ||= {}
+        grouped[param_name][source.to_s] = normalized
+      end
+
+      grouped
+    end
+
+    def bm25_field_option_param_for_column(column)
+      sql_type = column.sql_type.to_s.downcase
+      return "range_fields" if sql_type.include?("range")
+
+      case column.type
+      when :json, :jsonb then "json_fields"
+      when :text, :string then "text_fields"
+      when :integer, :float, :decimal then "numeric_fields"
+      when :boolean then "boolean_fields"
+      when :datetime, :timestamp, :time, :date then "datetime_fields"
+      else
+        nil
+      end
+    end
+
+    def normalize_field_options_for_param(options, param_name)
+      symbolized = options.each_with_object({}) { |(k, v), memo| memo[k.to_sym] = v }
+
+      case param_name
+      when "text_fields"
+        allowed = %i[fast record normalizer]
+      when "json_fields"
+        allowed = %i[fast expand_dots]
+      when "numeric_fields", "boolean_fields", "datetime_fields", "range_fields"
+        allowed = %i[fast]
+      else
+        allowed = []
+      end
+
+      symbolized.each_with_object({}) do |(key, value), memo|
+        next unless allowed.include?(key)
+
+        rendered =
+          case value
+          when Symbol then value.to_s
+          else value
+          end
+        memo[key.to_s] = rendered
+      end
     end
 
     def bm25_entry_sql(entry)
@@ -124,7 +213,7 @@ module ParadeDB
 
     def tokenizer_args(options)
       opts = options.dup
-      positional = Array(opts.delete(:__positional)).map(&:to_s)
+      positional = Array(opts.delete(:__positional)).map { |value| tokenizer_positional_arg_sql(value) }
 
       if opts.key?(:min) || opts.key?(:max)
         if opts.key?(:min) && opts.key?(:max)
@@ -138,6 +227,24 @@ module ParadeDB
       end
 
       [positional, named]
+    end
+
+    def tokenizer_positional_arg_sql(value)
+      case value
+      when Integer, Float
+        value.to_s
+      when TrueClass, FalseClass
+        value ? "true" : "false"
+      when NilClass
+        "null"
+      when Symbol
+        quote(value.to_s)
+      when String
+        quote(value)
+      else
+        raise ParadeDB::InvalidIndexDefinition,
+              "unsupported tokenizer positional arg type: #{value.class}"
+      end
     end
 
     def resolve_index_klass(index_klass)
@@ -199,15 +306,20 @@ module ParadeDB
       name = row["index_name"]
 
       key_field = extract_bm25_key_field(indexdef)
+      index_options = extract_bm25_index_options(indexdef)
       fields_sql = extract_bm25_fields_sql(indexdef)
 
       if key_field && fields_sql
         field_names = split_bm25_top_level(fields_sql).map { |f| f.strip }
         fields_ruby = field_names.map { |f| bm25_field_to_ruby(f) }
-        "add_bm25_index #{table.to_sym.inspect}, " \
+        statement = "add_bm25_index #{table.to_sym.inspect}, " \
           "fields: [#{fields_ruby.join(', ')}], " \
           "key_field: #{key_field.to_sym.inspect}, " \
           "name: #{name.inspect}"
+        unless index_options.empty?
+          statement += ", index_options: #{ruby_hash_literal(index_options)}"
+        end
+        statement
       else
         "execute #{indexdef.inspect}"
       end
@@ -221,6 +333,32 @@ module ParadeDB
       return unquoted[1] if unquoted
 
       nil
+    end
+
+    def extract_bm25_index_options(indexdef)
+      with_match = indexdef.match(/WITH\s*\((.*)\)\s*\z/im)
+      return {} unless with_match
+
+      with_sql = with_match[1]
+      options = {}
+      split_sql_arguments(with_sql).each do |argument|
+        key, value_sql = split_assignment(argument)
+        next if key.nil?
+        next if key == "key_field"
+
+        case key
+        when "target_segment_count"
+          parsed = parse_sql_literal(value_sql)
+          if parsed.is_a?(Integer)
+            options[:target_segment_count] = parsed
+          elsif parsed.is_a?(String) && parsed.match?(/\A\d+\z/)
+            options[:target_segment_count] = parsed.to_i
+          end
+        end
+      end
+      options
+    rescue
+      {}
     end
 
     def extract_bm25_fields_sql(indexdef)

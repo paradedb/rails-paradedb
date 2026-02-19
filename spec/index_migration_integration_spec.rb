@@ -11,21 +11,28 @@ end
 class IndexMigrationBookIndex < ParadeDB::Index
   self.table_name = :books
   self.key_field = :id
-  self.fields = [
-    :id,
-    { title: :simple },
-    { author: :literal }
-  ]
+  self.index_options = { target_segment_count: 17 }
+  self.fields = {
+    id: {},
+    title: {
+      tokenizers: [
+        { tokenizer: :literal },
+        { tokenizer: :simple, alias: "title_simple", filters: [:lowercase] }
+      ]
+    },
+    author: { tokenizer: :literal },
+    metadata: { fast: true, expand_dots: false }
+  }
 end
 
 class IndexMigrationBookByNameIndex < ParadeDB::Index
   self.table_name = :books
   self.key_field = :id
   self.index_name = :books_by_name_bm25_idx
-  self.fields = [
-    :id,
-    :title
-  ]
+  self.fields = {
+    id: {},
+    title: { tokenizer: :simple }
+  }
 end
 
 RSpec.describe "IndexMigrationIntegrationTest" do
@@ -76,24 +83,29 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     IndexMigrationBook.create!(title: "Ruby on Rails guide", author: "DHH")
     IndexMigrationBook.create!(title: "Distributed systems", author: "Tanenbaum")
 
-    ids = IndexMigrationBook.search(:title).matching_all("rails").pluck(:id)
+    ids = IndexMigrationBook.search(:title_simple).matching_all("rails").pluck(:id)
     assert_equal 1, ids.length
   end
 
-  it "raises for ambiguous DSL definitions" do
+  it "raises when multiple tokenizers for a field are missing aliases" do
     bad_index = Class.new(ParadeDB::Index) do
       self.table_name = :books
       self.key_field = :id
-      self.fields = [
-        :id,
-        { title: :simple },
-        { title: :literal }
-      ]
+      self.fields = {
+        id: {},
+        title: {
+          tokenizers: [
+            { tokenizer: :literal },
+            { tokenizer: :simple }
+          ]
+        }
+      }
     end
 
-    assert_raises(ParadeDB::InvalidIndexDefinition) do
+    error = assert_raises(ParadeDB::InvalidIndexDefinition) do
       ActiveRecord::Base.connection.create_paradedb_index(bad_index)
     end
+    assert_includes error.message, "alias"
   end
 
   it "supports create_paradedb_index with string class names" do
@@ -112,7 +124,10 @@ RSpec.describe "IndexMigrationIntegrationTest" do
 
     conn.add_bm25_index(
       :books,
-      fields: [:id, :title],
+      fields: {
+        id: {},
+        title: { tokenizer: :simple }
+      },
       key_field: :id,
       name: :books_custom_bm25_idx,
       if_not_exists: true
@@ -130,12 +145,19 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     v1 = Class.new(ParadeDB::Index) do
       self.table_name = :books
       self.key_field = :id
-      self.fields = [:id, :title]
+      self.fields = {
+        id: {},
+        title: { tokenizer: :simple }
+      }
     end
     v2 = Class.new(ParadeDB::Index) do
       self.table_name = :books
       self.key_field = :id
-      self.fields = [:id, :title, :author]
+      self.fields = {
+        id: {},
+        title: { tokenizer: :simple },
+        author: { tokenizer: :literal }
+      }
     end
 
     conn.create_paradedb_index(v1)
@@ -174,7 +196,16 @@ RSpec.describe "IndexMigrationIntegrationTest" do
   it "dumps bm25 indexes from catalog into schema output" do
     conn = ActiveRecord::Base.connection
     conn.remove_bm25_index(:books, if_exists: true)
-    conn.add_bm25_index(:books, fields: [:id, :title], key_field: :id, if_not_exists: true)
+    conn.add_bm25_index(
+      :books,
+      fields: {
+        id: {},
+        title: { tokenizer: :simple, alias: "title_simple" }
+      },
+      key_field: :id,
+      index_options: { target_segment_count: 17 },
+      if_not_exists: true
+    )
     conn.instance_variable_set(:@paradedb_schema_index_references, [])
 
     stream = StringIO.new
@@ -183,6 +214,8 @@ RSpec.describe "IndexMigrationIntegrationTest" do
 
     assert_includes schema, "add_bm25_index"
     assert_includes schema, ":books"
+    assert_includes schema, "title_simple"
+    assert_includes schema, "target_segment_count"
     expect(schema).not_to match(/add_index.*books_bm25_idx/)
     expect(schema).not_to match(/t\.index.*books_bm25_idx/)
   end
@@ -194,10 +227,13 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     expression_index = Class.new(ParadeDB::Index) do
       self.table_name = :books
       self.key_field = :id
-      self.fields = [
-        :id,
-        { "metadata->>'title'" => { simple: { alias: "metadata_title" } } }
-      ]
+      self.fields = {
+        id: {},
+        "(metadata->>'title')::text": {
+          tokenizer: :simple,
+          alias: "metadata_title"
+        }
+      }
     end
 
     conn.create_paradedb_index(expression_index)
@@ -207,17 +243,23 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     assert_includes indexdef, "pdb.simple"
   end
 
-  it "round-trips schema dump/load for tokenized fields with named tokenizer options" do
+  it "round-trips schema dump/load for structured multi-tokenizer fields" do
     conn = ActiveRecord::Base.connection
     conn.remove_bm25_index(:books, if_exists: true)
 
     conn.add_bm25_index(
       :books,
-      fields: [
-        :id,
-        { title: { simple: { alias: "title_simple" } } }
-      ],
+      fields: {
+        id: {},
+        title: {
+          tokenizers: [
+            { tokenizer: :literal },
+            { tokenizer: :simple, alias: "title_simple" }
+          ]
+        }
+      },
       key_field: :id,
+      index_options: { target_segment_count: 17 },
       if_not_exists: true
     )
 
@@ -225,7 +267,9 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection_pool, stream)
     schema = stream.string
     add_stmt = schema.each_line.find do |line|
-      line.include?("add_bm25_index :books") && line.include?("title_simple")
+      line.include?("add_bm25_index :books") &&
+        line.include?("title_simple") &&
+        line.include?("target_segment_count")
     end
 
     refute_nil add_stmt
@@ -235,16 +279,20 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     assert index_exists?("books_bm25_idx")
   end
 
-  it "round-trips schema dump/load for tokenized expression fields with casts" do
+  it "round-trips schema dump/load for structured expression fields with casts" do
     conn = ActiveRecord::Base.connection
     conn.remove_bm25_index(:books, if_exists: true)
 
     conn.add_bm25_index(
       :books,
-      fields: [
-        :id,
-        { "(metadata->>'title')::text" => { simple: { alias: "metadata_title_text" } } }
-      ],
+      fields: {
+        id: {},
+        "(metadata->>'title')::text": {
+          tokenizer: :simple,
+          alias: "metadata_title_text",
+          filters: [:lowercase]
+        }
+      },
       key_field: :id,
       if_not_exists: true
     )

@@ -12,6 +12,8 @@ module ParadeDB
       :more_like_this,
       :with_facets,
       :facets,
+      :with_agg,
+      :facets_agg,
       :paradedb_arel,
       :paradedb_index,
       :paradedb_index_class,
@@ -69,6 +71,18 @@ module ParadeDB
         ensure_postgres!
         paradedb_validate_index!
         all.extending(SearchMethods).facets(*fields, **opts)
+      end
+
+      def with_agg(**named_aggregations)
+        ensure_postgres!
+        paradedb_validate_index!
+        all.extending(SearchMethods).with_agg(**named_aggregations)
+      end
+
+      def facets_agg(**named_aggregations)
+        ensure_postgres!
+        paradedb_validate_index!
+        all.extending(SearchMethods).facets_agg(**named_aggregations)
       end
 
       def paradedb_arel
