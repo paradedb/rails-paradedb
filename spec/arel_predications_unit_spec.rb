@@ -158,11 +158,11 @@ RSpec.describe "ArelPredicationsUnitTest" do
   end
   it "pdb_range with Ruby range" do
     node = @t[:rating].pdb_range(3..5)
-    assert_equal %("products"."rating" @@@ pdb.range(int4range(3, 5, '[]'))), sql(node)
+    assert_equal %("products"."rating" @@@ pdb.range(int8range(3, 5, '[]'))), sql(node)
   end
   it "pdb_range with bound options" do
     node = @t[:rating].pdb_range(gte: 3, lt: 5)
-    assert_equal %q{"products"."rating" @@@ pdb.range(int4range(3, 5, '[)'))}, sql(node)
+    assert_equal %q{"products"."rating" @@@ pdb.range(int8range(3, 5, '[)'))}, sql(node)
   end
 
   # ---- pdb_more_like_this ----

@@ -78,11 +78,11 @@ RSpec.describe "UserApiUnitTest" do
   end
   it "range wrapper with Ruby range" do
     sql = UnitProduct.search(:rating).range(3..5).to_sql
-    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."rating" @@@ pdb.range(int4range(3, 5, '[]')))), sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."rating" @@@ pdb.range(int8range(3, 5, '[]')))), sql
   end
   it "range wrapper with bound options" do
     sql = UnitProduct.search(:rating).range(gte: 3, lt: 5).to_sql
-    assert_sql_equal %q{SELECT products.* FROM products WHERE ("products"."rating" @@@ pdb.range(int4range(3, 5, '[)')))}, sql
+    assert_sql_equal %q{SELECT products.* FROM products WHERE ("products"."rating" @@@ pdb.range(int8range(3, 5, '[)')))}, sql
   end
   it "more like this with id" do
     sql = UnitProduct.more_like_this(5, fields: [:description]).to_sql

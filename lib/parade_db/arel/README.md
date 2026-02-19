@@ -39,7 +39,7 @@ Render any node with `ParadeDB::Arel.to_sql(node)`. All nodes respond to
 | `full_text(column, expr)` | `column @@@ expr` (raw right-hand value) |
 | `match_all(column)` | `column @@@ pdb.all()` |
 | `exists(column)` | `column @@@ pdb.exists()` |
-| `range(column, value = nil, gte:, gt:, lte:, lt:, type:)` | `column @@@ pdb.range(int4range(3, 5, '[)'))` |
+| `range(column, value = nil, gte:, gt:, lte:, lt:, type:)` | `column @@@ pdb.range(int8range(3, 5, '[)'))` |
 | `more_like_this(column, key, fields: [:f1, :f2])` | `column @@@ pdb.more_like_this(key, ARRAY['f1','f2'])` |
 | `score(key_field)` | `pdb.score(key_field)` |
 | `snippet(column, start, finish, max)` | `pdb.snippet(column, start, finish, max)` |

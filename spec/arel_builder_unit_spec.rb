@@ -192,15 +192,15 @@ RSpec.describe "ArelBuilderUnitTest" do
   end
   it "range wrapper with Ruby range" do
     node = @builder.range(:rating, 3..5)
-    assert_equal %("products"."rating" @@@ pdb.range(int4range(3, 5, '[]'))), sql(node)
+    assert_equal %("products"."rating" @@@ pdb.range(int8range(3, 5, '[]'))), sql(node)
   end
   it "range wrapper with exclusive end range" do
     node = @builder.range(:rating, 3...5)
-    assert_equal %q{"products"."rating" @@@ pdb.range(int4range(3, 5, '[)'))}, sql(node)
+    assert_equal %q{"products"."rating" @@@ pdb.range(int8range(3, 5, '[)'))}, sql(node)
   end
   it "range wrapper with bound options" do
     node = @builder.range(:rating, nil, gte: 3, lt: 5)
-    assert_equal %q{"products"."rating" @@@ pdb.range(int4range(3, 5, '[)'))}, sql(node)
+    assert_equal %q{"products"."rating" @@@ pdb.range(int8range(3, 5, '[)'))}, sql(node)
   end
 
   # ---- more_like_this ----

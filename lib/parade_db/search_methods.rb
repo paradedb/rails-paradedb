@@ -386,7 +386,7 @@ module ParadeDB
 
       case column.type
       when :integer
-        column.limit == 8 ? "int8range" : "int4range"
+        "int8range"
       when :float, :decimal
         "numrange"
       when :date

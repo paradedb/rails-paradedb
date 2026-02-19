@@ -4,8 +4,6 @@ require "date"
 module ParadeDB
   module Arel
     class Builder
-      INT4_MIN = -2_147_483_648
-      INT4_MAX = 2_147_483_647
       RANGE_TYPES = %w[int4range int8range numrange daterange tsrange tstzrange].freeze
 
       attr_reader :table
@@ -234,7 +232,7 @@ module ParadeDB
         raise ArgumentError, "range requires at least one non-nil bound to infer type" if values.empty?
 
         if values.all? { |v| v.is_a?(::Integer) }
-          return values.any? { |v| v < INT4_MIN || v > INT4_MAX } ? "int8range" : "int4range"
+          return "int8range"
         end
 
         if values.all? { |v| v.is_a?(::Numeric) }
