@@ -8,7 +8,7 @@ module ParadeDB
     extend ActiveSupport::Concern
 
     INJECTED_CLASS_METHODS = [
-      :search,
+      :paradedb_search,
       :more_like_this,
       :with_facets,
       :facets,
@@ -33,6 +33,14 @@ module ParadeDB
 
       base.extend(ClassMethods)
       base.class_attribute :has_paradedb_index, default: false
+
+      # Provide `.search` as a convenience alias unless the model already defines it.
+      # In collision scenarios (Searchkick, Ransack, etc.), users can call `.paradedb_search`.
+      unless base.respond_to?(:search)
+        base.singleton_class.define_method(:search) do |column|
+          paradedb_search(column)
+        end
+      end
     end
 
     def self.detect_method_collision!(base, method_name)
@@ -48,7 +56,7 @@ module ParadeDB
     end
 
     module ClassMethods
-      def search(column)
+      def paradedb_search(column)
         ensure_postgres!
         validate_field_indexed!(column)
         paradedb_validate_index!
@@ -145,7 +153,7 @@ module ParadeDB
           message = "ParadeDB index drift detected for #{name}: expected #{definition.index_name} on #{definition.table_name} with bm25."
           case ParadeDB.index_validation_mode
           when :warn
-            Kernel.warn(message)
+            paradedb_log_warn(message)
           when :raise
             raise ParadeDB::IndexDriftError, message
           end
@@ -174,7 +182,7 @@ module ParadeDB
       def handle_missing_paradedb_index_class(candidate_name)
         case ParadeDB.index_validation_mode
         when :warn
-          Kernel.warn("ParadeDB index class not found for #{name}: expected #{candidate_name}")
+          paradedb_log_warn("ParadeDB index class not found for #{name}: expected #{candidate_name}")
           nil
         when :raise
           raise ParadeDB::IndexClassNotFoundError,
@@ -220,6 +228,14 @@ module ParadeDB
         alias_value = connection.quote(entry.query_key)
 
         Arel.sql("(#{source_sql}::pdb.alias(#{alias_value}))")
+      end
+
+      def paradedb_log_warn(message)
+        if defined?(Rails) && Rails.logger
+          Rails.logger.warn(message)
+        else
+          Kernel.warn(message)
+        end
       end
 
       def paradedb_catalog_index_valid?(definition)

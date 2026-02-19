@@ -16,13 +16,14 @@ module ParadeDB
         column_node(column)
       end
 
-      def match(column, *terms, boost: nil)
-        rhs = apply_boost(quoted_value(join_terms(terms)), boost)
+      def match(column, *terms, boost: nil, constant_score: nil)
+        rhs = apply_score_modifier(quoted_value(join_terms(terms)), boost: boost, constant_score: constant_score)
         infix("&&&", column_node(column), rhs)
       end
 
-      def match_any(column, *terms)
-        infix("|||", column_node(column), quoted_value(join_terms(terms)))
+      def match_any(column, *terms, boost: nil, constant_score: nil)
+        rhs = apply_score_modifier(quoted_value(join_terms(terms)), boost: boost, constant_score: constant_score)
+        infix("|||", column_node(column), rhs)
       end
 
       def full_text(column, expression)
@@ -30,72 +31,81 @@ module ParadeDB
         infix("@@@", column_node(column), rhs)
       end
 
-      def phrase(column, text, slop: nil)
+      def phrase(column, text, slop: nil, boost: nil, constant_score: nil)
         rhs = apply_slop(quoted_value(text), slop)
+        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("###", column_node(column), rhs)
       end
 
-      def fuzzy(column, term, distance: 1, prefix: nil, boost: nil)
+      def fuzzy(column, term, distance: 1, prefix: nil, boost: nil, constant_score: nil)
         validate_numeric!(distance, :distance)
         rhs = Nodes::FuzzyCast.new(quoted_value(term), quoted_value(distance), prefix: prefix)
-        rhs = apply_boost(rhs, boost)
+        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("===", column_node(column), rhs)
       end
 
-      def term(column, term, boost: nil)
-        rhs = apply_boost(quoted_value(term), boost)
+      def term(column, term, boost: nil, constant_score: nil)
+        rhs = apply_score_modifier(quoted_value(term), boost: boost, constant_score: constant_score)
         infix("===", column_node(column), rhs)
       end
 
-      def term_set(column, *terms)
+      def term_set(column, *terms, boost: nil, constant_score: nil)
         normalized_terms = normalize_term_set_terms(terms)
         array = Nodes::ArrayLiteral.new(normalized_terms.map { |term| quoted_value(term) })
         rhs = ::Arel::Nodes::NamedFunction.new("pdb.term_set", [array])
+        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("@@@", column_node(column), rhs)
       end
 
-      def regex(column, pattern)
+      def regex(column, pattern, boost: nil, constant_score: nil)
         rhs = ::Arel::Nodes::NamedFunction.new("pdb.regex", [quoted_value(pattern)])
+        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("@@@", column_node(column), rhs)
       end
 
-      def near(column, left_term, right_term, distance: 1)
+      def near(column, left_term, right_term, distance: 1, boost: nil, constant_score: nil)
         validate_numeric!(distance, :distance)
         # Produce: (left ## distance) ## right
         near_chain = infix("##", infix("##", quoted_value(left_term), quoted_value(distance)), quoted_value(right_term))
-        infix("@@@", column_node(column), ::Arel::Nodes::Grouping.new(near_chain))
+        rhs = apply_score_modifier(::Arel::Nodes::Grouping.new(near_chain), boost: boost, constant_score: constant_score)
+        infix("@@@", column_node(column), rhs)
       end
 
-      def phrase_prefix(column, *terms)
+      def phrase_prefix(column, *terms, boost: nil, constant_score: nil)
         flat = terms.flatten.compact
         raise ArgumentError, "phrase_prefix requires at least one term" if flat.empty?
         array = Nodes::ArrayLiteral.new(flat.map { |term| quoted_value(term) })
         rhs = ::Arel::Nodes::NamedFunction.new("pdb.phrase_prefix", [array])
+        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("@@@", column_node(column), rhs)
       end
 
-      def parse(column, query, lenient: nil)
+      def parse(column, query, lenient: nil, boost: nil, constant_score: nil)
         rhs = Nodes::ParseNode.new(quoted_value(query), lenient: lenient)
+        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("@@@", column_node(column), rhs)
       end
 
-      def match_all(column)
+      def match_all(column, boost: nil, constant_score: nil)
         rhs = ::Arel::Nodes::NamedFunction.new("pdb.all", [])
+        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("@@@", column_node(column), rhs)
       end
 
-      def exists(column)
+      def exists(column, boost: nil, constant_score: nil)
         rhs = ::Arel::Nodes::NamedFunction.new("pdb.exists", [])
+        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("@@@", column_node(column), rhs)
       end
 
-      def range(column, value = nil, gte: nil, gt: nil, lte: nil, lt: nil, type: nil)
+      def range(column, value = nil, gte: nil, gt: nil, lte: nil, lt: nil, type: nil, boost: nil, constant_score: nil)
         range_node = build_range_node(value, gte: gte, gt: gt, lte: lte, lt: lt, type: type)
         rhs = ::Arel::Nodes::NamedFunction.new("pdb.range", [range_node])
+        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("@@@", column_node(column), rhs)
       end
 
-      def more_like_this(column, key, fields: nil, options: {})
+      def more_like_this(column, key, fields: nil, options: {}, boost: nil, constant_score: nil)
         args = [quoted_value(key)]
         unless fields.nil?
           field_values = Array(fields).map { |field| quoted_value(field.to_s) }
@@ -107,6 +117,7 @@ module ParadeDB
         end
 
         rhs = ::Arel::Nodes::NamedFunction.new("pdb.more_like_this", args)
+        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("@@@", column_node(column), rhs)
       end
 
@@ -148,10 +159,19 @@ module ParadeDB
 
       private
 
-      def apply_boost(node, boost)
-        return node if boost.nil?
-        validate_numeric!(boost, :boost)
-        Nodes::BoostCast.new(node, quoted_value(boost))
+      def apply_score_modifier(node, boost:, constant_score:)
+        if boost && constant_score
+          raise ArgumentError, "boost and constant_score are mutually exclusive"
+        end
+        if boost
+          validate_numeric!(boost, :boost)
+          return Nodes::BoostCast.new(node, quoted_value(boost))
+        end
+        if constant_score
+          validate_numeric!(constant_score, :constant_score)
+          return Nodes::ConstCast.new(node, quoted_value(constant_score))
+        end
+        node
       end
 
       def apply_slop(node, slop)
@@ -172,7 +192,7 @@ module ParadeDB
           if arel_table
             arel_table[column.to_sym]
           else
-            ::Arel::Nodes::SqlLiteral.new(::ActiveRecord::Base.connection.quote_column_name(column.to_s))
+            ::Arel.sql(column.to_s)
           end
         else
           raise ArgumentError, "Unsupported column type: #{column.class}"

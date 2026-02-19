@@ -1,0 +1,15 @@
+# frozen_string_literal: true
+
+class <%= migration_class_name %> < ActiveRecord::Migration[<%= ActiveRecord::Migration.current_version %>]
+<% if options[:concurrent] -%>
+  disable_ddl_transaction!
+
+<% end -%>
+  def up
+    create_paradedb_index(<%= class_name %>Index, if_not_exists: true)
+  end
+
+  def down
+    remove_bm25_index :<%= table_name %>, name: :<%= index_name %>, if_exists: true
+  end
+end

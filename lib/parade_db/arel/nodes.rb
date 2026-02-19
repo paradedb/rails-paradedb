@@ -24,6 +24,26 @@ module ParadeDB
         alias == eql?
       end
 
+      class ConstCast < ::Arel::Nodes::Node
+        attr_reader :expr, :score
+
+        def initialize(expr, score)
+          @expr = expr
+          @score = score
+        end
+
+        def hash
+          [self.class, expr, score].hash
+        end
+
+        def eql?(other)
+          self.class == other.class &&
+            expr == other.expr &&
+            score == other.score
+        end
+        alias == eql?
+      end
+
       class SlopCast < ::Arel::Nodes::Node
         attr_reader :expr, :distance
 

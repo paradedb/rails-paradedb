@@ -1,0 +1,6 @@
+source "https://rubygems.org"
+
+eval_gemfile "../../Gemfile"
+
+# Hybrid example only: used to demonstrate composing ParadeDB BM25 with pgvector search.
+gem "neighbor"

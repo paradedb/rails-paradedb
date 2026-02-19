@@ -177,5 +177,5 @@ if $PROGRAM_NAME == __FILE__
 
   HybridRrfSetup.setup!
 
-  puts "\nSetup complete! Run: BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/hybrid_rrf/hybrid_rrf.rb"
+  puts "\nSetup complete! Run: BUNDLE_GEMFILE=examples/hybrid_rrf/Gemfile bundle exec ruby examples/hybrid_rrf/hybrid_rrf.rb"
 end

@@ -60,12 +60,12 @@ RSpec.describe "IndexDslUnitTest" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :products
       self.key_field = :id
-      self.fields = [
-        :id,
-        { description: :simple },
-        { category: { literal: {} } },
-        { "metadata->>'title'" => { simple: { alias: "metadata_title" } } }
-      ]
+      self.fields = {
+        id: {},
+        description: { tokenizer: :simple },
+        category: { tokenizer: :literal },
+        "metadata->>'title'" => { tokenizer: :simple, alias: "metadata_title" }
+      }
     end
 
     compiled = klass.compiled_definition
@@ -79,7 +79,7 @@ RSpec.describe "IndexDslUnitTest" do
   it "requires key_field" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :products
-      self.fields = [:id]
+      self.fields = { id: {} }
     end
 
     assert_raises(ParadeDB::InvalidIndexDefinition) { klass.compiled_definition }
@@ -89,11 +89,15 @@ RSpec.describe "IndexDslUnitTest" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :products
       self.key_field = :id
-      self.fields = [
-        :id,
-        { description: :simple },
-        { description: :literal }
-      ]
+      self.fields = {
+        id: {},
+        description: {
+          tokenizers: [
+            { tokenizer: :simple },
+            { tokenizer: :literal }
+          ]
+        }
+      }
     end
 
     error = assert_raises(ParadeDB::InvalidIndexDefinition) { klass.compiled_definition }
@@ -105,10 +109,15 @@ RSpec.describe "IndexDslUnitTest" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :products
       self.key_field = :id
-      self.fields = [
-        :id,
-        { description: { simple: { alias: "description_simple" }, literal: { alias: "description_exact" } } }
-      ]
+      self.fields = {
+        id: {},
+        description: {
+          tokenizers: [
+            { tokenizer: :simple, alias: "description_simple" },
+            { tokenizer: :literal, alias: "description_exact" }
+          ]
+        }
+      }
     end
 
     compiled = klass.compiled_definition
@@ -122,10 +131,10 @@ RSpec.describe "IndexDslUnitTest" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :products
       self.key_field = :id
-      self.fields = [
-        :id,
-        { description: { ngram: { min: 2, max: 5 } } }
-      ]
+      self.fields = {
+        id: {},
+        description: { tokenizer: :ngram, named_args: { min: 2, max: 5 } }
+      }
     end
 
     sql = ActiveRecord::Base.connection.send(:build_create_sql, klass.compiled_definition, if_not_exists: false)
@@ -136,11 +145,11 @@ RSpec.describe "IndexDslUnitTest" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :products
       self.key_field = :id
-      self.fields = [
-        :id,
-        { description: { "pdb::xyz" => {} } },
-        { "metadata->>'title'" => { "pdb::abc(12, \"fafda\")" => {} } }
-      ]
+      self.fields = {
+        id: {},
+        description: { tokenizer: "pdb::xyz" },
+        "metadata->>'title'" => { tokenizer: "pdb::abc(12, \"fafda\")" }
+      }
     end
 
     sql = ActiveRecord::Base.connection.send(:build_create_sql, klass.compiled_definition, if_not_exists: false)

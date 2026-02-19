@@ -18,6 +18,12 @@ Each example folder uses a Rails-like layout:
 BUNDLE_GEMFILE=examples/Gemfile bundle install
 ```
 
+The hybrid RRF example has its own Gemfile (it uses pgvector via `neighbor`):
+
+```bash
+BUNDLE_GEMFILE=examples/hybrid_rrf/Gemfile bundle install
+```
+
 ### 2. Start ParadeDB
 
 ```bash
@@ -101,16 +107,16 @@ Structure:
 - `examples/more_like_this/setup.rb`
 - `examples/more_like_this/more_like_this.rb`
 
-### AI & Vectors
+### Advanced Recipes
 
 1. Hybrid Search with RRF (`hybrid_rrf/`)
 
-Combines BM25 + vector ranking with Reciprocal Rank Fusion in a single SQL query
-using CTEs, built from ParadeDB and neighbor ActiveRecord relations.
+Demonstrates Reciprocal Rank Fusion (RRF) by composing a ParadeDB BM25 relation
+with a semantic relation (via `neighbor`) using CTEs.
 
 ```bash
-BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/hybrid_rrf/setup.rb
-BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/hybrid_rrf/hybrid_rrf.rb
+BUNDLE_GEMFILE=examples/hybrid_rrf/Gemfile bundle exec ruby examples/hybrid_rrf/setup.rb
+BUNDLE_GEMFILE=examples/hybrid_rrf/Gemfile bundle exec ruby examples/hybrid_rrf/hybrid_rrf.rb
 ```
 
 Structure:

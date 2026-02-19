@@ -310,10 +310,27 @@ module ParadeDB
       fields_sql = extract_bm25_fields_sql(indexdef)
 
       if key_field && fields_sql
-        field_names = split_bm25_top_level(fields_sql).map { |f| f.strip }
-        fields_ruby = field_names.map { |f| bm25_field_to_ruby(f) }
+        field_sqls = split_bm25_top_level(fields_sql).map(&:strip)
+        parsed = field_sqls.map { |f| bm25_parse_column_entry(f) }
+
+        grouped = {}
+        parsed.each { |e| (grouped[e[:source]] ||= []) << e }
+
+        fields_pairs = grouped.map do |source, entries|
+          source_ruby = source.match?(/[^a-zA-Z0-9_]/) ? "#{source.inspect} =>" : "#{source}:"
+
+          if entries.all? { |e| e[:tokenizer].nil? }
+            "#{source_ruby} {}"
+          elsif entries.length == 1
+            "#{source_ruby} #{bm25_tokenizer_config_ruby(entries.first)}"
+          else
+            configs = entries.map { |e| bm25_tokenizer_config_ruby(e) }
+            "#{source_ruby} { tokenizers: [#{configs.join(', ')}] }"
+          end
+        end
+
         statement = "add_bm25_index #{table.to_sym.inspect}, " \
-          "fields: [#{fields_ruby.join(', ')}], " \
+          "fields: { #{fields_pairs.join(', ')} }, " \
           "key_field: #{key_field.to_sym.inspect}, " \
           "name: #{name.inspect}"
         unless index_options.empty?
@@ -403,33 +420,22 @@ module ParadeDB
       parts
     end
 
-    def bm25_field_to_ruby(field_sql)
+    def bm25_parse_column_entry(field_sql)
       stripped = field_sql.strip
 
       if stripped.start_with?("(") && stripped.end_with?(")")
         inner = stripped[1..-2].strip
 
-        if (source_sql, tokenizer_sql_str = split_tokenized_cast(inner))
-          normalized_source = unwrap_surrounding_groupings(source_sql)
-          source_ruby =
-            if identifier_sql?(normalized_source)
-              unquote_identifier(normalized_source).to_sym.inspect
-            else
-              normalized_source.inspect
-            end
-
-          tokenizer_spec_ruby = tokenizer_sql_to_ruby(tokenizer_sql_str)
-          "{ #{source_ruby} => #{tokenizer_spec_ruby} }"
+        if (source_sql, tok_sql = split_tokenized_cast(inner))
+          normalized = unwrap_surrounding_groupings(source_sql)
+          source_name = identifier_sql?(normalized) ? unquote_identifier(normalized) : normalized
+          bm25_parse_tokenizer(tok_sql).merge(source: source_name)
         else
-          inner.inspect
+          { source: inner, tokenizer: nil, options: {} }
         end
       else
-        if identifier_sql?(stripped)
-          name = unquote_identifier(stripped)
-          name.to_sym.inspect
-        else
-          stripped.inspect
-        end
+        source_name = identifier_sql?(stripped) ? unquote_identifier(stripped) : stripped
+        { source: source_name, tokenizer: nil, options: {} }
       end
     end
 
@@ -573,23 +579,32 @@ module ParadeDB
       sql.match?(/\A[a-zA-Z_][a-zA-Z0-9_]*\z/) || sql.match?(/\A"(?:[^"]|"")+"\z/)
     end
 
-    def tokenizer_sql_to_ruby(tokenizer_sql)
-      match = tokenizer_sql.strip.match(/\A([a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*)(?:\((.*)\))?\z/m)
-      return tokenizer_sql.inspect unless match
+    def bm25_parse_tokenizer(tokenizer_sql_str)
+      match = tokenizer_sql_str.strip.match(/\A([a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*)(?:\((.*)\))?\z/m)
+      return { tokenizer: tokenizer_sql_str, options: {} } unless match
 
-      tokenizer_name = match[1]
+      raw_name = match[1]
       args_sql = match[2]
-      tokenizer_name_ruby = tokenizer_name_to_ruby(tokenizer_name)
-      return tokenizer_name_ruby if args_sql.nil? || args_sql.strip.empty?
+
+      normalized_name =
+        if raw_name.match?(/\A[a-zA-Z_][a-zA-Z0-9_]*\z/)
+          raw_name
+        elsif raw_name.start_with?("pdb.") && raw_name[4..].match?(/\A[a-zA-Z_][a-zA-Z0-9_]*\z/)
+          raw_name[4..]
+        else
+          raw_name
+        end
+
+      return { tokenizer: normalized_name, options: {} } if args_sql.nil? || args_sql.strip.empty?
 
       parsed_args = parse_tokenizer_arguments(split_sql_arguments(args_sql))
-      return tokenizer_sql.inspect if parsed_args.nil?
+      return { tokenizer: normalized_name, options: {} } if parsed_args.nil?
 
       positional = parsed_args[:positional].dup
       named = parsed_args[:named].dup
       options = {}
 
-      if tokenizer_name.end_with?("ngram") &&
+      if normalized_name.end_with?("ngram") &&
          positional.length >= 2 &&
          positional[0].is_a?(Integer) &&
          positional[1].is_a?(Integer)
@@ -600,19 +615,27 @@ module ParadeDB
       options[:__positional] = positional unless positional.empty?
       named.each { |k, v| options[k.to_sym] = v }
 
-      return tokenizer_name_ruby if options.empty?
-
-      "{ #{tokenizer_name_ruby} => #{ruby_hash_literal(options)} }"
+      { tokenizer: normalized_name, options: options }
     end
 
-    def tokenizer_name_to_ruby(tokenizer_name)
-      if tokenizer_name.match?(/\A[a-zA-Z_][a-zA-Z0-9_]*\z/)
-        tokenizer_name.to_sym.inspect
-      elsif tokenizer_name.start_with?("pdb.") && tokenizer_name[4..].match?(/\A[a-zA-Z_][a-zA-Z0-9_]*\z/)
-        tokenizer_name[4..].to_sym.inspect
-      else
-        tokenizer_name.inspect
+    def bm25_tokenizer_config_ruby(entry)
+      opts = entry[:options].dup
+      alias_val = opts.delete(:alias)
+      min_val = opts.delete(:min)
+      max_val = opts.delete(:max)
+      opts.delete(:__positional)
+
+      parts = ["tokenizer: #{entry[:tokenizer].to_sym.inspect}"]
+      parts << "min: #{min_val.inspect}" if min_val
+      parts << "max: #{max_val.inspect}" if max_val
+      parts << "alias: #{alias_val.inspect}" if alias_val
+
+      unless opts.empty?
+        named_pairs = opts.map { |k, v| "#{k.inspect} => #{v.inspect}" }.join(", ")
+        parts << "named_args: { #{named_pairs} }"
       end
+
+      "{ #{parts.join(', ')} }"
     end
 
     def split_sql_arguments(args_sql)

@@ -6,7 +6,7 @@
 [![Slack URL](https://img.shields.io/badge/Join%20Slack-purple?logo=slack&link=https%3A%2F%2Fjoin.slack.com%2Ft%2Fparadedbcommunity%2Fshared_invite%2Fzt-32abtyjg4-yoYoi~RPh9MSW8tDbl0BQw)](https://join.slack.com/t/paradedbcommunity/shared_invite/zt-32abtyjg4-yoYoi~RPh9MSW8tDbl0BQw)
 [![X URL](https://img.shields.io/twitter/url?url=https%3A%2F%2Ftwitter.com%2Fparadedb&label=Follow%20%40paradedb)](https://x.com/paradedb)
 
-[ParadeDB](https://paradedb.com) — simple, Elastic-quality search for Postgres — integration for ActiveRecord.
+[ParadeDB](https://paradedb.com) — simple, Elastic-quality search for Postgres — **BM25 full-text** integration for ActiveRecord.
 
 For complete ParadeDB documentation, see [docs.paradedb.com](https://docs.paradedb.com/).
 
@@ -57,12 +57,17 @@ Check out some examples:
 - [Faceted Search](examples/faceted_search/faceted_search.rb)
 - [Autocomplete](examples/autocomplete/autocomplete.rb)
 - [More Like This](examples/more_like_this/more_like_this.rb)
-- [Hybrid Search (RRF)](examples/hybrid_rrf/hybrid_rrf.rb)
 - [RAG](examples/rag/rag.rb)
 
 ## BM25 Index
 
-Define an index class:
+Generate an index class and migration:
+
+```bash
+rails g parade_db:index Product description category rating
+```
+
+Or define one manually:
 
 ```ruby
 class ProductIndex < ParadeDB::Index
@@ -205,6 +210,17 @@ Product.search(:description).matching_all("running")
        .where(in_stock: true)
        .order(:id)
        .limit(10)
+```
+
+### Method Name Conflicts
+
+This gem defines a model class method named `.search`.
+If your application already defines `.search`, rails-paradedb will **not** override it.
+
+Use `.paradedb_search` instead:
+
+```ruby
+Product.paradedb_search(:description).matching_all("shoes")
 ```
 
 ## Arel Layer

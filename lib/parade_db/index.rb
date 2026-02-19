@@ -219,15 +219,11 @@ module ParadeDB
         end
 
         def build_entries(raw_fields)
-          if raw_fields.is_a?(Hash)
-            return build_entries_from_structured_fields(raw_fields)
-          end
-
-          unless raw_fields.respond_to?(:to_ary)
+          unless raw_fields.is_a?(Hash)
             raise InvalidIndexDefinition, "fields must be a Hash"
           end
 
-          build_entries_from_legacy_fields(raw_fields.to_ary)
+          build_entries_from_structured_fields(raw_fields)
         end
 
         def build_entries_from_structured_fields(raw_fields)
@@ -295,28 +291,6 @@ module ParadeDB
           end
 
           [entries, field_options]
-        end
-
-        def build_entries_from_legacy_fields(raw_fields)
-          entries = []
-          raw_fields.each do |entry|
-            case entry
-            when Symbol, String
-              field = entry.to_s
-              entries << Entry.new(source: field, expression: expression?(field), tokenizer: nil, options: {}, query_key: field)
-            when Hash
-              unless entry.size == 1
-                raise InvalidIndexDefinition, "field hash entries must have exactly one key"
-              end
-
-              source, tokenizer_spec = entry.first
-              source_name = source.to_s
-              entries.concat(TokenizerParser.parse(source_name, tokenizer_spec))
-            else
-              raise InvalidIndexDefinition, "unsupported field entry type: #{entry.class}"
-            end
-          end
-          [entries, {}]
         end
 
         def normalize_index_options(raw_options)

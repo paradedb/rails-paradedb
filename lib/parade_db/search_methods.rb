@@ -112,17 +112,17 @@ module ParadeDB
       extending(SearchMethods).tap { |rel| rel._paradedb_current_field = column }
     end
 
-    def matching_all(*terms, boost: nil)
+    def matching_all(*terms, boost: nil, constant_score: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      node = builder.match(_paradedb_current_field, *terms, boost: boost)
+      node = builder.match(_paradedb_current_field, *terms, boost: boost, constant_score: constant_score)
       where(grouped(node))
     end
 
-    def matching_any(*terms)
+    def matching_any(*terms, boost: nil, constant_score: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      node = builder.match_any(_paradedb_current_field, *terms)
+      node = builder.match_any(_paradedb_current_field, *terms, boost: boost, constant_score: constant_score)
       where(grouped(node))
     end
 
@@ -133,88 +133,87 @@ module ParadeDB
       where(grouped(neg.not))
     end
 
-    def phrase(text, slop: nil)
+    def phrase(text, slop: nil, boost: nil, constant_score: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      node = builder.phrase(_paradedb_current_field, text, slop: slop)
+      node = builder.phrase(_paradedb_current_field, text, slop: slop, boost: boost, constant_score: constant_score)
       where(grouped(node))
     end
 
-    def fuzzy(term, distance:, prefix: nil, boost: nil)
+    def fuzzy(term, distance:, prefix: nil, boost: nil, constant_score: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      node = builder.fuzzy(_paradedb_current_field, term, distance: distance, prefix: prefix, boost: boost)
+      node = builder.fuzzy(_paradedb_current_field, term, distance: distance, prefix: prefix, boost: boost, constant_score: constant_score)
       where(grouped(node))
     end
 
-    def regex(pattern)
+    def regex(pattern, boost: nil, constant_score: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      node = builder.regex(_paradedb_current_field, pattern)
+      node = builder.regex(_paradedb_current_field, pattern, boost: boost, constant_score: constant_score)
       where(grouped(node))
     end
 
-    def term(value, boost: nil)
+    def term(value, boost: nil, constant_score: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      node = builder.term(_paradedb_current_field, value, boost: boost)
+      node = builder.term(_paradedb_current_field, value, boost: boost, constant_score: constant_score)
       where(grouped(node))
     end
 
-    def term_set(*values)
+    def term_set(*values, boost: nil, constant_score: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      node = builder.term_set(_paradedb_current_field, *values)
+      node = builder.term_set(_paradedb_current_field, *values, boost: boost, constant_score: constant_score)
       where(grouped(node))
     end
 
-    def near(left_term, right_term, distance: 1)
+    def near(left_term, right_term, distance: 1, boost: nil, constant_score: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      node = builder.near(_paradedb_current_field, left_term, right_term, distance: distance)
+      node = builder.near(_paradedb_current_field, left_term, right_term, distance: distance, boost: boost, constant_score: constant_score)
       where(grouped(node))
     end
 
-    def phrase_prefix(*terms)
+    def phrase_prefix(*terms, boost: nil, constant_score: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      node = builder.phrase_prefix(_paradedb_current_field, *terms)
+      node = builder.phrase_prefix(_paradedb_current_field, *terms, boost: boost, constant_score: constant_score)
       where(grouped(node))
     end
 
     # Parse query-string syntax into ParadeDB query AST (e.g. "running AND shoes").
-    # Mirrors Django's Parse convenience helper using relation-style Ruby DSL.
-    def parse(query, lenient: nil)
+    def parse(query, lenient: nil, boost: nil, constant_score: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
-      node = builder.parse(_paradedb_current_field, query, lenient: lenient)
+      node = builder.parse(_paradedb_current_field, query, lenient: lenient, boost: boost, constant_score: constant_score)
       where(grouped(node))
     end
 
     # Match-all wrapper for APIs that need an explicit ParadeDB predicate.
     # Use with `.search(:id)` (or any indexed field): `Product.search(:id).match_all`.
-    def match_all
+    def match_all(boost: nil, constant_score: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      where(grouped(builder.match_all(_paradedb_current_field)))
+      where(grouped(builder.match_all(_paradedb_current_field, boost: boost, constant_score: constant_score)))
     end
 
     # Exists wrapper to match rows where the indexed field has a value.
     # Use with `.search(:id)` (or another exists-compatible indexed field).
-    def exists
+    def exists(boost: nil, constant_score: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      where(grouped(builder.exists(_paradedb_current_field)))
+      where(grouped(builder.exists(_paradedb_current_field, boost: boost, constant_score: constant_score)))
     end
 
     # Range wrapper for numeric/date/timestamp fields in ParadeDB query context.
     # Examples:
     #   Product.search(:rating).range(3..5)
     #   Product.search(:rating).range(gte: 3, lt: 5)
-    def range(value = nil, gte: nil, gt: nil, lte: nil, lt: nil, type: nil)
+    def range(value = nil, gte: nil, gt: nil, lte: nil, lt: nil, type: nil, boost: nil, constant_score: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
       inferred_type = type || default_range_type_for_field(_paradedb_current_field)
-      node = builder.range(_paradedb_current_field, value, gte: gte, gt: gt, lte: lte, lt: lt, type: inferred_type)
+      node = builder.range(_paradedb_current_field, value, gte: gte, gt: gt, lte: lte, lt: lt, type: inferred_type, boost: boost, constant_score: constant_score)
       where(grouped(node))
     end
 

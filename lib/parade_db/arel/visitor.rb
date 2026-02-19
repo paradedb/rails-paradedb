@@ -11,6 +11,13 @@ module ParadeDB
           collector << ")"
         end
 
+        def visit_ParadeDB_Arel_Nodes_ConstCast(o, collector)
+          collector = visit(o.expr, collector)
+          collector << "::pdb.const("
+          collector = visit(o.score, collector)
+          collector << ")"
+        end
+
         def visit_ParadeDB_Arel_Nodes_SlopCast(o, collector)
           collector = visit(o.expr, collector)
           collector << "::pdb.slop("
