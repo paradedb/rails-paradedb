@@ -106,6 +106,10 @@ RSpec.describe "UserApiIntegrationTest" do
     sql = Product.search(:description).term("shoes").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" === 'shoes')), sql
   end
+  it "term set" do
+    sql = Product.search(:category).term_set("audio", "footwear").to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."category" @@@ pdb.term_set(ARRAY['audio', 'footwear']))), sql
+  end
   it "near proximity" do
     sql = Product.search(:description).near("sleek", "shoes", distance: 1).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('sleek' ## 1 ## 'shoes'))), sql
@@ -121,6 +125,18 @@ RSpec.describe "UserApiIntegrationTest" do
   it "match all wrapper" do
     sql = Product.search(:id).match_all.to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.all())), sql
+  end
+  it "exists wrapper" do
+    sql = Product.search(:id).exists.to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.exists())), sql
+  end
+  it "range wrapper with Ruby range" do
+    sql = Product.search(:rating).range(3..5).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."rating" @@@ pdb.range(int8range(3, 5, '[]')))), sql
+  end
+  it "range wrapper with bound options" do
+    sql = Product.search(:rating).range(gte: 3, lt: 5).to_sql
+    assert_sql_equal %q{SELECT products.* FROM products WHERE ("products"."rating" @@@ pdb.range(int8range(3, 5, '[)')))}, sql
   end
   it "more like this" do
     sql = Product.more_like_this(3, fields: [:description]).to_sql
@@ -162,6 +178,32 @@ RSpec.describe "UserApiIntegrationTest" do
 
     expected = <<~SQL.strip
       SELECT products.*, pdb.snippet("products"."description", '<mark>', '</mark>', 100) AS description_snippet FROM products
+      WHERE ("products"."description" &&& 'running shoes')
+    SQL
+
+    assert_sql_equal expected, sql
+  end
+  it "with snippets custom options" do
+    sql = Product.search(:description)
+                 .matching_all("running shoes")
+                 .with_snippets(:description, max_chars: 15, limit: 1, offset: 0, sort_by: :position)
+                 .to_sql
+
+    expected = <<~SQL.strip
+      SELECT products.*, pdb.snippets("products"."description", max_num_chars => 15, "limit" => 1, "offset" => 0, sort_by => 'position') AS description_snippets FROM products
+      WHERE ("products"."description" &&& 'running shoes')
+    SQL
+
+    assert_sql_equal expected, sql
+  end
+  it "with snippet positions" do
+    sql = Product.search(:description)
+                 .matching_all("running shoes")
+                 .with_snippet_positions(:description)
+                 .to_sql
+
+    expected = <<~SQL.strip
+      SELECT products.*, pdb.snippet_positions("products"."description") AS description_snippet_positions FROM products
       WHERE ("products"."description" &&& 'running shoes')
     SQL
 

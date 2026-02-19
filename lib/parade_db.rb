@@ -3,6 +3,7 @@
 require_relative "parade_db/version"
 require_relative "parade_db/arel"
 require_relative "parade_db/index"
+require_relative "parade_db/aggregations"
 require_relative "parade_db/migration_helpers"
 require_relative "parade_db/model"
 require_relative "parade_db/search_methods"

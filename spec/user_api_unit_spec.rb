@@ -40,6 +40,10 @@ RSpec.describe "UserApiUnitTest" do
     sql = UnitProduct.search(:description).term("literal").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" === 'literal')), sql
   end
+  it "term set wrapper" do
+    sql = UnitProduct.search(:category).term_set("audio", "footwear").to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."category" @@@ pdb.term_set(ARRAY['audio', 'footwear']))), sql
+  end
   it "regex" do
     sql = UnitProduct.search(:description).regex("run.*").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.regex('run.*'))), sql
@@ -67,6 +71,18 @@ RSpec.describe "UserApiUnitTest" do
   it "match all wrapper" do
     sql = UnitProduct.search(:id).match_all.to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.all())), sql
+  end
+  it "exists wrapper" do
+    sql = UnitProduct.search(:id).exists.to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.exists())), sql
+  end
+  it "range wrapper with Ruby range" do
+    sql = UnitProduct.search(:rating).range(3..5).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."rating" @@@ pdb.range(int8range(3, 5, '[]')))), sql
+  end
+  it "range wrapper with bound options" do
+    sql = UnitProduct.search(:rating).range(gte: 3, lt: 5).to_sql
+    assert_sql_equal %q{SELECT products.* FROM products WHERE ("products"."rating" @@@ pdb.range(int8range(3, 5, '[)')))}, sql
   end
   it "more like this with id" do
     sql = UnitProduct.more_like_this(5, fields: [:description]).to_sql
@@ -126,6 +142,38 @@ RSpec.describe "UserApiUnitTest" do
   it "with snippet custom" do
     sql = UnitProduct.search(:description).matching_all("shoes").with_snippet(:description, start_tag: "<b>", end_tag: "</b>", max_chars: 50).to_sql
     assert_sql_equal %(SELECT products.*, pdb.snippet("products"."description", '<b>', '</b>', 50) AS description_snippet FROM products
+      WHERE ("products"."description" &&& 'shoes')), sql
+  end
+  it "with snippets default alias" do
+    sql = UnitProduct.search(:description).matching_all("shoes")
+                     .with_snippets(:description, max_chars: 30, limit: 1, offset: 0, sort_by: :position)
+                     .to_sql
+
+    assert_sql_equal %(SELECT products.*, pdb.snippets("products"."description", max_num_chars => 30, "limit" => 1, "offset" => 0, sort_by => 'position') AS description_snippets FROM products
+      WHERE ("products"."description" &&& 'shoes')), sql
+  end
+  it "with snippets custom alias" do
+    sql = UnitProduct.search(:description).matching_all("shoes")
+                     .with_snippets(:description, as: :all_snips)
+                     .to_sql
+
+    assert_sql_equal %(SELECT products.*, pdb.snippets("products"."description") AS all_snips FROM products
+      WHERE ("products"."description" &&& 'shoes')), sql
+  end
+  it "with snippet positions default alias" do
+    sql = UnitProduct.search(:description).matching_all("shoes")
+                     .with_snippet_positions(:description)
+                     .to_sql
+
+    assert_sql_equal %(SELECT products.*, pdb.snippet_positions("products"."description") AS description_snippet_positions FROM products
+      WHERE ("products"."description" &&& 'shoes')), sql
+  end
+  it "with snippet positions custom alias" do
+    sql = UnitProduct.search(:description).matching_all("shoes")
+                     .with_snippet_positions(:description, as: "positions")
+                     .to_sql
+
+    assert_sql_equal %(SELECT products.*, pdb.snippet_positions("products"."description") AS positions FROM products
       WHERE ("products"."description" &&& 'shoes')), sql
   end
   it "with score then with snippet keeps both projections" do
@@ -269,6 +317,42 @@ RSpec.describe "UserApiUnitTest" do
     refute_includes sql, %("field": "category")
     refute_includes sql, %("size": 20)
     refute_includes sql, %("missing":)
+  end
+  it "facets_agg builds one pdb.agg projection per named aggregation" do
+    facet_sql = UnitProduct.search(:description)
+                           .matching_all("shoes")
+                           .send(
+                             :build_aggregation_query,
+                             UnitProduct.search(:description)
+                                        .matching_all("shoes")
+                                        .send(
+                                          :normalize_named_aggregation_specs,
+                                          docs: ParadeDB::Aggregations.value_count(:id),
+                                          avg_rating: ParadeDB::Aggregations.avg(:rating)
+                                        )
+                           )
+                           .sql
+
+    assert_includes facet_sql, %(pdb.agg('{"value_count":{"field":"id"}}') AS docs_facet)
+    assert_includes facet_sql, %(pdb.agg('{"avg":{"field":"rating"}}') AS avg_rating_facet)
+  end
+  it "with_agg adds multiple window aggregates" do
+    sql = UnitProduct.search(:description)
+                     .matching_all("shoes")
+                     .with_agg(
+                       docs: ParadeDB::Aggregations.value_count(:id),
+                       avg_rating: ParadeDB::Aggregations.avg(:rating)
+                     )
+                     .to_sql
+
+    assert_includes sql, %(pdb.agg('{"value_count":{"field":"id"}}') OVER () AS _docs_facet)
+    assert_includes sql, %(pdb.agg('{"avg":{"field":"rating"}}') OVER () AS _avg_rating_facet)
+  end
+  it "model with_agg class helper delegates to relation api" do
+    sql = UnitProduct.with_agg(docs: ParadeDB::Aggregations.value_count(:id)).to_sql
+
+    assert_includes sql, %(pdb.agg('{"value_count":{"field":"id"}}') OVER () AS _docs_facet)
+    assert_includes sql, %("products"."id" @@@ pdb.all())
   end
   it "with facets load requires order and limit" do
     rel = UnitProduct.search(:description)

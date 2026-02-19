@@ -3,6 +3,59 @@
 require "spec_helper"
 
 RSpec.describe "IndexDslUnitTest" do
+  it "compiles structured hash fields with index_options" do
+    klass = Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.index_options = { target_segment_count: 17 }
+      self.fields = {
+        id: {},
+        description: {
+          tokenizers: [
+            { tokenizer: :literal },
+            { tokenizer: :simple, alias: "description_simple", filters: [:lowercase] }
+          ]
+        }
+      }
+    end
+
+    compiled = klass.compiled_definition
+    assert_equal({ target_segment_count: 17 }, compiled.index_options)
+    assert_equal 3, compiled.entries.length
+    assert_includes compiled.entries.map(&:query_key), "description_simple"
+  end
+
+  it "rejects mixing tokenizers with single tokenizer keys" do
+    klass = Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.fields = {
+        id: {},
+        description: {
+          tokenizers: [{ tokenizer: :literal }],
+          tokenizer: :simple
+        }
+      }
+    end
+
+    error = assert_raises(ParadeDB::InvalidIndexDefinition) { klass.compiled_definition }
+    assert_includes error.message, "cannot mix"
+  end
+
+  it "rejects tokenizer config without tokenizer key" do
+    klass = Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.fields = {
+        id: {},
+        description: { filters: [:lowercase] }
+      }
+    end
+
+    error = assert_raises(ParadeDB::InvalidIndexDefinition) { klass.compiled_definition }
+    assert_includes error.message, "no :tokenizer"
+  end
+
   it "compiles a valid index definition" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :products

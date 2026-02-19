@@ -161,6 +161,13 @@ module ParadeDB
       where(grouped(node))
     end
 
+    def term_set(*values)
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+
+      node = builder.term_set(_paradedb_current_field, *values)
+      where(grouped(node))
+    end
+
     def near(left_term, right_term, distance: 1)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
@@ -189,6 +196,26 @@ module ParadeDB
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
       where(grouped(builder.match_all(_paradedb_current_field)))
+    end
+
+    # Exists wrapper to match rows where the indexed field has a value.
+    # Use with `.search(:id)` (or another exists-compatible indexed field).
+    def exists
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+
+      where(grouped(builder.exists(_paradedb_current_field)))
+    end
+
+    # Range wrapper for numeric/date/timestamp fields in ParadeDB query context.
+    # Examples:
+    #   Product.search(:rating).range(3..5)
+    #   Product.search(:rating).range(gte: 3, lt: 5)
+    def range(value = nil, gte: nil, gt: nil, lte: nil, lt: nil, type: nil)
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+
+      inferred_type = type || default_range_type_for_field(_paradedb_current_field)
+      node = builder.range(_paradedb_current_field, value, gte: gte, gt: gt, lte: lte, lt: lt, type: inferred_type)
+      where(grouped(node))
     end
 
     def more_like_this(key, fields: nil, **options)
@@ -223,6 +250,34 @@ module ParadeDB
       with_projection(snippet.as("#{column}_snippet"))
     end
 
+    def with_snippets(
+      column,
+      start_tag: nil,
+      end_tag: nil,
+      max_chars: nil,
+      limit: nil,
+      offset: nil,
+      sort_by: nil,
+      as: nil
+    )
+      snippets = builder.snippets(
+        column,
+        start_tag: start_tag,
+        end_tag: end_tag,
+        max_num_chars: normalize_integer_option!(max_chars, "max_chars"),
+        limit: normalize_integer_option!(limit, "limit"),
+        offset: normalize_integer_option!(offset, "offset"),
+        sort_by: normalize_snippets_sort_by(sort_by)
+      )
+
+      with_projection(snippets.as(normalize_projection_alias(as, "#{column}_snippets")))
+    end
+
+    def with_snippet_positions(column, as: nil)
+      positions = builder.snippet_positions(column)
+      with_projection(positions.as(normalize_projection_alias(as, "#{column}_snippet_positions")))
+    end
+
     # ---- Facets ----
 
     def facets(*fields, size: 10, order: "-count", missing: nil, agg: nil)
@@ -234,6 +289,11 @@ module ParadeDB
         missing: missing,
         agg: agg
       ).execute
+    end
+
+    def facets_agg(**named_aggregations)
+      agg_specs = normalize_named_aggregation_specs(named_aggregations)
+      build_aggregation_query(agg_specs).execute
     end
 
     # Internal method to build facet query (for testing)
@@ -282,6 +342,24 @@ module ParadeDB
       rel.select(*facet_selects)
     end
 
+    def with_agg(**named_aggregations)
+      ensure_paradedb_runtime!
+      agg_specs = normalize_named_aggregation_specs(named_aggregations)
+      rel = extending(FacetRelation, AggregationRelation)
+      rel._paradedb_facet_fields = agg_specs.keys
+
+      unless rel.has_paradedb_predicate?
+        rel = rel.ensure_paradedb_predicate
+      end
+
+      facet_selects = agg_specs.map do |alias_name, json|
+        builder.agg(json).over.as("_#{alias_name}_facet")
+      end
+
+      rel = rel.select(klass.arel_table[::Arel.star]) if rel.select_values.empty?
+      rel.select(*facet_selects)
+    end
+
     def has_paradedb_predicate?
       PredicateInspector.relation_has_paradedb_predicate?(self)
     end
@@ -300,6 +378,24 @@ module ParadeDB
       return primary_key if key_field.nil? || key_field.to_s.empty?
 
       key_field
+    end
+
+    def default_range_type_for_field(field)
+      column = klass.columns_hash[field.to_s]
+      return nil unless column
+
+      case column.type
+      when :integer
+        "int8range"
+      when :float, :decimal
+        "numrange"
+      when :date
+        "daterange"
+      when :datetime, :timestamp, :time
+        "tsrange"
+      else
+        nil
+      end
     end
 
     def more_like_this_key_value(key, runtime_key_field)
@@ -381,6 +477,22 @@ module ParadeDB
       }
     end
 
+    def normalize_named_aggregation_specs(named_aggregations)
+      ParadeDB::Aggregations
+        .build_named_payload(named_aggregations)
+        .transform_values(&:to_json)
+    end
+
+    def build_aggregation_query(agg_specs)
+      AggregationQuery.build(
+        relation: self,
+        primary_key: paradedb_runtime_key_field,
+        builder: builder,
+        agg_specs: agg_specs,
+        connection: connection
+      )
+    end
+
     def normalize_facet_fields(fields, agg:)
       raw_fields = Array(fields)
       return [] unless agg.nil?
@@ -437,6 +549,32 @@ module ParadeDB
       end
 
       stopwords.reject(&:empty?)
+    end
+
+    def normalize_integer_option!(value, name)
+      return nil if value.nil?
+
+      Integer(value)
+    rescue ArgumentError, TypeError
+      raise ArgumentError, "#{name} must be an integer"
+    end
+
+    def normalize_snippets_sort_by(sort_by)
+      return nil if sort_by.nil?
+
+      value = sort_by.to_s
+      return value if %w[score position].include?(value)
+
+      raise ArgumentError, "sort_by must be one of: score, position"
+    end
+
+    def normalize_projection_alias(custom_alias, default_alias)
+      return default_alias if custom_alias.nil?
+
+      value = custom_alias.to_s
+      raise ArgumentError, "as cannot be blank" if value.strip.empty?
+
+      value
     end
 
     def facet_order(order)
@@ -555,6 +693,84 @@ module ParadeDB
       end
     end
 
+    class AggregationQuery
+      attr_reader :relation, :connection
+
+      def self.build(relation:, primary_key:, builder:, agg_specs:, connection:)
+        new(
+          relation: relation,
+          primary_key: primary_key,
+          builder: builder,
+          agg_specs: agg_specs,
+          connection: connection
+        )
+      end
+
+      def initialize(relation:, primary_key:, builder:, agg_specs:, connection:)
+        @connection = connection
+        @agg_specs = agg_specs
+        @relation = build_relation(
+          relation: relation,
+          primary_key: primary_key,
+          builder: builder,
+          agg_specs: agg_specs
+        )
+      end
+
+      def sql
+        relation.to_sql
+      end
+
+      def execute
+        row = connection.select_one(sql)
+        parse_aggregates(row)
+      end
+
+      private
+
+      attr_reader :agg_specs
+
+      def build_relation(relation:, primary_key:, builder:, agg_specs:)
+        predicate_scope = relation.except(:select, :order, :limit, :offset, :group, :having, :distinct)
+        predicate_scope = predicate_scope.select(relation.klass.arel_table[::Arel.star]) if predicate_scope.select_values.empty?
+
+        unless PredicateInspector.relation_has_paradedb_predicate?(predicate_scope)
+          predicate_scope = predicate_scope.where(::Arel::Nodes::Grouping.new(builder.match_all(primary_key)))
+        end
+
+        source_alias = "paradedb_agg_source"
+        source = predicate_scope.arel.as(source_alias)
+        projections = agg_specs.map { |alias_name, json| builder.agg(json).as("#{alias_name}_facet") }
+
+        relation.klass.unscoped.from(source).select(*projections)
+      end
+
+      def parse_aggregates(row)
+        return {} unless row
+
+        aggregates = {}
+        row.each do |key, value|
+          next unless key.end_with?("_facet")
+
+          name = key.delete_suffix("_facet")
+          parsed = parse_value(value)
+          aggregates[name] = parsed unless parsed.nil?
+        end
+        aggregates
+      end
+
+      def parse_value(value)
+        case value
+        when nil
+          nil
+        when String
+          JSON.parse(value)
+        else
+          value
+        end
+      end
+    end
+
     # Module to add .facets accessor to relations
     module FacetRelation
       attr_accessor :_paradedb_facet_fields
@@ -608,6 +824,12 @@ module ParadeDB
         else
           value
         end
+      end
+    end
+
+    module AggregationRelation
+      def aggregates
+        facets
       end
     end
   end

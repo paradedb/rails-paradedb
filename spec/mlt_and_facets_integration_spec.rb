@@ -71,6 +71,40 @@ RSpec.describe "MltAndFacetsIntegrationTest" do
     assert_includes facets, "agg"
     assert_operator facets["agg"]["value"].to_f, :>=, 1.0
   end
+  it "facets_agg helper returns named aggregations" do
+    rel = MltFacetProduct.search(:description).matching_all("running")
+    aggs = rel.facets_agg(
+      docs: ParadeDB::Aggregations.value_count(:id),
+      avg_rating: ParadeDB::Aggregations.avg(:rating),
+      rating_hist: ParadeDB::Aggregations.histogram(:rating, interval: 1)
+    )
+
+    assert_kind_of Hash, aggs
+    assert_includes aggs, "docs"
+    assert_includes aggs, "avg_rating"
+    assert_includes aggs, "rating_hist"
+  end
+  it "with_agg helper returns rows and named aggregations" do
+    rel = MltFacetProduct.search(:description)
+                        .matching_all("running")
+                        .with_agg(
+                          docs: ParadeDB::Aggregations.value_count(:id),
+                          by_rating: ParadeDB::Aggregations.range(
+                            :rating,
+                            ranges: [{ to: 3 }, { from: 3, to: 5 }, { from: 5 }]
+                          )
+                        )
+                        .order(:id)
+                        .limit(10)
+
+    rows = rel.to_a
+    refute_empty rows
+
+    aggs = rel.aggregates
+    assert_kind_of Hash, aggs
+    assert_includes aggs, "docs"
+    assert_includes aggs, "by_rating"
+  end
 
   private
 

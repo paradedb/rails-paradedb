@@ -44,22 +44,33 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
     assert_equal [1, 2], near_ids
     assert_equal [1, 2, 5], prefix_ids
   end
-  it "parse and match all wrappers execute" do
+  it "parse, match all, and exists wrappers execute" do
     parse_ids = BehaviorProduct.search(:description)
                                .parse("running AND shoes", lenient: true)
                                .order(:id)
                                .pluck(:id)
     all_ids = BehaviorProduct.search(:id).match_all.order(:id).limit(3).pluck(:id)
+    exists_ids = BehaviorProduct.search(:id).exists.order(:id).limit(3).pluck(:id)
 
     assert_equal [1, 2], parse_ids
     assert_equal [1, 2, 3], all_ids
+    assert_equal [1, 2, 3], exists_ids
+  end
+  it "range wrapper executes for numeric field" do
+    inclusive_ids = BehaviorProduct.search(:rating).range(4..5).order(:id).pluck(:id)
+    half_open_ids = BehaviorProduct.search(:rating).range(gte: 4, lt: 5).order(:id).pluck(:id)
+
+    assert_equal [1, 2, 3, 5], inclusive_ids
+    assert_equal [2, 5], half_open_ids
   end
   it "term regex and fuzzy execute" do
     term_ids = BehaviorProduct.search(:category).term("audio").order(:id).pluck(:id)
+    term_set_ids = BehaviorProduct.search(:category).term_set(%w[audio footwear]).order(:id).pluck(:id)
     regex_ids = BehaviorProduct.search(:description).regex("run.*").order(:id).pluck(:id)
     fuzzy_ids = BehaviorProduct.search(:description).fuzzy("shose", distance: 2).order(:id).pluck(:id)
 
     assert_equal [3, 4], term_ids
+    assert_equal [1, 2, 3, 4, 5], term_set_ids
     assert_equal [1, 2, 6], regex_ids
     assert_equal [1, 2], fuzzy_ids
   end
@@ -112,6 +123,44 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
     rows.each do |row|
       refute_nil row.search_score
       refute_nil row.description_snippet
+    end
+  end
+  it "with snippets materialize array column with rails-style options" do
+    rows = BehaviorProduct.search(:description)
+                          .matching_all("running")
+                          .with_snippets(
+                            :description,
+                            start_tag: "<em>",
+                            end_tag: "</em>",
+                            max_chars: 15,
+                            limit: 1,
+                            offset: 0,
+                            sort_by: :position
+                          )
+                          .order(:id)
+                          .limit(2)
+                          .to_a
+
+    refute_empty rows
+    rows.each do |row|
+      refute_nil row.description_snippets
+      assert_kind_of Array, row.description_snippets
+      refute_empty row.description_snippets
+    end
+  end
+  it "with snippet positions materialize offsets column" do
+    rows = BehaviorProduct.search(:description)
+                          .matching_all("running")
+                          .with_snippet_positions(:description)
+                          .order(:id)
+                          .limit(2)
+                          .to_a
+
+    refute_empty rows
+    rows.each do |row|
+      refute_nil row.description_snippet_positions
+      assert_kind_of Array, row.description_snippet_positions
+      refute_empty row.description_snippet_positions
     end
   end
   it "facets and with facets execute and parse results" do

@@ -68,14 +68,28 @@ Define an index class:
 class ProductIndex < ParadeDB::Index
   self.table_name = :products
   self.key_field = :id
-  self.fields = [
-    :id,
-    :description,
-    { category: { literal: { alias: "category" } } },
-    { "metadata->>'color'" => { literal: { alias: "metadata_color" } } }
-  ]
+  self.index_options = { target_segment_count: 17 }
+  self.fields = {
+    id: {},
+    description: {
+      tokenizers: [
+        { tokenizer: :literal },
+        { tokenizer: :simple, alias: "description_simple", filters: [:lowercase] }
+      ]
+    },
+    category: { tokenizer: :literal, alias: "category" },
+    "metadata->>'color'": { tokenizer: :literal, alias: "metadata_color" },
+    metadata: { fast: true, expand_dots: false }
+  }
 end
 ```
+
+Field config supports:
+
+- `tokenizer` for a single tokenizer entry.
+- `tokenizers` for multiple tokenizer entries on the same source field.
+- `args`, `named_args`, `filters`, `stemmer`, `alias` inside tokenizer entries.
+- field options such as `fast`, `record`, `normalizer`, `expand_dots`.
 
 Create/remove it in a migration:
 
@@ -95,446 +109,107 @@ Available migration helpers:
 
 - `create_paradedb_index(index_class_or_name, if_not_exists: false)`
 - `replace_paradedb_index(index_class_or_name)`
-- `add_bm25_index(table, fields:, key_field:, name: nil, if_not_exists: false)`
+- `add_bm25_index(table, fields:, key_field:, name: nil, index_options: nil, if_not_exists: false)`
 - `remove_bm25_index(table, name: nil, if_exists: false)`
 - `reindex_bm25(table, name: nil, concurrently: false)`
 
+### Index Validation Mode
+
+Runtime index drift validation is controlled by `ParadeDB.index_validation_mode`.
+Default is `:off` (no runtime drift checks).
+
+```ruby
+ParadeDB.index_validation_mode = :warn  # log drift warnings
+ParadeDB.index_validation_mode = :raise # raise ParadeDB::IndexDriftError on drift
+ParadeDB.index_validation_mode = :off   # disable drift checks (default)
+```
+
 ## Query Types
 
-For a full list of supported query types and advanced options, please refer to the [ParadeDB Query Builder Documentation](https://docs.paradedb.com/documentation/query-builder/overview).
-
-### Basic Search
-
-Simple full-text search with `&&&` (AND) operator:
+For advanced options, see [ParadeDB Query Builder Documentation](https://docs.paradedb.com/documentation/query-builder/overview) and the runnable scripts in [`examples/`](examples).
 
 ```ruby
-# Single term
-Product.search(:description).matching_all("shoes")
-
-# Multiple terms (AND)
-Product.search(:description).matching_all("running", "shoes")
-```
-
-### OR Search
-
-Match any of the provided terms:
-
-```ruby
-# Match ANY term (OR)
-Product.search(:description).matching_any("wireless", "bluetooth")
-```
-
-### Phrase Search
-
-Match exact phrases with optional slop (word distance):
-
-```ruby
-# Exact phrase
-Product.search(:description).phrase("running shoes")
-
-# Phrase with slop (allow up to 2 words between)
-Product.search(:description).phrase("running shoes", slop: 2)
-```
-
-### Fuzzy Search
-
-Match terms with typo tolerance (Levenshtein distance):
-
-```ruby
-# Fuzzy match with distance 1
-Product.search(:description).fuzzy("shoez", distance: 1)
-
-# Fuzzy match with distance 2, prefix matching, and boost
-Product.search(:description).fuzzy("runing", distance: 2, prefix: true, boost: 1.5)
-```
-
-### Term Query
-
-Match exact tokens without tokenization:
-
-```ruby
-Product.search(:category).term("electronics")
-
-# With boost
-Product.search(:category).term("electronics", boost: 2.0)
-```
-
-### When to use `term` vs `matching_all`
-
-- **`matching_all`** / **`matching_any`**: Standard full-text search. The query string is tokenized and matched against indexed tokens. Use for natural language queries like `"running shoes"`.
-
-- **`term`**: Exact token match without further tokenization. The query is treated as a finalized token. Use when you need precise control, such as matching a specific category value or status field.
-
-```ruby
-# Full-text search - tokenizes "running shoes" into ["running", "shoes"]
+# Full-text
 Product.search(:description).matching_all("running shoes")
-
-# Exact term - matches the literal token "active" (case-sensitive to indexed form)
-Product.search(:status).term("active")
-```
-
-### Regex Query
-
-Match terms using a regular expression:
-
-```ruby
+Product.search(:description).matching_any("wireless", "bluetooth")
+Product.search(:description).phrase("running shoes", slop: 2)
+Product.search(:description).fuzzy("runing", distance: 2, prefix: true, boost: 1.5)
 Product.search(:description).regex("run.*")
-```
-
-### Match All
-
-Return all documents (useful with facets):
-
-```ruby
-Product.search(:id).match_all
-```
-
-### More Like This
-
-Find similar documents based on term frequency analysis:
-
-```ruby
-# Similar to a specific document by ID
-Product.more_like_this(42, fields: [:description])
-
-# Similar to a custom document (JSON string)
-Product.more_like_this('{"description": "comfortable running shoes"}')
-
-# Advanced MLT options
-Product.more_like_this(
-  42,
-  fields: [:description],
-  min_term_freq: 2,
-  max_query_terms: 10,
-  min_doc_freq: 1,
-  max_term_freq: 100,
-  max_doc_freq: 1000,
-  min_word_length: 3,
-  max_word_length: 15,
-  stopwords: %w[the a]
-)
-```
-
-**Combining with other filters:**
-
-```ruby
-# Combine with standard filters
-Product.more_like_this(42, fields: [:description])
-       .where(in_stock: true)
-       .where("rating >= ?", 4)
-
-# Chain with other querysets
-Product.more_like_this(42, fields: [:description])
-       .where.not(id: 42)  # Exclude the source document itself
-       .order(rating: :desc)
-       .limit(10)
-```
-
-### Excluding Terms
-
-Exclude documents matching specific terms:
-
-```ruby
-Product.search(:description).matching_all("shoes").excluding("cheap", "budget")
-```
-
-### Proximity Search
-
-Find terms within a specified word distance:
-
-```ruby
-Product.search(:description).near("running", "shoes", distance: 3)
-```
-
-### Phrase Prefix (Autocomplete)
-
-Match terms as prefixes for autocomplete functionality:
-
-```ruby
-Product.search(:description).phrase_prefix("run", "sh")
-```
-
-### Parse Query
-
-Use ParadeDB's query string syntax:
-
-```ruby
 Product.search(:description).parse("running AND shoes", lenient: true)
+
+# Exact token matching
+Product.search(:category).term("electronics", boost: 2.0)
+Product.search(:category).term_set("electronics", "audio")
+
+# Other predicates
+Product.search(:description).excluding("cheap", "budget")
+Product.search(:description).near("running", "shoes", distance: 3)
+Product.search(:description).phrase_prefix("run", "sh")
+Product.search(:id).match_all
+Product.search(:id).exists
+Product.search(:rating).range(gte: 3, lt: 5)
+
+# Similarity
+Product.more_like_this(42, fields: [:description])
 ```
 
 ## Annotations
 
-### BM25 Score
-
-Get the relevance score for each result. For more information on how scores are calculated, see [BM25 Scoring](https://docs.paradedb.com/documentation/sorting/score).
+See [BM25 Scoring](https://docs.paradedb.com/documentation/sorting/score) and [Highlighting](https://docs.paradedb.com/documentation/full-text/highlight) for full function details.
 
 ```ruby
-Product.search(:description).matching_all("shoes")
-       .with_score
-       .order(search_score: :desc)
-
-# Access the score on results
-results.each { |product| puts product.search_score }
-```
-
-### Snippet
-
-Get highlighted text snippets. For more details on snippet configuration, see [Highlighting](https://docs.paradedb.com/documentation/full-text/highlight).
-
-```ruby
-Product.search(:description).matching_all("shoes")
-       .with_snippet(:description, start_tag: "<b>", end_tag: "</b>")
-
-# Access the snippet on results
-results.each { |product| puts product.description_snippet }
-```
-
-Snippet options:
-
-| Option       | Description                    |
-|--------------|--------------------------------|
-| `start_tag`  | Opening highlight tag          |
-| `end_tag`    | Closing highlight tag          |
-| `max_chars`  | Maximum snippet length         |
-
-### Combining Score and Snippet
-
-```ruby
-Product.search(:description).matching_all("running", "shoes")
-       .with_score
-       .with_snippet(:description, start_tag: "<mark>", end_tag: "</mark>")
-       .order(search_score: :desc)
+Product.search(:description).matching_all("shoes").with_score
+Product.search(:description).matching_all("shoes").with_snippet(:description, start_tag: "<b>", end_tag: "</b>", max_chars: 80)
+Product.search(:description).matching_all("running").with_snippets(:description, max_chars: 15, limit: 2, offset: 0, sort_by: :position)
+Product.search(:description).matching_all("running").with_snippet_positions(:description)
 ```
 
 ## Faceted Search
 
-For a full list of supported aggregations and advanced options, please refer to the [ParadeDB Aggregations Documentation](https://docs.paradedb.com/documentation/aggregates/overview).
+For supported aggregate functions and JSON shapes, see [ParadeDB Aggregations Documentation](https://docs.paradedb.com/documentation/aggregates/overview).
 
-### Requirements
+`with_facets(...)` requires:
 
-The `.with_facets()` method has specific requirements:
-
-**When getting rows + facets:**
-
-- **MUST** have a ParadeDB search filter
-- **MUST** call `.order()` on the relation
-- **MUST** call `.limit()` on the relation
-
-**When getting facets only (`.facets()`):**
-
-- **MUST** have a ParadeDB search filter
-- No ordering or limit required
-
-**Why these requirements?**
-
-ParadeDB's aggregation uses window functions (`pdb.agg() OVER ()`) which require ordered, limited result sets when combined with row data. Without ordering and limits, PostgreSQL cannot efficiently compute the aggregations.
-
-### Basic Usage
-
-Get aggregated counts alongside results:
+- an existing ParadeDB predicate
+- `.order(...)`
+- `.limit(...)`
 
 ```ruby
-# Correct: Has filter, ordering, and limit
+# Rows + facets
 relation = Product.search(:description).matching_all("shoes")
-                  .with_facets(:category)
+                  .with_facets(:category, size: 10)
                   .order(:id)
                   .limit(10)
-
-rows = relation.to_a           # Product records
-facets = relation.facets       # Facet buckets hash
-# facets = {"category" => {"buckets" => [{"key" => "footwear", "doc_count" => 5}, ...]}}
-```
-
-```ruby
-# This will raise ParadeDB::FacetQueryError
-relation = Product.search(:description).matching_all("shoes")
-                  .with_facets(:category)  # Missing order() and limit()!
-```
-
-### Facets Only (No Rows)
-
-```ruby
-# No ordering/limit needed when only fetching facets
-facets = Product.search(:description).matching_all("shoes")
-                .facets(:category)
-```
-
-### Multiple Facet Fields
-
-```ruby
-relation = Product.search(:description).matching_all("shoes")
-                  .with_facets(:category, :rating)
-                  .order(:id)
-                  .limit(10)
-
-facets = relation.facets
-# facets = {"category" => {...}, "rating" => {...}}
-```
-
-### Facet Options
-
-```ruby
-relation = Product.search(:description).matching_all("shoes")
-                  .with_facets(
-                    :category,
-                    size: 20,           # Number of buckets (default: 10)
-                    order: "-count",    # Sort order: count, -count, key, -key
-                    missing: "Unknown"  # Value for documents without the field
-                  )
-                  .order(:rating)
-                  .limit(20)
-```
-
-### Custom Aggregation JSON
-
-```ruby
-facets = Product.search(:description).matching_all("shoes")
-                .facets(agg: { "value_count" => { "field" => "id" } })
-
-# Works with rows too
-relation = Product.search(:description).matching_all("shoes")
-                  .with_facets(agg: { "value_count" => { "field" => "id" } })
-                  .order(:id)
-                  .limit(10)
-
-# When agg: is present, field/size/order/missing are ignored for payload generation.
-```
-
-### Combining with Other ActiveRecord Methods
-
-```ruby
-# Filter, annotate, order, limit, then facet
-relation = Product.search(:description).matching_all("running", "shoes")
-                  .where("price < ?", 100)
-                  .with_score
-                  .with_facets(:category, :brand)
-                  .order(search_score: :desc)
-                  .limit(20)
-
 rows = relation.to_a
 facets = relation.facets
 
-# Works with includes
-relation = Product.search(:description).matching_all("shoes")
-                  .includes(:reviews)
-                  .with_facets(:category)
-                  .order(:id)
-                  .limit(10)
-```
+# Facets only
+facets_only = Product.search(:description).matching_all("shoes")
+                     .facets(:category)
 
-### Common Errors and Solutions
-
-#### Error: "ParadeDB::FacetQueryError - with_facets requires order() and limit()"
-
-```ruby
-# Missing ordering
-Product.search(:description).matching_all("shoes")
-       .with_facets(:category)
-       .limit(10)  # Missing order()!
-
-# Missing limit
-Product.search(:description).matching_all("shoes")
-       .with_facets(:category)
-       .order(:id)  # Missing limit()!
-
-# Both ordering and limit
-Product.search(:description).matching_all("shoes")
-       .with_facets(:category)
-       .order(:id)
-       .limit(10)
-
-# Or use facets() for facets only
-Product.search(:description).matching_all("shoes")
-       .facets(:category)
+# Named aggregation helpers
+aggs = Product.search(:description).matching_all("shoes")
+              .facets_agg(
+                docs: ParadeDB::Aggregations.value_count(:id),
+                avg_rating: ParadeDB::Aggregations.avg(:rating)
+              )
 ```
 
 ## ActiveRecord Integration
 
-Works seamlessly with ActiveRecord's query interface:
+ParadeDB scopes compose with regular ActiveRecord chaining:
 
 ```ruby
-
-# Multiple search fields (AND composition)
 Product.search(:description).matching_all("running")
-       .search(:category).phrase("Footwear")
-
-# OR composition across fields
-left = Product.search(:description).matching_all("shoes")
-right = Product.search(:category).matching_all("footwear")
-left.or(right)
-
-# Preload associations
-Product.search(:description).matching_all("shoes")
-       .preload(:reviews)
-
-# Chain with standard filters
-Product.search(:description).matching_all("shoes")
+       .search(:category).term("footwear")
        .where(in_stock: true)
-       .where("rating >= ?", 4)
-
-# Chain with exclusions
-Product.search(:description).matching_all("shoes")
-       .where.not(category: "clearance")
+       .order(:id)
+       .limit(10)
 ```
 
 ## Arel Layer
 
-The user API is built on top of a dedicated Arel layer that provides an AST and SQL renderer for ParadeDB operators. This is useful for building complex queries in case the ActiveRecord syntax is not enough. All of the ActiveRecord syntax is available in the Arel layer as well.
-
-### Quickstart
-
-```ruby
-require "parade_db/arel"
-
-arel = ParadeDB::Arel::Builder.new(:products)
-
-predicate = arel.match(:description, "running", "shoes")
-               .and(arel.regex(:description, "run.*"))
-               .and(arel.term(:in_stock, true))
-
-sql = ParadeDB::Arel.to_sql(predicate, Product.connection)
-# => ("products"."description" &&& 'running shoes' AND "products"."description" @@@ pdb.regex('run.*') AND "products"."in_stock" === TRUE)
-
-Product.where(Arel.sql(sql))
-```
-
-Render any node with `ParadeDB::Arel.to_sql(node)`. All nodes respond to `.and`, `.or`, and `.not`.
-
-### Builder Methods
-
-| Method | ParadeDB SQL |
-|--------|--------------|
-| `match(column, *terms, boost: nil)` | `column &&& 'a b'::pdb.boost(N)` |
-| `match_any(column, *terms)` | `column \|\|\| 'a b'` |
-| `phrase(column, text, slop: n)` | `column ### 'text'::pdb.slop(n)` |
-| `term(column, term, boost: nil)` | `column === 'term'::pdb.boost(N)` |
-| `fuzzy(column, term, distance:, prefix:, boost:)` | `column === 'term'::pdb.fuzzy(d[, "true"])::pdb.boost(N)` |
-| `regex(column, pattern)` | `column @@@ pdb.regex('pattern')` |
-| `near(column, a, b, distance:)` | `column @@@ ('a' ## d ## 'b')` |
-| `phrase_prefix(column, *terms)` | `column @@@ pdb.phrase_prefix(ARRAY['a','b'])` |
-| `full_text(column, expr)` | `column @@@ expr` (raw right-hand value) |
-| `more_like_this(column, key, fields: [:f1, :f2])` | `column @@@ pdb.more_like_this(key, ARRAY['f1','f2'])` |
-| `score(key_field)` | `pdb.score(key_field)` |
-| `snippet(column, start, finish, max)` | `pdb.snippet(column, start, finish, max)` |
-| `agg(json)` | `pdb.agg(json)` |
-
-`Builder#[]` returns a column node for manual composition: `arel[:description]`.
-
-### Composition
-
-Boolean composition uses the standard helpers:
-
-```ruby
-fast = arel.match(:description, "running").and(arel.term(:rating, 4))
-cheap = arel.match(:description, "budget")
-predicate = fast.or(cheap.not)
-```
-
-`predicate` renders to:
-
-```sql
-(("products"."description" &&& 'running' AND "products"."rating" === 4) OR NOT ("products"."description" &&& 'budget'))
-```
+See the dedicated Arel guide: [`lib/parade_db/arel/README.md`](lib/parade_db/arel/README.md).
 
 ## Security
 
@@ -573,8 +248,6 @@ Product.search(:description).matching_all(user_query)
 ## Contributing
 
 Contribution and local development workflow live in [`CONTRIBUTING.md`](CONTRIBUTING.md).
-
-Release process and policy live in [`RELEASE.md`](RELEASE.md).
 
 ## Support
 

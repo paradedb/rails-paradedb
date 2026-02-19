@@ -3,7 +3,7 @@
 module ParadeDB
   class Index
     class << self
-      attr_writer :table_name, :key_field, :index_name, :fields
+      attr_writer :table_name, :key_field, :index_name, :fields, :index_options
 
       def table_name
         @table_name
@@ -18,7 +18,11 @@ module ParadeDB
       end
 
       def fields
-        @fields || []
+        @fields || {}
+      end
+
+      def index_options
+        @index_options || {}
       end
 
       def default_index_name
@@ -38,7 +42,8 @@ module ParadeDB
     end
 
     class TokenizerParser
-      TOKENIZER_EXPRESSION = /\A[a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\s*[a-zA-Z0-9_'".,\s]*\s*\))?\z/.freeze
+      TOKENIZER_EXPRESSION = /\A[a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\s*[a-zA-Z0-9_'".,=\s:-]*\s*\))?\z/.freeze
+      TOKENIZER_SINGLE_KEYS = %i[tokenizer args named_args filters stemmer alias].freeze
 
       class << self
         def parse(source_name, tokenizer_spec)
@@ -64,6 +69,61 @@ module ParadeDB
         end
 
         private
+
+        def parse_structured_tokenizer_config(source_name, config, context:)
+          unless config.is_a?(Hash)
+            raise InvalidIndexDefinition, "#{context} for #{source_name.inspect} must be a Hash"
+          end
+
+          tokenizer = config[:tokenizer] || config["tokenizer"]
+          if tokenizer.nil?
+            raise InvalidIndexDefinition, "#{context} for #{source_name.inspect} requires :tokenizer"
+          end
+
+          tokenizer_name = tokenizer.to_s
+          validate_tokenizer_name!(source_name, tokenizer_name)
+
+          args = config[:args] || config["args"]
+          named_args = config[:named_args] || config["named_args"]
+          filters = config[:filters] || config["filters"]
+          stemmer = config[:stemmer] || config["stemmer"]
+          alias_name = config[:alias] || config["alias"]
+
+          options = {}
+          if args
+            unless args.respond_to?(:to_ary)
+              raise InvalidIndexDefinition, "args for #{source_name.inspect} must be an Array"
+            end
+            options[:__positional] = args.to_ary
+          end
+
+          if named_args
+            unless named_args.is_a?(Hash)
+              raise InvalidIndexDefinition, "named_args for #{source_name.inspect} must be a Hash"
+            end
+            named_args.each { |key, value| options[key.to_sym] = value }
+          end
+
+          if filters
+            unless filters.respond_to?(:to_ary)
+              raise InvalidIndexDefinition, "filters for #{source_name.inspect} must be an Array"
+            end
+            filters.to_ary.each do |name|
+              filter_key = name.to_s
+              if filter_key == "stemmer" && stemmer
+                options[:stemmer] = stemmer
+              else
+                key = filter_key.to_sym
+                options[key] = true unless options.key?(key)
+              end
+            end
+          end
+
+          options[:stemmer] = stemmer if stemmer && !options.key?(:stemmer)
+          options[:alias] = alias_name.to_s if alias_name
+
+          build_tokenized_entry(source_name, tokenizer_name, options)
+        end
 
         def normalize_options(opts)
           opts.each_with_object({}) do |(key, value), memo|
@@ -92,7 +152,7 @@ module ParadeDB
 
           raise InvalidIndexDefinition,
                 "invalid tokenizer name #{tokenizer.inspect} for #{source_name}. " \
-                "Expected identifier form like simple, pdb::simple, or pdb::ngram(2, 5)."
+                "Expected identifier form like simple, pdb::simple, or pdb::ngram(2, 5, alias=field_alias)."
         end
 
         def expression?(value)
@@ -103,14 +163,18 @@ module ParadeDB
 
     # Consumed by migration helpers; validates and normalizes the DSL class
     class DefinitionCompiler
-      class Compiled
-        attr_reader :table_name, :key_field, :index_name, :entries
+      FIELD_OPTION_KEYS = %i[fast record normalizer expand_dots].freeze
 
-        def initialize(table_name:, key_field:, index_name:, entries:)
+      class Compiled
+        attr_reader :table_name, :key_field, :index_name, :entries, :index_options, :field_options
+
+        def initialize(table_name:, key_field:, index_name:, entries:, index_options:, field_options:)
           @table_name = table_name
           @key_field = key_field
           @index_name = index_name
           @entries = entries
+          @index_options = index_options
+          @field_options = field_options
         end
       end
       Entry = Struct.new(:source, :expression, :tokenizer, :options, :query_key, keyword_init: true)
@@ -123,14 +187,12 @@ module ParadeDB
           raise InvalidIndexDefinition, "index_name must be present" if index_name.strip.empty?
 
           raw_fields = klass.fields
-          unless raw_fields.respond_to?(:to_ary)
-            raise InvalidIndexDefinition, "fields must be an Array"
-          end
-
-          entries = build_entries(raw_fields.to_ary)
+          entries, field_options = build_entries(raw_fields)
           if entries.empty?
             raise InvalidIndexDefinition, "fields must include at least one indexed field"
           end
+
+          index_options = normalize_index_options(klass.index_options)
 
           validate_key_field_shape!(key_field.to_s, entries)
           validate_query_key_collisions!(entries)
@@ -139,7 +201,9 @@ module ParadeDB
             table_name: table_name,
             key_field: key_field,
             index_name: index_name,
-            entries: entries
+            entries: entries,
+            index_options: index_options,
+            field_options: field_options
           )
         end
 
@@ -155,6 +219,85 @@ module ParadeDB
         end
 
         def build_entries(raw_fields)
+          if raw_fields.is_a?(Hash)
+            return build_entries_from_structured_fields(raw_fields)
+          end
+
+          unless raw_fields.respond_to?(:to_ary)
+            raise InvalidIndexDefinition, "fields must be a Hash"
+          end
+
+          build_entries_from_legacy_fields(raw_fields.to_ary)
+        end
+
+        def build_entries_from_structured_fields(raw_fields)
+          entries = []
+          field_options = {}
+
+          raw_fields.each do |source, config|
+            source_name = source.to_s
+            unless config.nil? || config.is_a?(Hash)
+              raise InvalidIndexDefinition, "field config for #{source_name.inspect} must be a Hash"
+            end
+            normalized = (config || {}).each_with_object({}) { |(k, v), memo| memo[k.to_sym] = v }
+
+            unknown_keys = normalized.keys - (TokenizerParser::TOKENIZER_SINGLE_KEYS + [:tokenizers] + FIELD_OPTION_KEYS)
+            unless unknown_keys.empty?
+              raise InvalidIndexDefinition,
+                    "unknown field config keys for #{source_name.inspect}: #{unknown_keys.map(&:inspect).join(', ')}"
+            end
+
+            tokenizers = normalized[:tokenizers]
+            single_tokenizer_keys_present = TokenizerParser::TOKENIZER_SINGLE_KEYS.any? { |key| normalized.key?(key) }
+
+            if tokenizers
+              if single_tokenizer_keys_present
+                raise InvalidIndexDefinition,
+                      "field #{source_name.inspect} cannot mix :tokenizers with :tokenizer/:args/:named_args/:filters/:stemmer/:alias"
+              end
+              unless tokenizers.respond_to?(:to_ary) && !tokenizers.to_ary.empty?
+                raise InvalidIndexDefinition, "field #{source_name.inspect} :tokenizers must be a non-empty Array"
+              end
+
+              tokenizers.to_ary.each_with_index do |tokenizer_config, idx|
+                entry = TokenizerParser.send(
+                  :parse_structured_tokenizer_config,
+                  source_name,
+                  tokenizer_config,
+                  context: "tokenizers[#{idx}]"
+                )
+                entries << entry
+              end
+            elsif single_tokenizer_keys_present
+              unless normalized[:tokenizer]
+                raise InvalidIndexDefinition,
+                      "field #{source_name.inspect} specifies tokenizer configuration but no :tokenizer"
+              end
+              entry = TokenizerParser.send(
+                :parse_structured_tokenizer_config,
+                source_name,
+                select_keys(normalized, TokenizerParser::TOKENIZER_SINGLE_KEYS),
+                context: "tokenizer config"
+              )
+              entries << entry
+            else
+              entries << Entry.new(
+                source: source_name,
+                expression: expression?(source_name),
+                tokenizer: nil,
+                options: {},
+                query_key: source_name
+              )
+            end
+
+            field_opts = select_keys(normalized, FIELD_OPTION_KEYS)
+            field_options[source_name] = field_opts unless field_opts.empty?
+          end
+
+          [entries, field_options]
+        end
+
+        def build_entries_from_legacy_fields(raw_fields)
           entries = []
           raw_fields.each do |entry|
             case entry
@@ -173,7 +316,39 @@ module ParadeDB
               raise InvalidIndexDefinition, "unsupported field entry type: #{entry.class}"
             end
           end
-          entries
+          [entries, {}]
+        end
+
+        def normalize_index_options(raw_options)
+          return {} if raw_options.nil?
+          unless raw_options.is_a?(Hash)
+            raise InvalidIndexDefinition, "index_options must be a Hash"
+          end
+
+          normalized = raw_options.each_with_object({}) do |(key, value), memo|
+            memo[key.to_sym] = value
+          end
+
+          unknown = normalized.keys - [:target_segment_count]
+          unless unknown.empty?
+            raise InvalidIndexDefinition,
+                  "unknown index_options keys: #{unknown.map(&:inspect).join(', ')}"
+          end
+
+          if normalized.key?(:target_segment_count)
+            target = normalized[:target_segment_count]
+            unless target.is_a?(Integer) && target.positive?
+              raise InvalidIndexDefinition, "index_options[:target_segment_count] must be an Integer > 0"
+            end
+          end
+
+          normalized
+        end
+
+        def select_keys(hash, keys)
+          keys.each_with_object({}) do |key, memo|
+            memo[key] = hash[key] if hash.key?(key)
+          end
         end
 
         def expression?(value)
