@@ -19,6 +19,20 @@ require_relative "model"
 module MoreLikeThisSetup
   module_function
 
+  def drop_bm25_indexes!(conn, table_name)
+    indexes = conn.select_values(<<~SQL)
+      SELECT indexname
+      FROM pg_indexes
+      WHERE schemaname = 'public'
+        AND tablename = #{conn.quote(table_name.to_s)}
+        AND indexdef LIKE '%USING bm25%'
+    SQL
+
+    indexes.each do |index_name|
+      conn.execute("DROP INDEX IF EXISTS #{conn.quote_table_name(index_name)}")
+    end
+  end
+
   def database_url
     return ENV["DATABASE_URL"] if ENV["DATABASE_URL"]
 
@@ -46,7 +60,7 @@ module MoreLikeThisSetup
     conn.execute(
       "CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');"
     )
-    conn.remove_bm25_index(:mock_items, if_exists: true)
+    drop_bm25_indexes!(conn, :mock_items)
     conn.create_paradedb_index(MockItemIndex, if_not_exists: true)
 
     MockItem.reset_column_information
