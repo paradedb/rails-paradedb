@@ -1,0 +1,12 @@
+# frozen_string_literal: true
+
+class <%= class_name %>Index < ParadeDB::Index
+  self.table_name = :<%= table_name %>
+  self.key_field  = :id
+  self.fields     = {
+    id: {},
+<% fields.each do |field| -%>
+    <%= field %>: {},
+<% end -%>
+  }
+end

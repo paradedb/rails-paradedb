@@ -2,5 +2,5 @@ source "https://rubygems.org"
 
 eval_gemfile "../Gemfile"
 
-# Example-only dependency loaded by shared example bootstrap to register vector types.
+# Used by the hybrid search example (BM25 + pgvector).
 gem "neighbor"

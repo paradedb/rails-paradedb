@@ -1,11 +1,5 @@
 # frozen_string_literal: true
 
-begin
-  require "neighbor"
-rescue LoadError
-  abort "Example requires neighbor. Run with `BUNDLE_GEMFILE=examples/Gemfile bundle exec ...`."
-end
-
 require "active_record"
 require_relative "../../lib/parade_db"
 
@@ -21,14 +15,14 @@ class MockItemIndex < ParadeDB::Index
   self.table_name = :mock_items
   self.key_field = :id
   self.index_name = :mock_items_bm25_idx
-  self.fields = [
-    :id,
-    :description,
-    :rating,
-    { category: { literal: { alias: "category" } } },
-    { "metadata->>'color'" => { literal: { alias: "metadata_color" } } },
-    { "metadata->>'location'" => { literal: { alias: "metadata_location" } } }
-  ]
+  self.fields = {
+    id: nil,
+    description: nil,
+    rating: nil,
+    category: { tokenizer: :literal },
+    "metadata->>'color'" => { tokenizer: :literal, alias: "metadata_color" },
+    "metadata->>'location'" => { tokenizer: :literal, alias: "metadata_location" }
+  }
 end
 
 class AutocompleteItem < ActiveRecord::Base
@@ -43,9 +37,14 @@ class AutocompleteItemIndex < ParadeDB::Index
   self.table_name = :autocomplete_items
   self.key_field = :id
   self.index_name = :autocomplete_items_idx
-  self.fields = [
-    :id,
-    { description: { unicode_words: {}, ngram: { min: 3, max: 8, alias: "description_ngram" } } },
-    { category: { literal: { alias: "category" } } }
-  ]
+  self.fields = {
+    id: nil,
+    description: {
+      tokenizers: [
+        { tokenizer: :unicode_words },
+        { tokenizer: :ngram, named_args: { min: 3, max: 8 }, alias: "description_ngram" }
+      ]
+    },
+    category: { tokenizer: :literal }
+  }
 end

@@ -30,7 +30,7 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
     Object.const_set("CustomRuntimeIndex", Class.new(ParadeDB::Index) do
       self.table_name = :products
       self.key_field = :id
-      self.fields = [:id, :description]
+      self.fields = { id: {}, description: {} }
     end)
 
     Object.const_set("ExplicitRuntimeProduct", Class.new(ActiveRecord::Base) do
@@ -52,7 +52,7 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
     Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
       self.table_name = :products
       self.key_field = :id
-      self.fields = [:id, :description]
+      self.fields = { id: {}, description: {} }
     end)
 
     conn = ActiveRecord::Base.connection
@@ -70,10 +70,10 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
     Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
       self.table_name = :products
       self.key_field = :id
-      self.fields = [
-        :id,
-        { description: { simple: { alias: "description_simple" } } }
-      ]
+      self.fields = {
+        id: {},
+        description: { tokenizer: :simple, alias: "description_simple" }
+      }
     end)
 
     conn = ActiveRecord::Base.connection
@@ -92,7 +92,7 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
       self.table_name = :products
       self.key_field = :id
       self.index_name = :products_missing_bm25_idx
-      self.fields = [:id, :description]
+      self.fields = { id: {}, description: {} }
     end)
 
     ParadeDB.index_validation_mode = :raise

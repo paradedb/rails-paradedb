@@ -28,7 +28,7 @@ RSpec.describe "ArelBuilderUnitTest" do
   it "bracket accessor without table" do
     attr = @no_table_builder[:description]
     assert_instance_of Arel::Nodes::SqlLiteral, attr
-    assert_equal %("description"), sql(attr)
+    assert_equal "description", sql(attr)
   end
   it "column node with invalid type" do
     error = assert_raises(ArgumentError) do
@@ -38,7 +38,7 @@ RSpec.describe "ArelBuilderUnitTest" do
   end
   it "attribute without table renders column only" do
     attr = @no_table_builder[:description]
-    assert_equal %("description"), sql(attr)
+    assert_equal "description", sql(attr)
   end
   it "attribute with table renders table dot column" do
     attr = @builder[:description]
