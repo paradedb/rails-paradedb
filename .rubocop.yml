@@ -1,0 +1,3 @@
+AllCops:
+  # Avoid RuboCop warnings when new cops are released.
+  NewCops: disable

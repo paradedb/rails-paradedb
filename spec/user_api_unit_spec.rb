@@ -198,7 +198,7 @@ RSpec.describe "UserApiUnitTest" do
   end
   it "facets only" do
     facet_sql = UnitProduct.search(:description).matching_all("shoes")
-                           .build_facet_query(fields: [:category, :brand], size: 10, order: "-count")
+                           .build_facet_query(fields: [:category, :brand], size: 10, order: :count_desc)
                            .sql
 
     expected = %(SELECT pdb.agg('{"terms":{"field":"category","size":10,"order":{"_count":"desc"}}}') AS category_facet, pdb.agg('{"terms":{"field":"brand","size":10,"order":{"_count":"desc"}}}') AS brand_facet FROM (SELECT products.* FROM products WHERE ("products"."description" &&& 'shoes')) paradedb_facet_source)
@@ -210,7 +210,7 @@ RSpec.describe "UserApiUnitTest" do
                            .build_facet_query(
                              fields: [],
                              size: 99,
-                             order: "count",
+                             order: :count_asc,
                              missing: "(missing)",
                              agg: { "value_count" => { "field" => "id" } }
                            )
@@ -306,7 +306,7 @@ RSpec.describe "UserApiUnitTest" do
                      .with_facets(
                        :category,
                        size: 20,
-                       order: "-count",
+                       order: :count_desc,
                        missing: "(missing)",
                        agg: { "value_count" => { "field" => "id" } }
                      )

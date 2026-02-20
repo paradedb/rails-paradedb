@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "parade_db/version"
+require_relative "parade_db/errors"
 require_relative "parade_db/arel"
 require_relative "parade_db/index"
 require_relative "parade_db/aggregations"
@@ -10,13 +11,13 @@ require_relative "parade_db/search_methods"
 require_relative "parade_db/railtie"
 
 module ParadeDB
-  class FacetQueryError < ArgumentError; end
-  class InvalidIndexDefinition < ArgumentError; end
-  class UnsupportedAdapterError < ArgumentError; end
-  class MethodCollisionError < ArgumentError; end
-  class FieldNotIndexed < ArgumentError; end
-  class IndexClassNotFoundError < ArgumentError; end
-  class IndexDriftError < ArgumentError; end
+  FacetQueryError = Errors::FacetQueryError
+  InvalidIndexDefinition = Errors::InvalidIndexDefinition
+  UnsupportedAdapterError = Errors::UnsupportedAdapterError
+  MethodCollisionError = Errors::MethodCollisionError
+  FieldNotIndexed = Errors::FieldNotIndexed
+  IndexClassNotFoundError = Errors::IndexClassNotFoundError
+  IndexDriftError = Errors::IndexDriftError
 
   module_function
 
@@ -39,7 +40,7 @@ module ParadeDB
     adapter_name = connection.adapter_name.to_s
     return if adapter_name.downcase.include?("postgres")
 
-    raise UnsupportedAdapterError,
+    raise Errors::UnsupportedAdapterError,
           "#{context} only supports PostgreSQL. Current adapter: #{adapter_name.inspect}"
   end
 end

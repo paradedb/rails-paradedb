@@ -279,7 +279,7 @@ module ParadeDB
 
     # ---- Facets ----
 
-    def facets(*fields, size: 10, order: "-count", missing: nil, agg: nil)
+    def facets(*fields, size: 10, order: :count_desc, missing: nil, agg: nil)
       ensure_paradedb_runtime!
       build_facet_query(
         fields: fields,
@@ -296,7 +296,7 @@ module ParadeDB
     end
 
     # Internal method to build facet query (for testing)
-    def build_facet_query(fields:, size: 10, order: "-count", missing: nil, agg: nil)
+    def build_facet_query(fields:, size: 10, order: :count_desc, missing: nil, agg: nil)
       ensure_paradedb_runtime!
       facet_args = normalize_facet_inputs(fields: fields, size: size, order: order, missing: missing, agg: agg)
       FacetQuery.build(
@@ -312,7 +312,7 @@ module ParadeDB
       )
     end
 
-    def with_facets(*fields, size: 10, order: "-count", missing: nil, agg: nil)
+    def with_facets(*fields, size: 10, order: :count_desc, missing: nil, agg: nil)
       ensure_paradedb_runtime!
       facet_args = normalize_facet_inputs(fields: fields, size: size, order: order, missing: missing, agg: agg)
       opts = {
@@ -578,14 +578,14 @@ module ParadeDB
 
     def facet_order(order)
       case order
-      when "-count" then ["_count", "desc"]
-      when "count" then ["_count", "asc"]
-      when "-key" then ["_key", "desc"]
-      when "key" then ["_key", "asc"]
+      when :count_desc then ["_count", "desc"]
+      when :count_asc then ["_count", "asc"]
+      when :key_desc then ["_key", "desc"]
+      when :key_asc then ["_key", "asc"]
       when nil then nil
       else
         raise ArgumentError,
-              "Unknown facet order #{order.inspect}. Valid values: '-count', 'count', '-key', 'key'"
+              "Unknown facet order #{order.inspect}. Valid values: :count_desc, :count_asc, :key_desc, :key_asc"
       end
     end
 

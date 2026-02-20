@@ -13,6 +13,31 @@ env:
   POSTGRES_DB: postgres
 
 jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: .ruby-version
+
+      - name: Install RuboCop
+        run: gem install rubocop --no-document
+
+      - name: Run RuboCop lint cops
+        run: |
+          rubocop --version
+          rubocop --lint \
+            lib \
+            spec \
+            rails-paradedb.gemspec \
+            Rakefile
+
   matrix-tests:
     name: Ruby ${{ matrix.ruby-version }}
     runs-on: ubuntu-latest

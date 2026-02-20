@@ -104,12 +104,12 @@ jobs:
 
       - name: Publish to RubyGems
         env:
-          RUBYGEMS_TOKEN: ${{ secrets.RUBYGEMS_TOKEN || secrets.RUBYGEMS_API_KEY }}
+          RUBYGEMS_TOKEN: ${{ secrets.RUBYGEMS_TOKEN }}
         run: |
           set -euo pipefail
 
           if [[ -z "${RUBYGEMS_TOKEN:-}" ]]; then
-            echo "Missing RubyGems secret (RUBYGEMS_TOKEN or RUBYGEMS_API_KEY)"
+            echo "Missing RubyGems secret (RUBYGEMS_TOKEN)"
             exit 1
           fi
 

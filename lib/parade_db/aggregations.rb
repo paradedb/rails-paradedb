@@ -4,10 +4,10 @@ module ParadeDB
   # Typed helpers for building agg JSON payloads passed to pdb.agg(...).
   module Aggregations
     TERMS_ORDER = {
-      "-count" => { "_count" => "desc" },
-      "count" => { "_count" => "asc" },
-      "-key" => { "_key" => "desc" },
-      "key" => { "_key" => "asc" }
+      count_desc: { "_count" => "desc" },
+      count_asc: { "_count" => "asc" },
+      key_desc: { "_key" => "desc" },
+      key_asc: { "_key" => "asc" }
     }.freeze
 
     module_function
@@ -22,7 +22,7 @@ module ParadeDB
       end
     end
 
-    def terms(field, size: 10, order: "-count", missing: nil)
+    def terms(field, size: 10, order: :count_desc, missing: nil)
       terms_payload = { "field" => normalize_field(field) }
       terms_payload["size"] = normalize_non_negative_integer(size, "size") unless size.nil?
       terms_payload["order"] = normalize_terms_order(order) unless order.nil?
@@ -180,6 +180,11 @@ module ParadeDB
     private_class_method :normalize_field
 
     def normalize_terms_order(order)
+      unless order.is_a?(Symbol)
+        raise ArgumentError,
+              "terms order must be a Symbol, got #{order.class}"
+      end
+
       mapped = TERMS_ORDER[order]
       return mapped if mapped
 
