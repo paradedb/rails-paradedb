@@ -345,7 +345,7 @@ RSpec.describe "GuardsUnitTest" do
     assert_includes error.message, "bogus"
   end
   it "facets with valid orders do not raise" do
-    %w[-count count -key key].each do |order|
+    %i[count_desc count_asc key_desc key_asc].each do |order|
       facet_query = GuardTestProduct.search(:description)
                                     .matching_all("shoes")
                                     .build_facet_query(fields: [:category], order: order)

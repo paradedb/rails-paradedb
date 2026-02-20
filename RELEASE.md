@@ -50,10 +50,9 @@ The workflow will:
 5. Create a GitHub release.
 6. Publish the gem to RubyGems.
 
-RubyGems secret:
+RubyGems publishing secret (GitHub Actions):
 
-- Preferred: `RUBYGEMS_TOKEN`
-- Backward-compatible fallback: `RUBYGEMS_API_KEY`
+- `RUBYGEMS_TOKEN`
 
 ## Feature Gating
 

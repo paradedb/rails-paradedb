@@ -255,7 +255,7 @@ RSpec.describe "UserApiIntegrationTest" do
   end
   it "facets only" do
     facet_sql = Product.search(:description).matching_all("shoes")
-                       .build_facet_query(fields: [:category, :brand], size: 10, order: "-count")
+                       .build_facet_query(fields: [:category, :brand], size: 10, order: :count_desc)
                        .sql
 
     expected = %(SELECT pdb.agg('{"terms":{"field":"category","size":10,"order":{"_count":"desc"}}}') AS category_facet, pdb.agg('{"terms":{"field":"brand","size":10,"order":{"_count":"desc"}}}') AS brand_facet FROM (SELECT products.* FROM products WHERE ("products"."description" &&& 'shoes')) paradedb_facet_source)
