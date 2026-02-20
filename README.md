@@ -61,6 +61,33 @@ Check out some examples:
 
 ## BM25 Index
 
+### Connecting an Index to a Model
+
+An index class is linked to a model in one of two ways:
+
+**Convention (recommended)**: name the index class `<Model>Index` and it is resolved automatically.
+
+```ruby
+class Product < ApplicationRecord
+  include ParadeDB::Model
+end
+
+class ProductIndex < ParadeDB::Index  # auto-linked to Product
+  # ...
+end
+```
+
+**Explicit**: call `paradedb_index` inside the model when you want a different name or multiple indexes.
+
+```ruby
+class Product < ApplicationRecord
+  include ParadeDB::Model
+  paradedb_index ProductSearchIndex
+end
+```
+
+### Defining an Index
+
 Generate an index class and migration:
 
 ```bash
@@ -95,6 +122,8 @@ Field config supports:
 - `tokenizers` for multiple tokenizer entries on the same source field.
 - `args`, `named_args`, `filters`, `stemmer`, `alias` inside tokenizer entries.
 - field options such as `fast`, `record`, `normalizer`, `expand_dots`.
+
+See [Tokenizers](https://docs.paradedb.com/documentation/tokenizers/overview), [Token Filters](https://docs.paradedb.com/documentation/token-filters/overview), and [Index Creation](https://docs.paradedb.com/documentation/indexing/create-index) for all available options.
 
 Create/remove it in a migration:
 
@@ -140,7 +169,6 @@ Product.search(:description).matching_any("wireless", "bluetooth")
 Product.search(:description).phrase("running shoes", slop: 2)
 Product.search(:description).fuzzy("runing", distance: 2, prefix: true, boost: 1.5)
 Product.search(:description).regex("run.*")
-Product.search(:description).parse("running AND shoes", lenient: true)
 
 # Exact token matching
 Product.search(:category).term("electronics", boost: 2.0)
@@ -152,9 +180,15 @@ Product.search(:description).near("running", "shoes", distance: 3)
 Product.search(:description).phrase_prefix("run", "sh")
 Product.search(:id).match_all
 Product.search(:id).exists
-Product.search(:rating).range(gte: 3, lt: 5)
+Product.search(:rating).range(gte: 3, lt: 5)  # also accepts a Ruby Range: range(3..5)
+                                               # See: https://docs.paradedb.com/documentation/query-builder/term/range-term
 
-# Similarity
+# Query string syntax (AND, OR, NOT, wildcards, field:value, boost^n)
+# See: https://docs.paradedb.com/documentation/query-builder/compound/query-parser
+Product.search(:description).parse("running AND shoes", lenient: true)
+
+# Similarity — many tuning options available
+# See: https://docs.paradedb.com/documentation/query-builder/specialized/more-like-this
 Product.more_like_this(42, fields: [:description])
 ```
 
@@ -163,7 +197,12 @@ Product.more_like_this(42, fields: [:description])
 See [BM25 Scoring](https://docs.paradedb.com/documentation/sorting/score) and [Highlighting](https://docs.paradedb.com/documentation/full-text/highlight) for full function details.
 
 ```ruby
-Product.search(:description).matching_all("shoes").with_score
+# with_score adds a `search_score` attribute to each result
+results = Product.search(:description).matching_all("shoes")
+                 .with_score
+                 .order(search_score: :desc)
+results.first.search_score  # => 0.87
+
 Product.search(:description).matching_all("shoes").with_snippet(:description, start_tag: "<b>", end_tag: "</b>", max_chars: 80)
 Product.search(:description).matching_all("running").with_snippets(:description, max_chars: 15, limit: 2, offset: 0, sort_by: :position)
 Product.search(:description).matching_all("running").with_snippet_positions(:description)
