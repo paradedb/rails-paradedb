@@ -39,17 +39,35 @@ jobs:
             Rakefile
 
   matrix-tests:
-    name: Ruby ${{ matrix.ruby-version }}
+    name: Ruby ${{ matrix.ruby-version }} / Rails ${{ matrix.rails-version }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
+          # Rails 7.2 supports Ruby 3.1+ — test on 3.2/3.3/3.4
+          - rails-version: "7.2"
+            ruby-version: "3.2"
+            gemfile: "gemfiles/rails72.gemfile"
+          - rails-version: "7.2"
+            ruby-version: "3.3"
+            gemfile: "gemfiles/rails72.gemfile"
+          - rails-version: "7.2"
+            ruby-version: "3.4"
+            gemfile: "gemfiles/rails72.gemfile"
           # Rails 8.1 supports Ruby 3.2+
-          - ruby-version: "3.2"
-          - ruby-version: "3.3"
-          - ruby-version: "3.4"
-          - ruby-version: "4.0"
+          - rails-version: "8.1"
+            ruby-version: "3.2"
+            gemfile: "Gemfile"
+          - rails-version: "8.1"
+            ruby-version: "3.3"
+            gemfile: "Gemfile"
+          - rails-version: "8.1"
+            ruby-version: "3.4"
+            gemfile: "Gemfile"
+          - rails-version: "8.1"
+            ruby-version: "4.0"
+            gemfile: "Gemfile"
 
     services:
       paradedb:
@@ -67,8 +85,10 @@ jobs:
           --health-retries 12
 
     env:
+      BUNDLE_GEMFILE: ${{ matrix.gemfile }}
       PARADEDB_TEST_DSN: postgresql://postgres:postgres@localhost:5432/postgres
       PGPASSWORD: postgres
+      COVERAGE: "1"
 
     steps:
       - name: Checkout
@@ -81,37 +101,32 @@ jobs:
           bundler-cache: true
 
       - name: Run unit tests
+        env:
+          COVERAGE_COMMAND_NAME: unit
         run: bundle exec rake test
 
       - name: Run integration tests
-        run: bundle exec rake test:integration
-
-      - name: Generate coverage report
         env:
-          COVERAGE: "1"
-          COVERAGE_COMMAND_NAME: ci-rspec
-        run: bundle exec rspec spec
+          COVERAGE_COMMAND_NAME: integration
+        run: bundle exec rake test:integration
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
         with:
           files: ./coverage/coverage.xml
-          flags: rails-paradedb,rb${{ matrix.ruby-version }}
+          flags: rails-paradedb,rb${{ matrix.ruby-version }},rl${{ matrix.rails-version }}
           fail_ci_if_error: false
           verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
-      - name: Install example dependencies
-        if: matrix.ruby-version == '3.3'
-        run: BUNDLE_GEMFILE=examples/Gemfile bundle install --jobs 4 --retry 3
-
       - name: Run examples
-        if: matrix.ruby-version == '3.3'
+        if: matrix.ruby-version == '3.3' && matrix.rails-version == '8.1'
         env:
           DATABASE_URL: ${{ env.PARADEDB_TEST_DSN }}
         run: |
           set -euo pipefail
+          BUNDLE_GEMFILE=examples/Gemfile bundle install --jobs 4 --retry 3
 
           run_example() {
             local script="$1"

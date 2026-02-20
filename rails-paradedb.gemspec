@@ -28,8 +28,8 @@ Gem::Specification.new do |spec|
   end
   spec.require_paths = ["lib"]
 
-  spec.add_dependency "activerecord", "~> 8.1"
-  spec.add_dependency "activesupport", "~> 8.1"
+  spec.add_dependency "activerecord", ">= 7.2", "< 9"
+  spec.add_dependency "activesupport", ">= 7.2", "< 9"
   spec.add_dependency "pg", "~> 1.5"
-  spec.add_dependency "railties", "~> 8.1"
+  spec.add_dependency "railties", ">= 7.2", "< 9"
 end

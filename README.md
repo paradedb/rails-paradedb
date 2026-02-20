@@ -15,7 +15,7 @@ For complete ParadeDB documentation, see [docs.paradedb.com](https://docs.parade
 | Component  | Version                          |
 |------------|----------------------------------|
 | Ruby       | 3.2+                             |
-| Rails      | 8.1+                             |
+| Rails      | 7.2+                             |
 | ParadeDB   | 0.21.0+                          |
 | PostgreSQL | 17+    (with ParadeDB extension) |
 
