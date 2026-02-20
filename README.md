@@ -82,7 +82,7 @@ class ProductIndex < ParadeDB::Index
         { tokenizer: :simple, alias: "description_simple", filters: [:lowercase] }
       ]
     },
-    category: { tokenizer: :literal, alias: "category" },
+    category: { tokenizer: :literal },
     "metadata->>'color'": { tokenizer: :literal, alias: "metadata_color" },
     metadata: { fast: true, expand_dots: false }
   }
