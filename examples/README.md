@@ -18,10 +18,10 @@ Each example folder uses a Rails-like layout:
 BUNDLE_GEMFILE=examples/Gemfile bundle install
 ```
 
-The hybrid RRF example has its own Gemfile (it uses pgvector via `neighbor`):
+The hybrid RRF example uses pgvector via `neighbor`, which is included in `examples/Gemfile`:
 
 ```bash
-BUNDLE_GEMFILE=examples/hybrid_rrf/Gemfile bundle install
+BUNDLE_GEMFILE=examples/Gemfile bundle install
 ```
 
 ### 2. Start ParadeDB
@@ -115,8 +115,8 @@ Demonstrates Reciprocal Rank Fusion (RRF) by composing a ParadeDB BM25 relation
 with a semantic relation (via `neighbor`) using CTEs.
 
 ```bash
-BUNDLE_GEMFILE=examples/hybrid_rrf/Gemfile bundle exec ruby examples/hybrid_rrf/setup.rb
-BUNDLE_GEMFILE=examples/hybrid_rrf/Gemfile bundle exec ruby examples/hybrid_rrf/hybrid_rrf.rb
+BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/hybrid_rrf/setup.rb
+BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/hybrid_rrf/hybrid_rrf.rb
 ```
 
 Structure:

@@ -1,3 +1,6 @@
 source "https://rubygems.org"
 
 eval_gemfile "../Gemfile"
+
+# Used by the hybrid search example (BM25 + pgvector).
+gem "neighbor"

@@ -3,7 +3,7 @@
 begin
   require "neighbor"
 rescue LoadError
-  abort "Example requires neighbor. Run with `BUNDLE_GEMFILE=examples/hybrid_rrf/Gemfile bundle exec ...`."
+  abort "Example requires neighbor. Run with `BUNDLE_GEMFILE=examples/Gemfile bundle exec ...`."
 end
 
 require "active_record"

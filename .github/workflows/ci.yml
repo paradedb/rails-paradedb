@@ -81,10 +81,6 @@ jobs:
         if: matrix.ruby-version == '3.3'
         run: BUNDLE_GEMFILE=examples/Gemfile bundle install --jobs 4 --retry 3
 
-      - name: Install hybrid RRF example dependencies
-        if: matrix.ruby-version == '3.3'
-        run: BUNDLE_GEMFILE=examples/hybrid_rrf/Gemfile bundle install --jobs 4 --retry 3
-
       - name: Run examples
         if: matrix.ruby-version == '3.3'
         env:
@@ -95,10 +91,9 @@ jobs:
           run_example() {
             local script="$1"
             local expected="$2"
-            local gemfile="${3:-examples/Gemfile}"
 
             echo "Running ${script}"
-            output="$(BUNDLE_GEMFILE=${gemfile} bundle exec ruby "${script}")"
+            output="$(BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby "${script}")"
             echo "${output}"
             echo "${output}" | grep -F "${expected}" >/dev/null
           }
@@ -108,5 +103,5 @@ jobs:
           run_example examples/autocomplete/autocomplete.rb "rails-paradedb Autocomplete Example"
           run_example examples/more_like_this/more_like_this.rb "rails-paradedb MoreLikeThis Example"
           run_example examples/faceted_search/faceted_search.rb "rails-paradedb Faceted Search Example"
-          run_example examples/hybrid_rrf/setup.rb "Hybrid Search Setup - Loading Embeddings from CSV" examples/hybrid_rrf/Gemfile
-          run_example examples/hybrid_rrf/hybrid_rrf.rb "Hybrid Search with Reciprocal Rank Fusion (single SQL query)" examples/hybrid_rrf/Gemfile
+          run_example examples/hybrid_rrf/setup.rb "Hybrid Search Setup - Loading Embeddings from CSV"
+          run_example examples/hybrid_rrf/hybrid_rrf.rb "Hybrid Search with Reciprocal Rank Fusion (single SQL query)"
