@@ -74,6 +74,32 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
     assert_equal [1, 2, 6], regex_ids
     assert_equal [1, 2], fuzzy_ids
   end
+  it "fuzzy with constant score executes" do
+    baseline_ids = BehaviorProduct.search(:description)
+                                  .fuzzy("shose", distance: 2)
+                                  .order(:id)
+                                  .pluck(:id)
+
+    const_ids = BehaviorProduct.search(:description)
+                               .fuzzy("shose", distance: 2, constant_score: 1.0)
+                               .order(:id)
+                               .pluck(:id)
+
+    assert_equal baseline_ids, const_ids
+  end
+  it "phrase slop with constant score executes" do
+    baseline_ids = BehaviorProduct.search(:description)
+                                  .phrase("running shoes", slop: 2)
+                                  .order(:id)
+                                  .pluck(:id)
+
+    const_ids = BehaviorProduct.search(:description)
+                               .phrase("running shoes", slop: 2, constant_score: 1.0)
+                               .order(:id)
+                               .pluck(:id)
+
+    assert_equal baseline_ids, const_ids
+  end
   it "more like this with id executes and returns similar rows" do
     ids = BehaviorProduct.more_like_this(3, fields: [:description]).limit(5).pluck(:id)
 

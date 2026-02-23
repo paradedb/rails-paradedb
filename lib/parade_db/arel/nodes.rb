@@ -44,6 +44,24 @@ module ParadeDB
         alias == eql?
       end
 
+      class QueryCast < ::Arel::Nodes::Node
+        attr_reader :expr
+
+        def initialize(expr)
+          @expr = expr
+        end
+
+        def hash
+          [self.class, expr].hash
+        end
+
+        def eql?(other)
+          self.class == other.class &&
+            expr == other.expr
+        end
+        alias == eql?
+      end
+
       class SlopCast < ::Arel::Nodes::Node
         attr_reader :expr, :distance
 

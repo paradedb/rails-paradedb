@@ -25,6 +25,11 @@ module ParadeDB
           collector << ")"
         end
 
+        def visit_ParadeDB_Arel_Nodes_QueryCast(o, collector)
+          collector = visit(o.expr, collector)
+          collector << "::pdb.query"
+        end
+
         def visit_ParadeDB_Arel_Nodes_FuzzyCast(o, collector)
           collector = visit(o.expr, collector)
           collector << "::pdb.fuzzy("

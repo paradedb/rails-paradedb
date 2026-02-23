@@ -33,6 +33,8 @@ module ParadeDB
 
       def phrase(column, text, slop: nil, boost: nil, constant_score: nil)
         rhs = apply_slop(quoted_value(text), slop)
+        # ParadeDB cannot cast pdb.slop directly to pdb.const. Bridge through pdb.query.
+        rhs = Nodes::QueryCast.new(rhs) if !constant_score.nil? && !slop.nil?
         rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("###", column_node(column), rhs)
       end
@@ -40,6 +42,8 @@ module ParadeDB
       def fuzzy(column, term, distance: 1, prefix: nil, boost: nil, constant_score: nil)
         validate_numeric!(distance, :distance)
         rhs = Nodes::FuzzyCast.new(quoted_value(term), quoted_value(distance), prefix: prefix)
+        # ParadeDB cannot cast pdb.fuzzy directly to pdb.const. Bridge through pdb.query.
+        rhs = Nodes::QueryCast.new(rhs) unless constant_score.nil?
         rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("===", column_node(column), rhs)
       end

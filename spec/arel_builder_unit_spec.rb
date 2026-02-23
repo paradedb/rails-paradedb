@@ -86,6 +86,10 @@ RSpec.describe "ArelBuilderUnitTest" do
     node = @builder.phrase(:description, "running shoes", slop: 10)
     assert_equal %("products"."description" ### 'running shoes'::pdb.slop(10)), sql(node)
   end
+  it "phrase with slop and constant score bridges through query" do
+    node = @builder.phrase(:description, "running shoes", slop: 2, constant_score: 1.0)
+    assert_equal %("products"."description" ### 'running shoes'::pdb.slop(2)::pdb.query::pdb.const(1.0)), sql(node)
+  end
 
   # ---- term ----
   it "term without boost" do
@@ -138,6 +142,10 @@ RSpec.describe "ArelBuilderUnitTest" do
   it "fuzzy with boost only" do
     node = @builder.fuzzy(:description, "shose", distance: 2, boost: 1.5)
     assert_equal %("products"."description" === 'shose'::pdb.fuzzy(2)::pdb.boost(1.5)), sql(node)
+  end
+  it "fuzzy with constant score bridges through query" do
+    node = @builder.fuzzy(:description, "shose", distance: 2, constant_score: 1.0)
+    assert_equal %("products"."description" === 'shose'::pdb.fuzzy(2)::pdb.query::pdb.const(1.0)), sql(node)
   end
   it "fuzzy with prefix and boost" do
     node = @builder.fuzzy(:description, "runn", distance: 1, prefix: true, boost: 2.0)
