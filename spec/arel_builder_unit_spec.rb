@@ -58,6 +58,14 @@ RSpec.describe "ArelBuilderUnitTest" do
     node = @builder.match(:description, "shoes", boost: 2.5)
     assert_equal %("products"."description" &&& 'shoes'::pdb.boost(2.5)), sql(node)
   end
+  it "match with tokenizer override" do
+    node = @builder.match(:description, "running shoes", tokenizer: "whitespace")
+    assert_equal %("products"."description" &&& 'running shoes'::pdb.whitespace), sql(node)
+  end
+  it "match with tokenizer override and args" do
+    node = @builder.match(:description, "running shoes", tokenizer: "whitespace('lowercase=false')")
+    assert_equal %("products"."description" &&& 'running shoes'::pdb.whitespace('lowercase=false')), sql(node)
+  end
   it "match without boost" do
     node = @builder.match(:description, "shoes", boost: nil)
     assert_equal %("products"."description" &&& 'shoes'), sql(node)

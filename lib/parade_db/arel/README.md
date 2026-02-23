@@ -27,8 +27,8 @@ Render any node with `ParadeDB::Arel.to_sql(node)`. All nodes respond to
 
 | Method | ParadeDB SQL |
 |--------|--------------|
-| `match(column, *terms, distance:, prefix:, transposition_cost_one:, boost: nil)` | `column &&& 'a b'::pdb.fuzzy(...)::pdb.boost(N)` |
-| `match_any(column, *terms, distance:, prefix:, transposition_cost_one:, boost: nil)` | `column \|\|\| 'a b'::pdb.fuzzy(...)::pdb.boost(N)` |
+| `match(column, *terms, tokenizer: nil, distance:, prefix:, transposition_cost_one:, boost: nil)` | `column &&& 'a b'::pdb.whitespace::pdb.fuzzy(...)::pdb.boost(N)` |
+| `match_any(column, *terms, tokenizer: nil, distance:, prefix:, transposition_cost_one:, boost: nil)` | `column \|\|\| 'a b'::pdb.whitespace::pdb.fuzzy(...)::pdb.boost(N)` |
 | `phrase(column, text, slop: n)` | `column ### 'text'::pdb.slop(n)` |
 | `term(column, term, distance:, prefix:, transposition_cost_one:, boost: nil)` | `column === 'term'::pdb.fuzzy(...)::pdb.boost(N)` |
 | `term_set(column, *terms)` | `column @@@ pdb.term_set(ARRAY[...])` |
@@ -45,7 +45,7 @@ Render any node with `ParadeDB::Arel.to_sql(node)`. All nodes respond to
 | `snippet(column, start, finish, max)` | `pdb.snippet(column, start, finish, max)` |
 | `snippets(column, start_tag:, end_tag:, max_num_chars:, limit:, offset:, sort_by:)` | `pdb.snippets(column, ...)` |
 | `snippet_positions(column)` | `pdb.snippet_positions(column)` |
-| `agg(json)` | `pdb.agg(json)` |
+| `agg(json, exact: nil)` | `pdb.agg(json[, false])` |
 
 `Builder#[]` returns a column node for manual composition: `arel[:description]`.
 

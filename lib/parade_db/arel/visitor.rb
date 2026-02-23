@@ -56,6 +56,12 @@ module ParadeDB
           collector << "]"
         end
 
+        def visit_ParadeDB_Arel_Nodes_TokenizerCast(o, collector)
+          collector = visit(o.expr, collector)
+          collector << "::"
+          collector << o.tokenizer_sql
+        end
+
         def visit_ParadeDB_Arel_Nodes_ParseNode(o, collector)
           collector << "pdb.parse("
           collector = visit(o.query, collector)

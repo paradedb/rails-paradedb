@@ -124,6 +124,26 @@ module ParadeDB
         alias == eql?
       end
 
+      class TokenizerCast < ::Arel::Nodes::Node
+        attr_reader :expr, :tokenizer_sql
+
+        def initialize(expr, tokenizer_sql)
+          @expr = expr
+          @tokenizer_sql = tokenizer_sql
+        end
+
+        def hash
+          [self.class, expr, tokenizer_sql].hash
+        end
+
+        def eql?(other)
+          self.class == other.class &&
+            expr == other.expr &&
+            tokenizer_sql == other.tokenizer_sql
+        end
+        alias == eql?
+      end
+
       class ParseNode < ::Arel::Nodes::Node
         attr_reader :query, :lenient, :conjunction_mode
 

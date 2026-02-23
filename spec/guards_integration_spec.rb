@@ -94,6 +94,14 @@ RSpec.describe "GuardsUnitTest" do
     node = builder.match(:description, "shoes", boost: nil)
     refute_nil node
   end
+  it "match tokenizer rejects non-string" do
+    error = assert_raises(ArgumentError) { builder.match(:description, "shoes", tokenizer: 123) }
+    assert_includes error.message, "tokenizer must be a string"
+  end
+  it "match tokenizer rejects invalid expression" do
+    error = assert_raises(ArgumentError) { builder.match(:description, "shoes", tokenizer: "whitespace;drop") }
+    assert_includes error.message, "invalid tokenizer expression"
+  end
   it "phrase slop rejects non numeric" do
     error = assert_raises(ArgumentError) { builder.phrase(:description, "running shoes", slop: "lots") }
     assert_includes error.message, "slop must be numeric"
@@ -342,6 +350,20 @@ RSpec.describe "GuardsUnitTest" do
                                   .matching_all("shoes")
                                   .build_facet_query(fields: [Object.new], agg: { "value_count" => { "field" => "id" } })
     assert_includes facet_query.sql, %(pdb.agg('{"value_count":{"field":"id"}}'))
+  end
+  it "facets exact false raises on non-windowed API" do
+    error = assert_raises(ArgumentError) do
+      GuardTestProduct.search(:description).matching_all("shoes").facets(:category, exact: false)
+    end
+    assert_includes error.message, "facets(exact: false)"
+  end
+  it "facets_agg exact false raises on non-windowed API" do
+    error = assert_raises(ArgumentError) do
+      GuardTestProduct.search(:description)
+                      .matching_all("shoes")
+                      .facets_agg(exact: false, docs: ParadeDB::Aggregations.value_count(:id))
+    end
+    assert_includes error.message, "facets_agg(exact: false)"
   end
 
   # ──────────────────────────────────────────────

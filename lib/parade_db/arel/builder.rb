@@ -5,6 +5,7 @@ module ParadeDB
   module Arel
     class Builder
       RANGE_TYPES = %w[int4range int8range numrange daterange tsrange tstzrange].freeze
+      TOKENIZER_EXPRESSION = /\A[a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\s*[a-zA-Z0-9_'".,=\s:-]*\s*\))?\z/.freeze
 
       attr_reader :table
 
@@ -19,6 +20,7 @@ module ParadeDB
       def match(
         column,
         *terms,
+        tokenizer: nil,
         distance: nil,
         prefix: nil,
         transposition_cost_one: nil,
@@ -33,6 +35,7 @@ module ParadeDB
           transposition_cost_one: transposition_cost_one,
           bridge_to_query: !constant_score.nil?
         )
+        rhs = apply_tokenizer(rhs, tokenizer)
         rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("&&&", column_node(column), rhs)
       end
@@ -40,6 +43,7 @@ module ParadeDB
       def match_any(
         column,
         *terms,
+        tokenizer: nil,
         distance: nil,
         prefix: nil,
         transposition_cost_one: nil,
@@ -54,6 +58,7 @@ module ParadeDB
           transposition_cost_one: transposition_cost_one,
           bridge_to_query: !constant_score.nil?
         )
+        rhs = apply_tokenizer(rhs, tokenizer)
         rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("|||", column_node(column), rhs)
       end
@@ -205,8 +210,14 @@ module ParadeDB
         ::Arel::Nodes::NamedFunction.new("pdb.snippet_positions", [column_node(column)])
       end
 
-      def agg(json)
-        ::Arel::Nodes::NamedFunction.new("pdb.agg", [quoted_value(json)])
+      def agg(json, exact: nil)
+        unless exact.nil? || exact == true || exact == false
+          raise ArgumentError, "exact must be true, false, or nil"
+        end
+
+        args = [quoted_value(json)]
+        args << quoted_value(false) if exact == false
+        ::Arel::Nodes::NamedFunction.new("pdb.agg", args)
       end
 
       private
@@ -244,6 +255,17 @@ module ParadeDB
 
         # ParadeDB cannot cast pdb.fuzzy directly to pdb.const. Bridge through pdb.query.
         Nodes::QueryCast.new(rhs)
+      end
+
+      def apply_tokenizer(node, tokenizer)
+        return node if tokenizer.nil?
+
+        unless tokenizer.is_a?(String)
+          raise ArgumentError, "tokenizer must be a string"
+        end
+
+        normalized = normalize_tokenizer(tokenizer)
+        Nodes::TokenizerCast.new(node, normalized)
       end
 
       def apply_slop(node, slop)
@@ -409,6 +431,30 @@ module ParadeDB
         unless value.is_a?(Integer)
           raise ArgumentError, "#{name} must be an integer"
         end
+      end
+
+      def normalize_tokenizer(tokenizer)
+        value = tokenizer.strip
+        if value.empty?
+          raise ArgumentError, "tokenizer cannot be blank"
+        end
+        unless TOKENIZER_EXPRESSION.match?(value)
+          raise ArgumentError, "invalid tokenizer expression: #{tokenizer.inspect}"
+        end
+
+        if value.include?("(")
+          function_name, rest = value.split("(", 2)
+          normalized_name = normalize_tokenizer_function_name(function_name)
+          return "#{normalized_name}(#{rest}"
+        end
+
+        normalize_tokenizer_function_name(value)
+      end
+
+      def normalize_tokenizer_function_name(function_name)
+        return function_name if function_name.include?(".") || function_name.include?("::")
+
+        "pdb.#{function_name}"
       end
 
       def arel_table

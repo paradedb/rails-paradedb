@@ -35,6 +35,14 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
 
     assert_equal [3, 5], ids
   end
+  it "matching with tokenizer override executes" do
+    ids = BehaviorProduct.search(:description)
+                         .matching_any("running shoes", tokenizer: "whitespace")
+                         .order(:id)
+                         .pluck(:id)
+
+    assert_equal [1, 2, 6], ids
+  end
   it "phrase near and phrase prefix execute" do
     phrase_ids = BehaviorProduct.search(:description).phrase("running shoes").order(:id).pluck(:id)
     near_ids = BehaviorProduct.search(:description).near("running", "shoes", distance: 1).order(:id).pluck(:id)
@@ -214,6 +222,20 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
     assert_kind_of Hash, rel_facets
     assert_includes rel_facets, "rating"
     assert_match(/[45]/, rel_facets["rating"].to_json)
+  end
+  it "with facets exact false executes" do
+    rel = BehaviorProduct.search(:description)
+                         .matching_all("running shoes")
+                         .with_facets(:rating, size: 10, exact: false)
+                         .order(:id)
+                         .limit(10)
+
+    rows = rel.to_a
+    assert_equal [1, 2], rows.map(&:id)
+
+    rel_facets = rel.facets
+    assert_kind_of Hash, rel_facets
+    assert_includes rel_facets, "rating"
   end
   it "with facets without topn shape raises friendly error" do
     rel = BehaviorProduct.search(:description).matching_all("running shoes").with_facets(:rating, size: 10)

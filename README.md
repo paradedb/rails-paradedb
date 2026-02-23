@@ -158,6 +158,20 @@ ParadeDB.index_validation_mode = :raise # raise ParadeDB::IndexDriftError on dri
 ParadeDB.index_validation_mode = :off   # disable drift checks (default)
 ```
 
+### Diagnostics Helpers
+
+`rails-paradedb` also exposes helpers for ParadeDB diagnostics table functions:
+
+- `ParadeDB.paradedb_indexes`
+- `ParadeDB.paradedb_index_segments(index_name)`
+- `ParadeDB.paradedb_verify_index(index_name, ...)`
+- `ParadeDB.paradedb_verify_all_indexes(...)`
+
+```ruby
+ParadeDB.paradedb_indexes
+ParadeDB.paradedb_verify_index("products_bm25_idx", sample_rate: 0.1)
+```
+
 ## Query Types
 
 For advanced options, see [ParadeDB Query Builder Documentation](https://docs.paradedb.com/documentation/query-builder/overview) and the runnable scripts in [`examples/`](examples).
@@ -166,6 +180,8 @@ For advanced options, see [ParadeDB Query Builder Documentation](https://docs.pa
 # Full-text
 Product.search(:description).matching_all("running shoes")
 Product.search(:description).matching_any("wireless", "bluetooth")
+Product.search(:description).matching_any("running shoes", tokenizer: "whitespace")
+Product.search(:description).matching_any("running shoes", tokenizer: "whitespace('lowercase=false')")
 Product.search(:description).phrase("running shoes", slop: 2)
 Product.search(:description).matching_any("runing", distance: 2, prefix: true, boost: 1.5)
 Product.search(:description).term("runing", distance: 2, transposition_cost_one: true)
@@ -230,9 +246,16 @@ relation = Product.search(:description).matching_all("shoes")
 rows = relation.to_a
 facets = relation.facets
 
+# Non-exact (faster) window facets
+inexact_relation = Product.search(:description).matching_all("shoes")
+                          .with_facets(:category, size: 10, exact: false)
+                          .order(:id)
+                          .limit(10)
+
 # Facets only
 facets_only = Product.search(:description).matching_all("shoes")
                      .facets(:category)
+# Note: exact: false is window-only and requires with_facets/with_agg.
 
 # Named aggregation helpers
 aggs = Product.search(:description).matching_all("shoes")

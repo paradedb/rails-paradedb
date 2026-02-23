@@ -41,6 +41,14 @@ RSpec.describe "ArelPredicationsUnitTest" do
     node = @t[:description].pdb_match_any("wireless", "bluetooth", "earbuds")
     assert_equal %("products"."description" ||| 'wireless bluetooth earbuds'), sql(node)
   end
+  it "pdb_match with tokenizer override" do
+    node = @t[:description].pdb_match("running shoes", tokenizer: "whitespace")
+    assert_equal %("products"."description" &&& 'running shoes'::pdb.whitespace), sql(node)
+  end
+  it "pdb_match with tokenizer args" do
+    node = @t[:description].pdb_match("running shoes", tokenizer: "whitespace('lowercase=false')")
+    assert_equal %("products"."description" &&& 'running shoes'::pdb.whitespace('lowercase=false')), sql(node)
+  end
 
   # ---- pdb_phrase ----
   it "pdb_phrase without slop" do
@@ -263,5 +271,9 @@ RSpec.describe "ArelPredicationsUnitTest" do
   it "pdb_match raises on non-numeric boost" do
     error = assert_raises(ArgumentError) { @t[:description].pdb_match("shoes", boost: "high") }
     assert_match(/boost must be numeric/, error.message)
+  end
+  it "pdb_match raises on invalid tokenizer" do
+    error = assert_raises(ArgumentError) { @t[:description].pdb_match("shoes", tokenizer: "bad;tokenizer") }
+    assert_match(/invalid tokenizer expression/, error.message)
   end
 end

@@ -3,16 +3,20 @@
 module ParadeDB
   module Arel
     module Predications
-      def pdb_match(*terms, distance: nil, prefix: nil, transposition_cost_one: nil, boost: nil)
+      TOKENIZER_EXPRESSION = /\A[a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\s*[a-zA-Z0-9_'".,=\s:-]*\s*\))?\z/.freeze
+
+      def pdb_match(*terms, tokenizer: nil, distance: nil, prefix: nil, transposition_cost_one: nil, boost: nil)
         rhs = pdb_quoted(pdb_join_terms(terms))
         rhs = pdb_apply_fuzzy(rhs, distance: distance, prefix: prefix, transposition_cost_one: transposition_cost_one)
+        rhs = pdb_apply_tokenizer(rhs, tokenizer)
         rhs = pdb_apply_boost(rhs, boost)
         ::Arel::Nodes::InfixOperation.new("&&&", self, rhs)
       end
 
-      def pdb_match_any(*terms, distance: nil, prefix: nil, transposition_cost_one: nil, boost: nil)
+      def pdb_match_any(*terms, tokenizer: nil, distance: nil, prefix: nil, transposition_cost_one: nil, boost: nil)
         rhs = pdb_quoted(pdb_join_terms(terms))
         rhs = pdb_apply_fuzzy(rhs, distance: distance, prefix: prefix, transposition_cost_one: transposition_cost_one)
+        rhs = pdb_apply_tokenizer(rhs, tokenizer)
         rhs = pdb_apply_boost(rhs, boost)
         ::Arel::Nodes::InfixOperation.new("|||", self, rhs)
       end
@@ -171,6 +175,17 @@ module ParadeDB
         )
       end
 
+      def pdb_apply_tokenizer(node, tokenizer)
+        return node if tokenizer.nil?
+
+        unless tokenizer.is_a?(String)
+          raise ArgumentError, "tokenizer must be a string"
+        end
+
+        normalized = pdb_normalize_tokenizer(tokenizer)
+        Nodes::TokenizerCast.new(node, normalized)
+      end
+
       def pdb_apply_slop(node, slop)
         return node if slop.nil?
 
@@ -200,6 +215,30 @@ module ParadeDB
         return if value.is_a?(Integer)
 
         raise ArgumentError, "#{name} must be an integer"
+      end
+
+      def pdb_normalize_tokenizer(tokenizer)
+        value = tokenizer.strip
+        if value.empty?
+          raise ArgumentError, "tokenizer cannot be blank"
+        end
+        unless TOKENIZER_EXPRESSION.match?(value)
+          raise ArgumentError, "invalid tokenizer expression: #{tokenizer.inspect}"
+        end
+
+        if value.include?("(")
+          function_name, rest = value.split("(", 2)
+          normalized_name = pdb_normalize_tokenizer_function_name(function_name)
+          return "#{normalized_name}(#{rest}"
+        end
+
+        pdb_normalize_tokenizer_function_name(value)
+      end
+
+      def pdb_normalize_tokenizer_function_name(function_name)
+        return function_name if function_name.include?(".") || function_name.include?("::")
+
+        "pdb.#{function_name}"
       end
 
       module_function
