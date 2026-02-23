@@ -43,6 +43,24 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
 
     assert_equal [1, 2, 6], ids
   end
+  it "matching with tokenizer + fuzzy distance defers error to database" do
+    error = assert_raises(ActiveRecord::StatementInvalid) do
+      BehaviorProduct.search(:description)
+                     .matching_any("runing shose", tokenizer: "whitespace", distance: 1)
+                     .order(:id)
+                     .pluck(:id)
+    end
+    assert_match(/cannot cast type/i, error.message)
+  end
+  it "matching with tokenizer + fuzzy constant score defers error to database" do
+    error = assert_raises(ActiveRecord::StatementInvalid) do
+      BehaviorProduct.search(:description)
+                     .matching_any("runing shose", tokenizer: "whitespace", distance: 1, constant_score: 1.0)
+                     .order(:id)
+                     .pluck(:id)
+    end
+    assert_match(/cannot cast type/i, error.message)
+  end
   it "phrase near and phrase prefix execute" do
     phrase_ids = BehaviorProduct.search(:description).phrase("running shoes").order(:id).pluck(:id)
     near_ids = BehaviorProduct.search(:description).near("running", "shoes", distance: 1).order(:id).pluck(:id)
@@ -59,6 +77,10 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
                                .parse("running AND shoes", lenient: true)
                                .order(:id)
                                .pluck(:id)
+    parse_default_ids = BehaviorProduct.search(:description)
+                                       .parse("running shoes")
+                                       .order(:id)
+                                       .pluck(:id)
     parse_conj_ids = BehaviorProduct.search(:description)
                                     .parse("running shoes", conjunction_mode: true)
                                     .order(:id)
@@ -68,6 +90,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
 
     assert_equal [1, 2], parse_ids
     assert_equal [1, 2], parse_conj_ids
+    assert_operator parse_default_ids.length, :>, parse_conj_ids.length
     assert_equal [1, 2, 3], all_ids
     assert_equal [1, 2, 3], exists_ids
   end
