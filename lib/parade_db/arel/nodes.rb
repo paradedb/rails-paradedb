@@ -83,23 +83,25 @@ module ParadeDB
       end
 
       class FuzzyCast < ::Arel::Nodes::Node
-        attr_reader :expr, :distance, :prefix
+        attr_reader :expr, :distance, :prefix, :transposition_cost_one
 
-        def initialize(expr, distance, prefix: nil)
+        def initialize(expr, distance, prefix: nil, transposition_cost_one: nil)
           @expr = expr
           @distance = distance
           @prefix = prefix
+          @transposition_cost_one = transposition_cost_one
         end
 
         def hash
-          [self.class, expr, distance, prefix].hash
+          [self.class, expr, distance, prefix, transposition_cost_one].hash
         end
 
         def eql?(other)
           self.class == other.class &&
             expr == other.expr &&
             distance == other.distance &&
-            prefix == other.prefix
+            prefix == other.prefix &&
+            transposition_cost_one == other.transposition_cost_one
         end
         alias == eql?
       end

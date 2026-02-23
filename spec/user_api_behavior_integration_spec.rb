@@ -67,7 +67,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
     term_ids = BehaviorProduct.search(:category).term("audio").order(:id).pluck(:id)
     term_set_ids = BehaviorProduct.search(:category).term_set(%w[audio footwear]).order(:id).pluck(:id)
     regex_ids = BehaviorProduct.search(:description).regex("run.*").order(:id).pluck(:id)
-    fuzzy_ids = BehaviorProduct.search(:description).fuzzy("shose", distance: 2).order(:id).pluck(:id)
+    fuzzy_ids = BehaviorProduct.search(:description).term("shose", distance: 2).order(:id).pluck(:id)
 
     assert_equal [3, 4], term_ids
     assert_equal [1, 2, 3, 4, 5], term_set_ids
@@ -76,12 +76,12 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
   end
   it "fuzzy with constant score executes" do
     baseline_ids = BehaviorProduct.search(:description)
-                                  .fuzzy("shose", distance: 2)
+                                  .term("shose", distance: 2)
                                   .order(:id)
                                   .pluck(:id)
 
     const_ids = BehaviorProduct.search(:description)
-                               .fuzzy("shose", distance: 2, constant_score: 1.0)
+                               .term("shose", distance: 2, constant_score: 1.0)
                                .order(:id)
                                .pluck(:id)
 

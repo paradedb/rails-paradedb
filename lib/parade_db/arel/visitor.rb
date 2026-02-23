@@ -34,7 +34,16 @@ module ParadeDB
           collector = visit(o.expr, collector)
           collector << "::pdb.fuzzy("
           collector = visit(o.distance, collector)
-          collector << ', "true"' if o.prefix
+
+          if o.transposition_cost_one
+            collector << ", "
+            collector << (o.prefix ? '"true"' : '"false"')
+            collector << ", "
+            collector << '"true"'
+          elsif o.prefix
+            collector << ', "true"'
+          end
+
           collector << ")"
         end
 

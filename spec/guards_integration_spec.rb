@@ -34,8 +34,8 @@ RSpec.describe "GuardsUnitTest" do
     error = assert_raises(RuntimeError) { bare_relation.phrase("running shoes") }
     assert_includes error.message, "No search field set"
   end
-  it "fuzzy without search raises" do
-    error = assert_raises(RuntimeError) { bare_relation.fuzzy("shoes", distance: 1) }
+  it "fuzzy-style matching_any without search raises" do
+    error = assert_raises(RuntimeError) { bare_relation.matching_any("shoes", distance: 1) }
     assert_includes error.message, "No search field set"
   end
   it "regex without search raises" do
@@ -102,16 +102,20 @@ RSpec.describe "GuardsUnitTest" do
     node = builder.phrase(:description, "running shoes", slop: 2)
     refute_nil node
   end
-  it "fuzzy distance rejects non numeric" do
-    error = assert_raises(ArgumentError) { builder.fuzzy(:description, "shoes", distance: "far") }
+  it "fuzzy distance on term rejects non numeric" do
+    error = assert_raises(ArgumentError) { builder.term(:description, "shoes", distance: "far") }
     assert_includes error.message, "distance must be numeric"
   end
-  it "fuzzy boost rejects non numeric" do
-    error = assert_raises(ArgumentError) { builder.fuzzy(:description, "shoes", distance: 1, boost: "high") }
+  it "fuzzy distance on term rejects out of range" do
+    error = assert_raises(ArgumentError) { builder.term(:description, "shoes", distance: 5) }
+    assert_includes error.message, "distance must be between 0 and 2"
+  end
+  it "fuzzy boost on term rejects non numeric" do
+    error = assert_raises(ArgumentError) { builder.term(:description, "shoes", distance: 1, boost: "high") }
     assert_includes error.message, "boost must be numeric"
   end
-  it "fuzzy accepts valid numerics" do
-    node = builder.fuzzy(:description, "shoes", distance: 2, boost: 1.5)
+  it "fuzzy options on term accept valid numerics" do
+    node = builder.term(:description, "shoes", distance: 2, boost: 1.5)
     refute_nil node
   end
   it "term boost rejects non numeric" do

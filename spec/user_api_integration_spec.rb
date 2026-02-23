@@ -95,7 +95,7 @@ RSpec.describe "UserApiIntegrationTest" do
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ### 'running shoes'::pdb.slop(2))), sql
   end
   it "fuzzy with prefix" do
-    sql = Product.search(:description).fuzzy("runn", distance: 1, prefix: true).to_sql
+    sql = Product.search(:description).term("runn", distance: 1, prefix: true).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" === 'runn'::pdb.fuzzy(1, "true"))), sql
   end
   it "regex" do

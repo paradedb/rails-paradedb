@@ -78,26 +78,26 @@ RSpec.describe "ArelPredicationsUnitTest" do
     assert_equal %("products"."category" @@@ pdb.term_set(ARRAY['audio', 'footwear'])), sql(node)
   end
 
-  # ---- pdb_fuzzy ----
-  it "pdb_fuzzy distance only" do
-    node = @t[:description].pdb_fuzzy("shose", distance: 2)
+  # ---- fuzzy options on pdb_term ----
+  it "pdb_term with distance" do
+    node = @t[:description].pdb_term("shose", distance: 2)
     assert_equal %("products"."description" === 'shose'::pdb.fuzzy(2)), sql(node)
   end
-  it "pdb_fuzzy with prefix true" do
-    node = @t[:description].pdb_fuzzy("runn", distance: 1, prefix: true)
+  it "pdb_term with prefix true" do
+    node = @t[:description].pdb_term("runn", distance: 1, prefix: true)
     assert_equal %("products"."description" === 'runn'::pdb.fuzzy(1, "true")), sql(node)
   end
-  it "pdb_fuzzy with prefix false" do
-    node = @t[:description].pdb_fuzzy("shose", distance: 2, prefix: false)
+  it "pdb_term with prefix false" do
+    node = @t[:description].pdb_term("shose", distance: 2, prefix: false)
     assert_equal %("products"."description" === 'shose'::pdb.fuzzy(2)), sql(node)
   end
-  it "pdb_fuzzy with boost" do
-    node = @t[:description].pdb_fuzzy("shose", distance: 2, boost: 1.5)
-    assert_equal %("products"."description" === 'shose'::pdb.fuzzy(2)::pdb.boost(1.5)), sql(node)
+  it "pdb_term with transposition cost one" do
+    node = @t[:description].pdb_term("shose", distance: 1, transposition_cost_one: true)
+    assert_equal %("products"."description" === 'shose'::pdb.fuzzy(1, "false", "true")), sql(node)
   end
-  it "pdb_fuzzy with prefix and boost" do
-    node = @t[:description].pdb_fuzzy("runn", distance: 1, prefix: true, boost: 2.0)
-    assert_equal %("products"."description" === 'runn'::pdb.fuzzy(1, "true")::pdb.boost(2.0)), sql(node)
+  it "pdb_term with fuzzy boost" do
+    node = @t[:description].pdb_term("shose", distance: 2, boost: 1.5)
+    assert_equal %("products"."description" === 'shose'::pdb.fuzzy(2)::pdb.boost(1.5)), sql(node)
   end
 
   # ---- pdb_regex ----
@@ -244,9 +244,13 @@ RSpec.describe "ArelPredicationsUnitTest" do
   end
 
   # ---- Validation ----
-  it "pdb_fuzzy raises on non-numeric distance" do
-    error = assert_raises(ArgumentError) { @t[:description].pdb_fuzzy("shoes", distance: "far") }
+  it "pdb_term raises on non-numeric distance" do
+    error = assert_raises(ArgumentError) { @t[:description].pdb_term("shoes", distance: "far") }
     assert_match(/distance must be numeric/, error.message)
+  end
+  it "pdb_term raises on out-of-range distance" do
+    error = assert_raises(ArgumentError) { @t[:description].pdb_term("shoes", distance: 5) }
+    assert_match(/between 0 and 2/, error.message)
   end
   it "pdb_match raises on non-numeric boost" do
     error = assert_raises(ArgumentError) { @t[:description].pdb_match("shoes", boost: "high") }

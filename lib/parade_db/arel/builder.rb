@@ -16,13 +16,45 @@ module ParadeDB
         column_node(column)
       end
 
-      def match(column, *terms, boost: nil, constant_score: nil)
-        rhs = apply_score_modifier(quoted_value(join_terms(terms)), boost: boost, constant_score: constant_score)
+      def match(
+        column,
+        *terms,
+        distance: nil,
+        prefix: nil,
+        transposition_cost_one: nil,
+        boost: nil,
+        constant_score: nil
+      )
+        rhs = quoted_value(join_terms(terms))
+        rhs = apply_fuzzy(
+          rhs,
+          distance: distance,
+          prefix: prefix,
+          transposition_cost_one: transposition_cost_one,
+          bridge_to_query: !constant_score.nil?
+        )
+        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("&&&", column_node(column), rhs)
       end
 
-      def match_any(column, *terms, boost: nil, constant_score: nil)
-        rhs = apply_score_modifier(quoted_value(join_terms(terms)), boost: boost, constant_score: constant_score)
+      def match_any(
+        column,
+        *terms,
+        distance: nil,
+        prefix: nil,
+        transposition_cost_one: nil,
+        boost: nil,
+        constant_score: nil
+      )
+        rhs = quoted_value(join_terms(terms))
+        rhs = apply_fuzzy(
+          rhs,
+          distance: distance,
+          prefix: prefix,
+          transposition_cost_one: transposition_cost_one,
+          bridge_to_query: !constant_score.nil?
+        )
+        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("|||", column_node(column), rhs)
       end
 
@@ -39,17 +71,24 @@ module ParadeDB
         infix("###", column_node(column), rhs)
       end
 
-      def fuzzy(column, term, distance: 1, prefix: nil, boost: nil, constant_score: nil)
-        validate_numeric!(distance, :distance)
-        rhs = Nodes::FuzzyCast.new(quoted_value(term), quoted_value(distance), prefix: prefix)
-        # ParadeDB cannot cast pdb.fuzzy directly to pdb.const. Bridge through pdb.query.
-        rhs = Nodes::QueryCast.new(rhs) unless constant_score.nil?
+      def term(
+        column,
+        term,
+        distance: nil,
+        prefix: nil,
+        transposition_cost_one: nil,
+        boost: nil,
+        constant_score: nil
+      )
+        rhs = quoted_value(term)
+        rhs = apply_fuzzy(
+          rhs,
+          distance: distance,
+          prefix: prefix,
+          transposition_cost_one: transposition_cost_one,
+          bridge_to_query: !constant_score.nil?
+        )
         rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
-        infix("===", column_node(column), rhs)
-      end
-
-      def term(column, term, boost: nil, constant_score: nil)
-        rhs = apply_score_modifier(quoted_value(term), boost: boost, constant_score: constant_score)
         infix("===", column_node(column), rhs)
       end
 
@@ -176,6 +215,26 @@ module ParadeDB
           return Nodes::ConstCast.new(node, quoted_value(constant_score))
         end
         node
+      end
+
+      def apply_fuzzy(node, distance:, prefix:, transposition_cost_one:, bridge_to_query: false)
+        fuzzy_enabled = !distance.nil? || prefix || transposition_cost_one
+        return node unless fuzzy_enabled
+
+        normalized_distance = distance.nil? ? 1 : distance
+        validate_fuzzy_distance!(normalized_distance)
+
+        rhs = Nodes::FuzzyCast.new(
+          node,
+          quoted_value(normalized_distance),
+          prefix: prefix,
+          transposition_cost_one: transposition_cost_one
+        )
+
+        return rhs unless bridge_to_query
+
+        # ParadeDB cannot cast pdb.fuzzy directly to pdb.const. Bridge through pdb.query.
+        Nodes::QueryCast.new(rhs)
       end
 
       def apply_slop(node, slop)
@@ -327,6 +386,13 @@ module ParadeDB
         return if value.nil?
         unless value.is_a?(Numeric)
           raise ArgumentError, "#{name} must be numeric, got #{value.class}"
+        end
+      end
+
+      def validate_fuzzy_distance!(distance)
+        validate_numeric!(distance, :distance)
+        unless (0..2).cover?(distance)
+          raise ArgumentError, "distance must be between 0 and 2"
         end
       end
 

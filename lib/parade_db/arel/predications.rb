@@ -3,13 +3,18 @@
 module ParadeDB
   module Arel
     module Predications
-      def pdb_match(*terms, boost: nil)
-        rhs = pdb_apply_boost(pdb_quoted(pdb_join_terms(terms)), boost)
+      def pdb_match(*terms, distance: nil, prefix: nil, transposition_cost_one: nil, boost: nil)
+        rhs = pdb_quoted(pdb_join_terms(terms))
+        rhs = pdb_apply_fuzzy(rhs, distance: distance, prefix: prefix, transposition_cost_one: transposition_cost_one)
+        rhs = pdb_apply_boost(rhs, boost)
         ::Arel::Nodes::InfixOperation.new("&&&", self, rhs)
       end
 
-      def pdb_match_any(*terms)
-        ::Arel::Nodes::InfixOperation.new("|||", self, pdb_quoted(pdb_join_terms(terms)))
+      def pdb_match_any(*terms, distance: nil, prefix: nil, transposition_cost_one: nil, boost: nil)
+        rhs = pdb_quoted(pdb_join_terms(terms))
+        rhs = pdb_apply_fuzzy(rhs, distance: distance, prefix: prefix, transposition_cost_one: transposition_cost_one)
+        rhs = pdb_apply_boost(rhs, boost)
+        ::Arel::Nodes::InfixOperation.new("|||", self, rhs)
       end
 
       def pdb_full_text(expression)
@@ -22,15 +27,10 @@ module ParadeDB
         ::Arel::Nodes::InfixOperation.new("###", self, rhs)
       end
 
-      def pdb_fuzzy(term, distance: 1, prefix: nil, boost: nil)
-        pdb_validate_numeric!(distance, :distance)
-        rhs = Nodes::FuzzyCast.new(pdb_quoted(term), pdb_quoted(distance), prefix: prefix)
+      def pdb_term(term, distance: nil, prefix: nil, transposition_cost_one: nil, boost: nil)
+        rhs = pdb_quoted(term)
+        rhs = pdb_apply_fuzzy(rhs, distance: distance, prefix: prefix, transposition_cost_one: transposition_cost_one)
         rhs = pdb_apply_boost(rhs, boost)
-        ::Arel::Nodes::InfixOperation.new("===", self, rhs)
-      end
-
-      def pdb_term(term, boost: nil)
-        rhs = pdb_apply_boost(pdb_quoted(term), boost)
         ::Arel::Nodes::InfixOperation.new("===", self, rhs)
       end
 
@@ -142,6 +142,24 @@ module ParadeDB
 
         pdb_validate_numeric!(boost, :boost)
         Nodes::BoostCast.new(node, pdb_quoted(boost))
+      end
+
+      def pdb_apply_fuzzy(node, distance:, prefix:, transposition_cost_one:)
+        fuzzy_enabled = !distance.nil? || prefix || transposition_cost_one
+        return node unless fuzzy_enabled
+
+        normalized_distance = distance.nil? ? 1 : distance
+        pdb_validate_numeric!(normalized_distance, :distance)
+        unless (0..2).cover?(normalized_distance)
+          raise ArgumentError, "distance must be between 0 and 2"
+        end
+
+        Nodes::FuzzyCast.new(
+          node,
+          pdb_quoted(normalized_distance),
+          prefix: prefix,
+          transposition_cost_one: transposition_cost_one
+        )
       end
 
       def pdb_apply_slop(node, slop)

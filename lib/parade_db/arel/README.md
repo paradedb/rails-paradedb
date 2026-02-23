@@ -27,12 +27,11 @@ Render any node with `ParadeDB::Arel.to_sql(node)`. All nodes respond to
 
 | Method | ParadeDB SQL |
 |--------|--------------|
-| `match(column, *terms, boost: nil)` | `column &&& 'a b'::pdb.boost(N)` |
-| `match_any(column, *terms)` | `column \|\|\| 'a b'` |
+| `match(column, *terms, distance:, prefix:, transposition_cost_one:, boost: nil)` | `column &&& 'a b'::pdb.fuzzy(...)::pdb.boost(N)` |
+| `match_any(column, *terms, distance:, prefix:, transposition_cost_one:, boost: nil)` | `column \|\|\| 'a b'::pdb.fuzzy(...)::pdb.boost(N)` |
 | `phrase(column, text, slop: n)` | `column ### 'text'::pdb.slop(n)` |
-| `term(column, term, boost: nil)` | `column === 'term'::pdb.boost(N)` |
+| `term(column, term, distance:, prefix:, transposition_cost_one:, boost: nil)` | `column === 'term'::pdb.fuzzy(...)::pdb.boost(N)` |
 | `term_set(column, *terms)` | `column @@@ pdb.term_set(ARRAY[...])` |
-| `fuzzy(column, term, distance:, prefix:, boost:)` | `column === 'term'::pdb.fuzzy(d[, "true"])::pdb.boost(N)` |
 | `regex(column, pattern)` | `column @@@ pdb.regex('pattern')` |
 | `near(column, a, b, distance:)` | `column @@@ ('a' ## d ## 'b')` |
 | `phrase_prefix(column, *terms)` | `column @@@ pdb.phrase_prefix(ARRAY['a','b'])` |

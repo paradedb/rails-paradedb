@@ -15,7 +15,7 @@ RSpec.describe "ArelIntegrationTest" do
     nodes << @builder.match(:description, "running", "shoes")
     nodes << @builder.match_any(:description, "wireless", "bluetooth")
     nodes << @builder.phrase(:description, "running shoes", slop: 2)
-    nodes << @builder.fuzzy(:description, "shose", distance: 2, prefix: false, boost: 2)
+    nodes << @builder.term(:description, "shose", distance: 2, prefix: false, boost: 2)
     nodes << @builder.term(:description, "literal")
     nodes << @builder.term_set(:category, %w[audio footwear])
     nodes << @builder.regex(:description, "run.*")

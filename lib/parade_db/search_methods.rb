@@ -112,17 +112,47 @@ module ParadeDB
       extending(SearchMethods).tap { |rel| rel._paradedb_current_field = column }
     end
 
-    def matching_all(*terms, boost: nil, constant_score: nil)
+    def matching_all(
+      *terms,
+      distance: nil,
+      prefix: nil,
+      transposition_cost_one: nil,
+      boost: nil,
+      constant_score: nil
+    )
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      node = builder.match(_paradedb_current_field, *terms, boost: boost, constant_score: constant_score)
+      node = builder.match(
+        _paradedb_current_field,
+        *terms,
+        distance: distance,
+        prefix: prefix,
+        transposition_cost_one: transposition_cost_one,
+        boost: boost,
+        constant_score: constant_score
+      )
       where(grouped(node))
     end
 
-    def matching_any(*terms, boost: nil, constant_score: nil)
+    def matching_any(
+      *terms,
+      distance: nil,
+      prefix: nil,
+      transposition_cost_one: nil,
+      boost: nil,
+      constant_score: nil
+    )
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      node = builder.match_any(_paradedb_current_field, *terms, boost: boost, constant_score: constant_score)
+      node = builder.match_any(
+        _paradedb_current_field,
+        *terms,
+        distance: distance,
+        prefix: prefix,
+        transposition_cost_one: transposition_cost_one,
+        boost: boost,
+        constant_score: constant_score
+      )
       where(grouped(node))
     end
 
@@ -140,13 +170,6 @@ module ParadeDB
       where(grouped(node))
     end
 
-    def fuzzy(term, distance:, prefix: nil, boost: nil, constant_score: nil)
-      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
-
-      node = builder.fuzzy(_paradedb_current_field, term, distance: distance, prefix: prefix, boost: boost, constant_score: constant_score)
-      where(grouped(node))
-    end
-
     def regex(pattern, boost: nil, constant_score: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
@@ -154,10 +177,25 @@ module ParadeDB
       where(grouped(node))
     end
 
-    def term(value, boost: nil, constant_score: nil)
+    def term(
+      value,
+      distance: nil,
+      prefix: nil,
+      transposition_cost_one: nil,
+      boost: nil,
+      constant_score: nil
+    )
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      node = builder.term(_paradedb_current_field, value, boost: boost, constant_score: constant_score)
+      node = builder.term(
+        _paradedb_current_field,
+        value,
+        distance: distance,
+        prefix: prefix,
+        transposition_cost_one: transposition_cost_one,
+        boost: boost,
+        constant_score: constant_score
+      )
       where(grouped(node))
     end
 

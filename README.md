@@ -167,7 +167,8 @@ For advanced options, see [ParadeDB Query Builder Documentation](https://docs.pa
 Product.search(:description).matching_all("running shoes")
 Product.search(:description).matching_any("wireless", "bluetooth")
 Product.search(:description).phrase("running shoes", slop: 2)
-Product.search(:description).fuzzy("runing", distance: 2, prefix: true, boost: 1.5)
+Product.search(:description).matching_any("runing", distance: 2, prefix: true, boost: 1.5)
+Product.search(:description).term("runing", distance: 2, transposition_cost_one: true)
 Product.search(:description).regex("run.*")
 
 # Exact token matching

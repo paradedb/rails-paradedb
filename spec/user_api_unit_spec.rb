@@ -33,7 +33,7 @@ RSpec.describe "UserApiUnitTest" do
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ### 'running shoes'::pdb.slop(2))), sql
   end
   it "fuzzy prefix boost" do
-    sql = UnitProduct.search(:description).fuzzy("shose", distance: 2, prefix: false, boost: 2).to_sql
+    sql = UnitProduct.search(:description).term("shose", distance: 2, prefix: false, boost: 2).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" === 'shose'::pdb.fuzzy(2)::pdb.boost(2))), sql
   end
   it "term exact" do
