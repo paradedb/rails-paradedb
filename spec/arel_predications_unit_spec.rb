@@ -129,6 +129,10 @@ RSpec.describe "ArelPredicationsUnitTest" do
     node = @t[:description].pdb_phrase_prefix("running", "sh")
     assert_equal %("products"."description" @@@ pdb.phrase_prefix(ARRAY['running', 'sh'])), sql(node)
   end
+  it "pdb_phrase_prefix with max expansion" do
+    node = @t[:description].pdb_phrase_prefix("running", "sh", max_expansion: 100)
+    assert_equal %("products"."description" @@@ pdb.phrase_prefix(ARRAY['running', 'sh'], 100)), sql(node)
+  end
   it "pdb_phrase_prefix raises with no terms" do
     assert_raises(ArgumentError) { @t[:description].pdb_phrase_prefix }
   end
@@ -145,6 +149,10 @@ RSpec.describe "ArelPredicationsUnitTest" do
   it "pdb_parse with lenient false" do
     node = @t[:description].pdb_parse("shoes", lenient: false)
     assert_equal %("products"."description" @@@ pdb.parse('shoes', lenient => false)), sql(node)
+  end
+  it "pdb_parse with conjunction_mode true" do
+    node = @t[:description].pdb_parse("running shoes", conjunction_mode: true)
+    assert_equal %("products"."description" @@@ pdb.parse('running shoes', conjunction_mode => true)), sql(node)
   end
 
   # ---- pdb_all ----

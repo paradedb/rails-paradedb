@@ -65,6 +65,11 @@ module ParadeDB
             collector << (o.lenient ? "true" : "false")
           end
 
+          unless o.conjunction_mode.nil?
+            collector << ", conjunction_mode => "
+            collector << (o.conjunction_mode ? "true" : "false")
+          end
+
           collector << ")"
         end
       end

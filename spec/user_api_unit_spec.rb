@@ -56,6 +56,10 @@ RSpec.describe "UserApiUnitTest" do
     sql = UnitProduct.search(:description).phrase_prefix("run", "sh").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.phrase_prefix(ARRAY['run', 'sh']))), sql
   end
+  it "phrase prefix with max expansion" do
+    sql = UnitProduct.search(:description).phrase_prefix("run", "sh", max_expansion: 100).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.phrase_prefix(ARRAY['run', 'sh'], 100))), sql
+  end
   it "parse query with lenient" do
     sql = UnitProduct.search(:description).parse("running AND shoes", lenient: true).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.parse('running AND shoes', lenient => true))), sql
@@ -67,6 +71,10 @@ RSpec.describe "UserApiUnitTest" do
   it "parse query with lenient false" do
     sql = UnitProduct.search(:description).parse("running AND shoes", lenient: false).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.parse('running AND shoes', lenient => false))), sql
+  end
+  it "parse query with conjunction mode" do
+    sql = UnitProduct.search(:description).parse("running shoes", conjunction_mode: true).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.parse('running shoes', conjunction_mode => true))), sql
   end
   it "match all wrapper" do
     sql = UnitProduct.search(:id).match_all.to_sql

@@ -39,20 +39,27 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
     phrase_ids = BehaviorProduct.search(:description).phrase("running shoes").order(:id).pluck(:id)
     near_ids = BehaviorProduct.search(:description).near("running", "shoes", distance: 1).order(:id).pluck(:id)
     prefix_ids = BehaviorProduct.search(:category).phrase_prefix("foot").order(:id).pluck(:id)
+    prefix_max_ids = BehaviorProduct.search(:category).phrase_prefix("foot", max_expansion: 100).order(:id).pluck(:id)
 
     assert_equal [1, 2], phrase_ids
     assert_equal [1, 2], near_ids
     assert_equal [1, 2, 5], prefix_ids
+    assert_equal prefix_ids, prefix_max_ids
   end
   it "parse, match all, and exists wrappers execute" do
     parse_ids = BehaviorProduct.search(:description)
                                .parse("running AND shoes", lenient: true)
                                .order(:id)
                                .pluck(:id)
+    parse_conj_ids = BehaviorProduct.search(:description)
+                                    .parse("running shoes", conjunction_mode: true)
+                                    .order(:id)
+                                    .pluck(:id)
     all_ids = BehaviorProduct.search(:id).match_all.order(:id).limit(3).pluck(:id)
     exists_ids = BehaviorProduct.search(:id).exists.order(:id).limit(3).pluck(:id)
 
     assert_equal [1, 2], parse_ids
+    assert_equal [1, 2], parse_conj_ids
     assert_equal [1, 2, 3], all_ids
     assert_equal [1, 2, 3], exists_ids
   end

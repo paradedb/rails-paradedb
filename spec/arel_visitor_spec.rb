@@ -62,6 +62,14 @@ RSpec.describe "ArelVisitorTest" do
     node = @builder.phrase_prefix(:description, "running", "sh")
     assert_equal %("products"."description" @@@ pdb.phrase_prefix(ARRAY['running', 'sh'])), sql(node)
   end
+  it "phrase prefix with max expansion" do
+    node = @builder.phrase_prefix(:description, "running", "sh", max_expansion: 100)
+    assert_equal %("products"."description" @@@ pdb.phrase_prefix(ARRAY['running', 'sh'], 100)), sql(node)
+  end
+  it "parse with conjunction mode" do
+    node = @builder.parse(:description, "running shoes", conjunction_mode: true)
+    assert_equal %("products"."description" @@@ pdb.parse('running shoes', conjunction_mode => true)), sql(node)
+  end
   it "more like this" do
     node = @builder.more_like_this(:id, 3, fields: [:description])
     assert_equal %("products"."id" @@@ pdb.more_like_this(3, ARRAY['description'])), sql(node)

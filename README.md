@@ -179,6 +179,7 @@ Product.search(:category).term_set("electronics", "audio")
 Product.search(:description).excluding("cheap", "budget")
 Product.search(:description).near("running", "shoes", distance: 3)
 Product.search(:description).phrase_prefix("run", "sh")
+Product.search(:description).phrase_prefix("run", "sh", max_expansion: 100)
 Product.search(:id).match_all
 Product.search(:id).exists
 Product.search(:rating).range(gte: 3, lt: 5)  # also accepts a Ruby Range: range(3..5)
@@ -187,6 +188,7 @@ Product.search(:rating).range(gte: 3, lt: 5)  # also accepts a Ruby Range: range
 # Query string syntax (AND, OR, NOT, wildcards, field:value, boost^n)
 # See: https://docs.paradedb.com/documentation/query-builder/compound/query-parser
 Product.search(:description).parse("running AND shoes", lenient: true)
+Product.search(:description).parse("running shoes", conjunction_mode: true)
 
 # Similarity — many tuning options available
 # See: https://docs.paradedb.com/documentation/query-builder/specialized/more-like-this

@@ -213,17 +213,30 @@ module ParadeDB
       where(grouped(node))
     end
 
-    def phrase_prefix(*terms, boost: nil, constant_score: nil)
+    def phrase_prefix(*terms, max_expansion: nil, boost: nil, constant_score: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      node = builder.phrase_prefix(_paradedb_current_field, *terms, boost: boost, constant_score: constant_score)
+      node = builder.phrase_prefix(
+        _paradedb_current_field,
+        *terms,
+        max_expansion: max_expansion,
+        boost: boost,
+        constant_score: constant_score
+      )
       where(grouped(node))
     end
 
     # Parse query-string syntax into ParadeDB query AST (e.g. "running AND shoes").
-    def parse(query, lenient: nil, boost: nil, constant_score: nil)
+    def parse(query, lenient: nil, conjunction_mode: nil, boost: nil, constant_score: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
-      node = builder.parse(_paradedb_current_field, query, lenient: lenient, boost: boost, constant_score: constant_score)
+      node = builder.parse(
+        _paradedb_current_field,
+        query,
+        lenient: lenient,
+        conjunction_mode: conjunction_mode,
+        boost: boost,
+        constant_score: constant_score
+      )
       where(grouped(node))
     end
 

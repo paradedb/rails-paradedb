@@ -110,6 +110,10 @@ RSpec.describe "GuardsUnitTest" do
     error = assert_raises(ArgumentError) { builder.term(:description, "shoes", distance: 5) }
     assert_includes error.message, "distance must be between 0 and 2"
   end
+  it "fuzzy distance on matching_any rejects out of range" do
+    error = assert_raises(ArgumentError) { builder.match_any(:description, "shoes", distance: 5) }
+    assert_includes error.message, "distance must be between 0 and 2"
+  end
   it "fuzzy boost on term rejects non numeric" do
     error = assert_raises(ArgumentError) { builder.term(:description, "shoes", distance: 1, boost: "high") }
     assert_includes error.message, "boost must be numeric"
@@ -186,6 +190,10 @@ RSpec.describe "GuardsUnitTest" do
   it "phrase prefix with nil terms raises" do
     error = assert_raises(ArgumentError) { builder.phrase_prefix(:description, nil, nil) }
     assert_includes error.message, "phrase_prefix requires at least one term"
+  end
+  it "phrase prefix max expansion must be integer" do
+    error = assert_raises(ArgumentError) { builder.phrase_prefix(:description, "run", max_expansion: "100") }
+    assert_includes error.message, "max_expansion must be an integer"
   end
 
   # ──────────────────────────────────────────────

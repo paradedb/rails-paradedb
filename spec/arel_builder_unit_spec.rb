@@ -194,6 +194,10 @@ RSpec.describe "ArelBuilderUnitTest" do
     node = @builder.phrase_prefix(:description, "running", "sh")
     assert_equal %("products"."description" @@@ pdb.phrase_prefix(ARRAY['running', 'sh'])), sql(node)
   end
+  it "phrase prefix with max expansion" do
+    node = @builder.phrase_prefix(:description, "running", "sh", max_expansion: 100)
+    assert_equal %("products"."description" @@@ pdb.phrase_prefix(ARRAY['running', 'sh'], 100)), sql(node)
+  end
   it "phrase prefix three terms" do
     node = @builder.phrase_prefix(:description, "trail", "running", "sh")
     assert_equal %("products"."description" @@@ pdb.phrase_prefix(ARRAY['trail', 'running', 'sh'])), sql(node)

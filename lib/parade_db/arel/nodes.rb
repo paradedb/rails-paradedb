@@ -125,21 +125,23 @@ module ParadeDB
       end
 
       class ParseNode < ::Arel::Nodes::Node
-        attr_reader :query, :lenient
+        attr_reader :query, :lenient, :conjunction_mode
 
-        def initialize(query, lenient: nil)
+        def initialize(query, lenient: nil, conjunction_mode: nil)
           @query = query
           @lenient = lenient
+          @conjunction_mode = conjunction_mode
         end
 
         def hash
-          [self.class, query, lenient].hash
+          [self.class, query, lenient, conjunction_mode].hash
         end
 
         def eql?(other)
           self.class == other.class &&
             query == other.query &&
-            lenient == other.lenient
+            lenient == other.lenient &&
+            conjunction_mode == other.conjunction_mode
         end
         alias == eql?
       end

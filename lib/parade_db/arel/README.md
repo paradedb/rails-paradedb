@@ -34,7 +34,8 @@ Render any node with `ParadeDB::Arel.to_sql(node)`. All nodes respond to
 | `term_set(column, *terms)` | `column @@@ pdb.term_set(ARRAY[...])` |
 | `regex(column, pattern)` | `column @@@ pdb.regex('pattern')` |
 | `near(column, a, b, distance:)` | `column @@@ ('a' ## d ## 'b')` |
-| `phrase_prefix(column, *terms)` | `column @@@ pdb.phrase_prefix(ARRAY['a','b'])` |
+| `phrase_prefix(column, *terms, max_expansion: nil)` | `column @@@ pdb.phrase_prefix(ARRAY['a','b'][, 100])` |
+| `parse(column, query, lenient: nil, conjunction_mode: nil)` | `column @@@ pdb.parse('q', lenient => true, conjunction_mode => true)` |
 | `full_text(column, expr)` | `column @@@ expr` (raw right-hand value) |
 | `match_all(column)` | `column @@@ pdb.all()` |
 | `exists(column)` | `column @@@ pdb.exists()` |

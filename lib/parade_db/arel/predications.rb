@@ -53,17 +53,26 @@ module ParadeDB
         ::Arel::Nodes::InfixOperation.new("@@@", self, ::Arel::Nodes::Grouping.new(near_chain))
       end
 
-      def pdb_phrase_prefix(*terms)
+      def pdb_phrase_prefix(*terms, max_expansion: nil)
         flat = terms.flatten.compact
         raise ArgumentError, "phrase_prefix requires at least one term" if flat.empty?
 
         array = Nodes::ArrayLiteral.new(flat.map { |term| pdb_quoted(term) })
-        rhs = ::Arel::Nodes::NamedFunction.new("pdb.phrase_prefix", [array])
+        args = [array]
+        unless max_expansion.nil?
+          pdb_validate_integer!(max_expansion, :max_expansion)
+          args << pdb_quoted(max_expansion)
+        end
+        rhs = ::Arel::Nodes::NamedFunction.new("pdb.phrase_prefix", args)
         ::Arel::Nodes::InfixOperation.new("@@@", self, rhs)
       end
 
-      def pdb_parse(query, lenient: nil)
-        rhs = Nodes::ParseNode.new(pdb_quoted(query), lenient: lenient)
+      def pdb_parse(query, lenient: nil, conjunction_mode: nil)
+        rhs = Nodes::ParseNode.new(
+          pdb_quoted(query),
+          lenient: lenient,
+          conjunction_mode: conjunction_mode
+        )
         ::Arel::Nodes::InfixOperation.new("@@@", self, rhs)
       end
 
@@ -185,6 +194,12 @@ module ParadeDB
         return if value.is_a?(Numeric)
 
         raise ArgumentError, "#{name} must be numeric, got #{value.class}"
+      end
+
+      def pdb_validate_integer!(value, name)
+        return if value.is_a?(Integer)
+
+        raise ArgumentError, "#{name} must be an integer"
       end
 
       module_function

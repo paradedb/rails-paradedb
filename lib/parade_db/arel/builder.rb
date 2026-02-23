@@ -114,17 +114,26 @@ module ParadeDB
         infix("@@@", column_node(column), rhs)
       end
 
-      def phrase_prefix(column, *terms, boost: nil, constant_score: nil)
+      def phrase_prefix(column, *terms, max_expansion: nil, boost: nil, constant_score: nil)
         flat = terms.flatten.compact
         raise ArgumentError, "phrase_prefix requires at least one term" if flat.empty?
         array = Nodes::ArrayLiteral.new(flat.map { |term| quoted_value(term) })
-        rhs = ::Arel::Nodes::NamedFunction.new("pdb.phrase_prefix", [array])
+        args = [array]
+        unless max_expansion.nil?
+          validate_integer!(max_expansion, :max_expansion)
+          args << quoted_value(max_expansion)
+        end
+        rhs = ::Arel::Nodes::NamedFunction.new("pdb.phrase_prefix", args)
         rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("@@@", column_node(column), rhs)
       end
 
-      def parse(column, query, lenient: nil, boost: nil, constant_score: nil)
-        rhs = Nodes::ParseNode.new(quoted_value(query), lenient: lenient)
+      def parse(column, query, lenient: nil, conjunction_mode: nil, boost: nil, constant_score: nil)
+        rhs = Nodes::ParseNode.new(
+          quoted_value(query),
+          lenient: lenient,
+          conjunction_mode: conjunction_mode
+        )
         rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("@@@", column_node(column), rhs)
       end
@@ -393,6 +402,12 @@ module ParadeDB
         validate_numeric!(distance, :distance)
         unless (0..2).cover?(distance)
           raise ArgumentError, "distance must be between 0 and 2"
+        end
+      end
+
+      def validate_integer!(value, name)
+        unless value.is_a?(Integer)
+          raise ArgumentError, "#{name} must be an integer"
         end
       end
 
