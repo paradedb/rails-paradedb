@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "set"
 require "spec_helper"
 
 RSpec.describe "DiagnosticsIntegrationTest" do
@@ -14,7 +13,7 @@ RSpec.describe "DiagnosticsIntegrationTest" do
   it "indexes helper returns bm25 index metadata" do
     rows = ParadeDB.paradedb_indexes
     assert_kind_of Array, rows
-    assert rows.any? { |row| row["indexname"] == "products_bm25_idx" }
+    assert(rows.any? { |row| row["indexname"] == "products_bm25_idx" })
   end
 
   it "index_segments helper returns segment metadata" do
@@ -65,9 +64,9 @@ RSpec.describe "DiagnosticsIntegrationTest" do
         AND p.proname IN ('indexes', 'index_segments', 'verify_index', 'verify_all_indexes')
     SQL
 
-    available = rows.to_a.map { |row| row["proname"] }.to_set
-    required = Set.new(%w[indexes index_segments verify_index verify_all_indexes])
+    available = rows.to_a.map { |row| row["proname"] }
+    required = %w[indexes index_segments verify_index verify_all_indexes]
     missing = required - available
-    skip "ParadeDB diagnostics not available in this pg_search version: #{missing.to_a.sort.join(', ')}" unless missing.empty?
+    skip "ParadeDB diagnostics not available in this pg_search version: #{missing.sort.join(', ')}" unless missing.empty?
   end
 end
