@@ -25,11 +25,25 @@ module ParadeDB
           collector << ")"
         end
 
+        def visit_ParadeDB_Arel_Nodes_QueryCast(o, collector)
+          collector = visit(o.expr, collector)
+          collector << "::pdb.query"
+        end
+
         def visit_ParadeDB_Arel_Nodes_FuzzyCast(o, collector)
           collector = visit(o.expr, collector)
           collector << "::pdb.fuzzy("
           collector = visit(o.distance, collector)
-          collector << ', "true"' if o.prefix
+
+          if o.transposition_cost_one
+            collector << ", "
+            collector << (o.prefix ? '"true"' : '"false"')
+            collector << ", "
+            collector << '"true"'
+          elsif o.prefix
+            collector << ', "true"'
+          end
+
           collector << ")"
         end
 
@@ -42,6 +56,12 @@ module ParadeDB
           collector << "]"
         end
 
+        def visit_ParadeDB_Arel_Nodes_TokenizerCast(o, collector)
+          collector = visit(o.expr, collector)
+          collector << "::"
+          collector << o.tokenizer_sql
+        end
+
         def visit_ParadeDB_Arel_Nodes_ParseNode(o, collector)
           collector << "pdb.parse("
           collector = visit(o.query, collector)
@@ -49,6 +69,11 @@ module ParadeDB
           unless o.lenient.nil?
             collector << ", lenient => "
             collector << (o.lenient ? "true" : "false")
+          end
+
+          unless o.conjunction_mode.nil?
+            collector << ", conjunction_mode => "
+            collector << (o.conjunction_mode ? "true" : "false")
           end
 
           collector << ")"

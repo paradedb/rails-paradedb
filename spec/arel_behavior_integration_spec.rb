@@ -112,24 +112,24 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
   # ---- fuzzy ----
   it "fuzzy corrects typo" do
     # "shose" is 1 edit from "shoes"
-    ids = search(:description).fuzzy("shose", distance: 2).order(:id).pluck(:id)
+    ids = search(:description).term("shose", distance: 2).order(:id).pluck(:id)
     assert_equal [1, 2], ids
   end
   it "fuzzy with prefix true" do
-    ids = search(:description).fuzzy("runn", distance: 1, prefix: true).order(:id).pluck(:id)
+    ids = search(:description).term("runn", distance: 1, prefix: true).order(:id).pluck(:id)
     assert_includes ids, 1
     assert_includes ids, 2
   end
   it "fuzzy with small distance fewer matches" do
     # distance 1 may not correct "shose" -> "shoes" depending on tokenizer
-    ids_d1 = search(:description).fuzzy("shose", distance: 1).order(:id).pluck(:id)
-    ids_d2 = search(:description).fuzzy("shose", distance: 2).order(:id).pluck(:id)
+    ids_d1 = search(:description).term("shose", distance: 1).order(:id).pluck(:id)
+    ids_d2 = search(:description).term("shose", distance: 2).order(:id).pluck(:id)
     # Larger distance should be superset or equal
     assert (ids_d1 - ids_d2).empty?, "distance=2 should include all distance=1 results"
   end
   it "fuzzy with boost and prefix" do
     ids = search(:description)
-            .fuzzy("runn", distance: 1, prefix: true, boost: 1.5)
+            .term("runn", distance: 1, prefix: true, boost: 1.5)
             .order(:id)
             .pluck(:id)
     refute_empty ids

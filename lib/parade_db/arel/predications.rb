@@ -3,13 +3,22 @@
 module ParadeDB
   module Arel
     module Predications
-      def pdb_match(*terms, boost: nil)
-        rhs = pdb_apply_boost(pdb_quoted(pdb_join_terms(terms)), boost)
+      TOKENIZER_EXPRESSION = /\A[a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\s*[a-zA-Z0-9_'".,=\s:-]*\s*\))?\z/.freeze
+
+      def pdb_match(*terms, tokenizer: nil, distance: nil, prefix: nil, transposition_cost_one: nil, boost: nil)
+        rhs = pdb_quoted(pdb_join_terms(terms))
+        rhs = pdb_apply_fuzzy(rhs, distance: distance, prefix: prefix, transposition_cost_one: transposition_cost_one)
+        rhs = pdb_apply_tokenizer(rhs, tokenizer)
+        rhs = pdb_apply_boost(rhs, boost)
         ::Arel::Nodes::InfixOperation.new("&&&", self, rhs)
       end
 
-      def pdb_match_any(*terms)
-        ::Arel::Nodes::InfixOperation.new("|||", self, pdb_quoted(pdb_join_terms(terms)))
+      def pdb_match_any(*terms, tokenizer: nil, distance: nil, prefix: nil, transposition_cost_one: nil, boost: nil)
+        rhs = pdb_quoted(pdb_join_terms(terms))
+        rhs = pdb_apply_fuzzy(rhs, distance: distance, prefix: prefix, transposition_cost_one: transposition_cost_one)
+        rhs = pdb_apply_tokenizer(rhs, tokenizer)
+        rhs = pdb_apply_boost(rhs, boost)
+        ::Arel::Nodes::InfixOperation.new("|||", self, rhs)
       end
 
       def pdb_full_text(expression)
@@ -22,15 +31,10 @@ module ParadeDB
         ::Arel::Nodes::InfixOperation.new("###", self, rhs)
       end
 
-      def pdb_fuzzy(term, distance: 1, prefix: nil, boost: nil)
-        pdb_validate_numeric!(distance, :distance)
-        rhs = Nodes::FuzzyCast.new(pdb_quoted(term), pdb_quoted(distance), prefix: prefix)
+      def pdb_term(term, distance: nil, prefix: nil, transposition_cost_one: nil, boost: nil)
+        rhs = pdb_quoted(term)
+        rhs = pdb_apply_fuzzy(rhs, distance: distance, prefix: prefix, transposition_cost_one: transposition_cost_one)
         rhs = pdb_apply_boost(rhs, boost)
-        ::Arel::Nodes::InfixOperation.new("===", self, rhs)
-      end
-
-      def pdb_term(term, boost: nil)
-        rhs = pdb_apply_boost(pdb_quoted(term), boost)
         ::Arel::Nodes::InfixOperation.new("===", self, rhs)
       end
 
@@ -53,17 +57,26 @@ module ParadeDB
         ::Arel::Nodes::InfixOperation.new("@@@", self, ::Arel::Nodes::Grouping.new(near_chain))
       end
 
-      def pdb_phrase_prefix(*terms)
+      def pdb_phrase_prefix(*terms, max_expansion: nil)
         flat = terms.flatten.compact
         raise ArgumentError, "phrase_prefix requires at least one term" if flat.empty?
 
         array = Nodes::ArrayLiteral.new(flat.map { |term| pdb_quoted(term) })
-        rhs = ::Arel::Nodes::NamedFunction.new("pdb.phrase_prefix", [array])
+        args = [array]
+        unless max_expansion.nil?
+          pdb_validate_integer!(max_expansion, :max_expansion)
+          args << pdb_quoted(max_expansion)
+        end
+        rhs = ::Arel::Nodes::NamedFunction.new("pdb.phrase_prefix", args)
         ::Arel::Nodes::InfixOperation.new("@@@", self, rhs)
       end
 
-      def pdb_parse(query, lenient: nil)
-        rhs = Nodes::ParseNode.new(pdb_quoted(query), lenient: lenient)
+      def pdb_parse(query, lenient: nil, conjunction_mode: nil)
+        rhs = Nodes::ParseNode.new(
+          pdb_quoted(query),
+          lenient: lenient,
+          conjunction_mode: conjunction_mode
+        )
         ::Arel::Nodes::InfixOperation.new("@@@", self, rhs)
       end
 
@@ -144,6 +157,35 @@ module ParadeDB
         Nodes::BoostCast.new(node, pdb_quoted(boost))
       end
 
+      def pdb_apply_fuzzy(node, distance:, prefix:, transposition_cost_one:)
+        fuzzy_enabled = !distance.nil? || prefix || transposition_cost_one
+        return node unless fuzzy_enabled
+
+        normalized_distance = distance.nil? ? 1 : distance
+        pdb_validate_numeric!(normalized_distance, :distance)
+        unless (0..2).cover?(normalized_distance)
+          raise ArgumentError, "distance must be between 0 and 2"
+        end
+
+        Nodes::FuzzyCast.new(
+          node,
+          pdb_quoted(normalized_distance),
+          prefix: prefix,
+          transposition_cost_one: transposition_cost_one
+        )
+      end
+
+      def pdb_apply_tokenizer(node, tokenizer)
+        return node if tokenizer.nil?
+
+        unless tokenizer.is_a?(String)
+          raise ArgumentError, "tokenizer must be a string"
+        end
+
+        normalized = pdb_normalize_tokenizer(tokenizer)
+        Nodes::TokenizerCast.new(node, normalized)
+      end
+
       def pdb_apply_slop(node, slop)
         return node if slop.nil?
 
@@ -167,6 +209,36 @@ module ParadeDB
         return if value.is_a?(Numeric)
 
         raise ArgumentError, "#{name} must be numeric, got #{value.class}"
+      end
+
+      def pdb_validate_integer!(value, name)
+        return if value.is_a?(Integer)
+
+        raise ArgumentError, "#{name} must be an integer"
+      end
+
+      def pdb_normalize_tokenizer(tokenizer)
+        value = tokenizer.strip
+        if value.empty?
+          raise ArgumentError, "tokenizer cannot be blank"
+        end
+        unless TOKENIZER_EXPRESSION.match?(value)
+          raise ArgumentError, "invalid tokenizer expression: #{tokenizer.inspect}"
+        end
+
+        if value.include?("(")
+          function_name, rest = value.split("(", 2)
+          normalized_name = pdb_normalize_tokenizer_function_name(function_name)
+          return "#{normalized_name}(#{rest}"
+        end
+
+        pdb_normalize_tokenizer_function_name(value)
+      end
+
+      def pdb_normalize_tokenizer_function_name(function_name)
+        return function_name if function_name.include?(".") || function_name.include?("::")
+
+        "pdb.#{function_name}"
       end
 
       module_function

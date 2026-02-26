@@ -34,8 +34,8 @@ RSpec.describe "GuardsUnitTest" do
     error = assert_raises(RuntimeError) { bare_relation.phrase("running shoes") }
     assert_includes error.message, "No search field set"
   end
-  it "fuzzy without search raises" do
-    error = assert_raises(RuntimeError) { bare_relation.fuzzy("shoes", distance: 1) }
+  it "fuzzy-style matching_any without search raises" do
+    error = assert_raises(RuntimeError) { bare_relation.matching_any("shoes", distance: 1) }
     assert_includes error.message, "No search field set"
   end
   it "regex without search raises" do
@@ -94,6 +94,14 @@ RSpec.describe "GuardsUnitTest" do
     node = builder.match(:description, "shoes", boost: nil)
     refute_nil node
   end
+  it "match tokenizer rejects non-string" do
+    error = assert_raises(ArgumentError) { builder.match(:description, "shoes", tokenizer: 123) }
+    assert_includes error.message, "tokenizer must be a string"
+  end
+  it "match tokenizer rejects invalid expression" do
+    error = assert_raises(ArgumentError) { builder.match(:description, "shoes", tokenizer: "whitespace;drop") }
+    assert_includes error.message, "invalid tokenizer expression"
+  end
   it "phrase slop rejects non numeric" do
     error = assert_raises(ArgumentError) { builder.phrase(:description, "running shoes", slop: "lots") }
     assert_includes error.message, "slop must be numeric"
@@ -102,16 +110,24 @@ RSpec.describe "GuardsUnitTest" do
     node = builder.phrase(:description, "running shoes", slop: 2)
     refute_nil node
   end
-  it "fuzzy distance rejects non numeric" do
-    error = assert_raises(ArgumentError) { builder.fuzzy(:description, "shoes", distance: "far") }
+  it "fuzzy distance on term rejects non numeric" do
+    error = assert_raises(ArgumentError) { builder.term(:description, "shoes", distance: "far") }
     assert_includes error.message, "distance must be numeric"
   end
-  it "fuzzy boost rejects non numeric" do
-    error = assert_raises(ArgumentError) { builder.fuzzy(:description, "shoes", distance: 1, boost: "high") }
+  it "fuzzy distance on term rejects out of range" do
+    error = assert_raises(ArgumentError) { builder.term(:description, "shoes", distance: 5) }
+    assert_includes error.message, "distance must be between 0 and 2"
+  end
+  it "fuzzy distance on matching_any rejects out of range" do
+    error = assert_raises(ArgumentError) { builder.match_any(:description, "shoes", distance: 5) }
+    assert_includes error.message, "distance must be between 0 and 2"
+  end
+  it "fuzzy boost on term rejects non numeric" do
+    error = assert_raises(ArgumentError) { builder.term(:description, "shoes", distance: 1, boost: "high") }
     assert_includes error.message, "boost must be numeric"
   end
-  it "fuzzy accepts valid numerics" do
-    node = builder.fuzzy(:description, "shoes", distance: 2, boost: 1.5)
+  it "fuzzy options on term accept valid numerics" do
+    node = builder.term(:description, "shoes", distance: 2, boost: 1.5)
     refute_nil node
   end
   it "term boost rejects non numeric" do
@@ -182,6 +198,10 @@ RSpec.describe "GuardsUnitTest" do
   it "phrase prefix with nil terms raises" do
     error = assert_raises(ArgumentError) { builder.phrase_prefix(:description, nil, nil) }
     assert_includes error.message, "phrase_prefix requires at least one term"
+  end
+  it "phrase prefix max expansion must be integer" do
+    error = assert_raises(ArgumentError) { builder.phrase_prefix(:description, "run", max_expansion: "100") }
+    assert_includes error.message, "max_expansion must be an integer"
   end
 
   # ──────────────────────────────────────────────
@@ -330,6 +350,20 @@ RSpec.describe "GuardsUnitTest" do
                                   .matching_all("shoes")
                                   .build_facet_query(fields: [Object.new], agg: { "value_count" => { "field" => "id" } })
     assert_includes facet_query.sql, %(pdb.agg('{"value_count":{"field":"id"}}'))
+  end
+  it "facets exact false raises on non-windowed API" do
+    error = assert_raises(ArgumentError) do
+      GuardTestProduct.search(:description).matching_all("shoes").facets(:category, exact: false)
+    end
+    assert_includes error.message, "facets(exact: false)"
+  end
+  it "facets_agg exact false raises on non-windowed API" do
+    error = assert_raises(ArgumentError) do
+      GuardTestProduct.search(:description)
+                      .matching_all("shoes")
+                      .facets_agg(exact: false, docs: ParadeDB::Aggregations.value_count(:id))
+    end
+    assert_includes error.message, "facets_agg(exact: false)"
   end
 
   # ──────────────────────────────────────────────

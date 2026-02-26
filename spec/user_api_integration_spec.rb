@@ -77,6 +77,10 @@ RSpec.describe "UserApiIntegrationTest" do
     sql = Product.search(:description).matching_any("wireless", "bluetooth").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ||| 'wireless bluetooth')), sql
   end
+  it "matching all with tokenizer override" do
+    sql = Product.search(:description).matching_all("running shoes", tokenizer: "whitespace").to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" &&& 'running shoes'::pdb.whitespace)), sql
+  end
   it "excluding terms" do
     sql = Product.search(:description)
                  .matching_all("shoes")
@@ -95,7 +99,7 @@ RSpec.describe "UserApiIntegrationTest" do
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ### 'running shoes'::pdb.slop(2))), sql
   end
   it "fuzzy with prefix" do
-    sql = Product.search(:description).fuzzy("runn", distance: 1, prefix: true).to_sql
+    sql = Product.search(:description).term("runn", distance: 1, prefix: true).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" === 'runn'::pdb.fuzzy(1, "true"))), sql
   end
   it "regex" do
@@ -118,9 +122,17 @@ RSpec.describe "UserApiIntegrationTest" do
     sql = Product.search(:description).phrase_prefix("run", "sh").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.phrase_prefix(ARRAY['run', 'sh']))), sql
   end
+  it "phrase prefix with max expansion" do
+    sql = Product.search(:description).phrase_prefix("run", "sh", max_expansion: 100).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.phrase_prefix(ARRAY['run', 'sh'], 100))), sql
+  end
   it "parse query" do
     sql = Product.search(:description).parse("running AND shoes", lenient: true).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.parse('running AND shoes', lenient => true))), sql
+  end
+  it "parse query with conjunction mode" do
+    sql = Product.search(:description).parse("running shoes", conjunction_mode: true).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.parse('running shoes', conjunction_mode => true))), sql
   end
   it "match all wrapper" do
     sql = Product.search(:id).match_all.to_sql
@@ -275,6 +287,18 @@ RSpec.describe "UserApiIntegrationTest" do
       WHERE ("products"."description" &&& 'shoes') AND "products"."in_stock" = true
       ORDER BY "products"."rating" DESC
       LIMIT 10
+    SQL
+
+    assert_sql_equal expected, sql
+  end
+  it "with facets exact false emits second agg argument" do
+    sql = Product.search(:description).matching_all("shoes")
+                 .with_facets(:category, size: 10, exact: false)
+                 .to_sql
+
+    expected = <<~SQL.strip
+      SELECT products.*, pdb.agg('{"terms":{"field":"category","size":10,"order":{"_count":"desc"}}}', false) OVER () AS _category_facet FROM products
+      WHERE ("products"."description" &&& 'shoes')
     SQL
 
     assert_sql_equal expected, sql

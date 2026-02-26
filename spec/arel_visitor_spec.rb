@@ -18,6 +18,10 @@ RSpec.describe "ArelVisitorTest" do
     node = @builder.match_any(:description, "wireless", "bluetooth")
     assert_equal %("products"."description" ||| 'wireless bluetooth'), sql(node)
   end
+  it "match any with tokenizer override" do
+    node = @builder.match_any(:description, "running shoes", tokenizer: "whitespace")
+    assert_equal %("products"."description" ||| 'running shoes'::pdb.whitespace), sql(node)
+  end
   it "phrase with slop" do
     node = @builder.phrase(:description, "running shoes", slop: 2)
     assert_equal %("products"."description" ### 'running shoes'::pdb.slop(2)), sql(node)
@@ -34,16 +38,16 @@ RSpec.describe "ArelVisitorTest" do
     node = @builder.term(:description, "shoes", boost: 2)
     assert_equal %("products"."description" === 'shoes'::pdb.boost(2)), sql(node)
   end
-  it "fuzzy with prefix" do
-    node = @builder.fuzzy(:description, "runn", distance: 1, prefix: true)
+  it "term with fuzzy prefix" do
+    node = @builder.term(:description, "runn", distance: 1, prefix: true)
     assert_equal %("products"."description" === 'runn'::pdb.fuzzy(1, "true")), sql(node)
   end
-  it "fuzzy with boost" do
-    node = @builder.fuzzy(:description, "shose", distance: 2, boost: 2)
+  it "term with fuzzy boost" do
+    node = @builder.term(:description, "shose", distance: 2, boost: 2)
     assert_equal %("products"."description" === 'shose'::pdb.fuzzy(2)::pdb.boost(2)), sql(node)
   end
-  it "fuzzy with prefix and boost" do
-    node = @builder.fuzzy(:description, "runn", distance: 1, prefix: true, boost: 1.5)
+  it "term with fuzzy prefix and boost" do
+    node = @builder.term(:description, "runn", distance: 1, prefix: true, boost: 1.5)
     assert_equal %("products"."description" === 'runn'::pdb.fuzzy(1, "true")::pdb.boost(1.5)), sql(node)
   end
   it "boost" do
@@ -61,6 +65,14 @@ RSpec.describe "ArelVisitorTest" do
   it "phrase prefix" do
     node = @builder.phrase_prefix(:description, "running", "sh")
     assert_equal %("products"."description" @@@ pdb.phrase_prefix(ARRAY['running', 'sh'])), sql(node)
+  end
+  it "phrase prefix with max expansion" do
+    node = @builder.phrase_prefix(:description, "running", "sh", max_expansion: 100)
+    assert_equal %("products"."description" @@@ pdb.phrase_prefix(ARRAY['running', 'sh'], 100)), sql(node)
+  end
+  it "parse with conjunction mode" do
+    node = @builder.parse(:description, "running shoes", conjunction_mode: true)
+    assert_equal %("products"."description" @@@ pdb.parse('running shoes', conjunction_mode => true)), sql(node)
   end
   it "more like this" do
     node = @builder.more_like_this(:id, 3, fields: [:description])

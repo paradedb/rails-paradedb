@@ -28,12 +28,20 @@ RSpec.describe "UserApiUnitTest" do
     sql = UnitProduct.search(:description).matching_any("wireless", "bluetooth").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ||| 'wireless bluetooth')), sql
   end
+  it "matching all with tokenizer override" do
+    sql = UnitProduct.search(:description).matching_all("running shoes", tokenizer: "whitespace").to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" &&& 'running shoes'::pdb.whitespace)), sql
+  end
+  it "matching all with tokenizer args" do
+    sql = UnitProduct.search(:description).matching_all("running shoes", tokenizer: "whitespace('lowercase=false')").to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" &&& 'running shoes'::pdb.whitespace('lowercase=false'))), sql
+  end
   it "phrase slop" do
     sql = UnitProduct.search(:description).phrase("running shoes", slop: 2).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ### 'running shoes'::pdb.slop(2))), sql
   end
   it "fuzzy prefix boost" do
-    sql = UnitProduct.search(:description).fuzzy("shose", distance: 2, prefix: false, boost: 2).to_sql
+    sql = UnitProduct.search(:description).term("shose", distance: 2, prefix: false, boost: 2).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" === 'shose'::pdb.fuzzy(2)::pdb.boost(2))), sql
   end
   it "term exact" do
@@ -56,6 +64,10 @@ RSpec.describe "UserApiUnitTest" do
     sql = UnitProduct.search(:description).phrase_prefix("run", "sh").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.phrase_prefix(ARRAY['run', 'sh']))), sql
   end
+  it "phrase prefix with max expansion" do
+    sql = UnitProduct.search(:description).phrase_prefix("run", "sh", max_expansion: 100).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.phrase_prefix(ARRAY['run', 'sh'], 100))), sql
+  end
   it "parse query with lenient" do
     sql = UnitProduct.search(:description).parse("running AND shoes", lenient: true).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.parse('running AND shoes', lenient => true))), sql
@@ -67,6 +79,10 @@ RSpec.describe "UserApiUnitTest" do
   it "parse query with lenient false" do
     sql = UnitProduct.search(:description).parse("running AND shoes", lenient: false).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.parse('running AND shoes', lenient => false))), sql
+  end
+  it "parse query with conjunction mode" do
+    sql = UnitProduct.search(:description).parse("running shoes", conjunction_mode: true).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.parse('running shoes', conjunction_mode => true))), sql
   end
   it "match all wrapper" do
     sql = UnitProduct.search(:id).match_all.to_sql
@@ -300,6 +316,21 @@ RSpec.describe "UserApiUnitTest" do
     expected = %(SELECT products.*, pdb.agg('{"terms":{"field":"category","size":10,"order":{"_count":"desc"}}}') OVER () AS _category_facet FROM products WHERE ("products"."description" &&& 'shoes'))
     assert_sql_equal expected, sql
   end
+  it "with facets exact false emits second agg argument" do
+    sql = UnitProduct.search(:description)
+                     .matching_all("shoes")
+                     .with_facets(:category, size: 10, exact: false)
+                     .to_sql
+
+    expected = %(SELECT products.*, pdb.agg('{"terms":{"field":"category","size":10,"order":{"_count":"desc"}}}', false) OVER () AS _category_facet FROM products WHERE ("products"."description" &&& 'shoes'))
+    assert_sql_equal expected, sql
+  end
+  it "facets exact false raises" do
+    error = assert_raises(ArgumentError) do
+      UnitProduct.search(:description).matching_all("shoes").facets(:category, exact: false)
+    end
+    assert_includes error.message, "facets(exact: false)"
+  end
   it "with facets uses custom agg and ignores field size order missing" do
     sql = UnitProduct.search(:description)
                      .matching_all("shoes")
@@ -347,6 +378,26 @@ RSpec.describe "UserApiUnitTest" do
 
     assert_includes sql, %(pdb.agg('{"value_count":{"field":"id"}}') OVER () AS _docs_facet)
     assert_includes sql, %(pdb.agg('{"avg":{"field":"rating"}}') OVER () AS _avg_rating_facet)
+  end
+  it "with_agg exact false emits second agg argument" do
+    sql = UnitProduct.search(:description)
+                     .matching_all("shoes")
+                     .with_agg(
+                       exact: false,
+                       docs: ParadeDB::Aggregations.value_count(:id)
+                     )
+                     .to_sql
+
+    assert_includes sql, %(pdb.agg('{"value_count":{"field":"id"}}', FALSE) OVER () AS _docs_facet)
+  end
+  it "facets_agg exact false raises" do
+    error = assert_raises(ArgumentError) do
+      UnitProduct.search(:description).matching_all("shoes").facets_agg(
+        exact: false,
+        docs: ParadeDB::Aggregations.value_count(:id)
+      )
+    end
+    assert_includes error.message, "facets_agg(exact: false)"
   end
   it "model with_agg class helper delegates to relation api" do
     sql = UnitProduct.with_agg(docs: ParadeDB::Aggregations.value_count(:id)).to_sql

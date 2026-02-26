@@ -112,17 +112,51 @@ module ParadeDB
       extending(SearchMethods).tap { |rel| rel._paradedb_current_field = column }
     end
 
-    def matching_all(*terms, boost: nil, constant_score: nil)
+    def matching_all(
+      *terms,
+      tokenizer: nil,
+      distance: nil,
+      prefix: nil,
+      transposition_cost_one: nil,
+      boost: nil,
+      constant_score: nil
+    )
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      node = builder.match(_paradedb_current_field, *terms, boost: boost, constant_score: constant_score)
+      node = builder.match(
+        _paradedb_current_field,
+        *terms,
+        tokenizer: tokenizer,
+        distance: distance,
+        prefix: prefix,
+        transposition_cost_one: transposition_cost_one,
+        boost: boost,
+        constant_score: constant_score
+      )
       where(grouped(node))
     end
 
-    def matching_any(*terms, boost: nil, constant_score: nil)
+    def matching_any(
+      *terms,
+      tokenizer: nil,
+      distance: nil,
+      prefix: nil,
+      transposition_cost_one: nil,
+      boost: nil,
+      constant_score: nil
+    )
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      node = builder.match_any(_paradedb_current_field, *terms, boost: boost, constant_score: constant_score)
+      node = builder.match_any(
+        _paradedb_current_field,
+        *terms,
+        tokenizer: tokenizer,
+        distance: distance,
+        prefix: prefix,
+        transposition_cost_one: transposition_cost_one,
+        boost: boost,
+        constant_score: constant_score
+      )
       where(grouped(node))
     end
 
@@ -140,13 +174,6 @@ module ParadeDB
       where(grouped(node))
     end
 
-    def fuzzy(term, distance:, prefix: nil, boost: nil, constant_score: nil)
-      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
-
-      node = builder.fuzzy(_paradedb_current_field, term, distance: distance, prefix: prefix, boost: boost, constant_score: constant_score)
-      where(grouped(node))
-    end
-
     def regex(pattern, boost: nil, constant_score: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
@@ -154,10 +181,25 @@ module ParadeDB
       where(grouped(node))
     end
 
-    def term(value, boost: nil, constant_score: nil)
+    def term(
+      value,
+      distance: nil,
+      prefix: nil,
+      transposition_cost_one: nil,
+      boost: nil,
+      constant_score: nil
+    )
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      node = builder.term(_paradedb_current_field, value, boost: boost, constant_score: constant_score)
+      node = builder.term(
+        _paradedb_current_field,
+        value,
+        distance: distance,
+        prefix: prefix,
+        transposition_cost_one: transposition_cost_one,
+        boost: boost,
+        constant_score: constant_score
+      )
       where(grouped(node))
     end
 
@@ -175,17 +217,30 @@ module ParadeDB
       where(grouped(node))
     end
 
-    def phrase_prefix(*terms, boost: nil, constant_score: nil)
+    def phrase_prefix(*terms, max_expansion: nil, boost: nil, constant_score: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      node = builder.phrase_prefix(_paradedb_current_field, *terms, boost: boost, constant_score: constant_score)
+      node = builder.phrase_prefix(
+        _paradedb_current_field,
+        *terms,
+        max_expansion: max_expansion,
+        boost: boost,
+        constant_score: constant_score
+      )
       where(grouped(node))
     end
 
     # Parse query-string syntax into ParadeDB query AST (e.g. "running AND shoes").
-    def parse(query, lenient: nil, boost: nil, constant_score: nil)
+    def parse(query, lenient: nil, conjunction_mode: nil, boost: nil, constant_score: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
-      node = builder.parse(_paradedb_current_field, query, lenient: lenient, boost: boost, constant_score: constant_score)
+      node = builder.parse(
+        _paradedb_current_field,
+        query,
+        lenient: lenient,
+        conjunction_mode: conjunction_mode,
+        boost: boost,
+        constant_score: constant_score
+      )
       where(grouped(node))
     end
 
@@ -279,24 +334,35 @@ module ParadeDB
 
     # ---- Facets ----
 
-    def facets(*fields, size: 10, order: :count_desc, missing: nil, agg: nil)
+    def facets(*fields, size: 10, order: :count_desc, missing: nil, agg: nil, exact: nil)
       ensure_paradedb_runtime!
+      validate_exact_option!(exact)
+      if exact == false
+        raise ArgumentError, "facets(exact: false) requires with_facets so aggregation runs as a window function"
+      end
+
       build_facet_query(
         fields: fields,
         size: size,
         order: order,
         missing: missing,
-        agg: agg
+        agg: agg,
+        exact: exact
       ).execute
     end
 
-    def facets_agg(**named_aggregations)
+    def facets_agg(exact: nil, **named_aggregations)
+      validate_exact_option!(exact)
+      if exact == false
+        raise ArgumentError, "facets_agg(exact: false) requires with_agg so aggregation runs as a window function"
+      end
+
       agg_specs = normalize_named_aggregation_specs(named_aggregations)
-      build_aggregation_query(agg_specs).execute
+      build_aggregation_query(agg_specs, exact: exact).execute
     end
 
     # Internal method to build facet query (for testing)
-    def build_facet_query(fields:, size: 10, order: :count_desc, missing: nil, agg: nil)
+    def build_facet_query(fields:, size: 10, order: :count_desc, missing: nil, agg: nil, exact: nil)
       ensure_paradedb_runtime!
       facet_args = normalize_facet_inputs(fields: fields, size: size, order: order, missing: missing, agg: agg)
       FacetQuery.build(
@@ -308,12 +374,14 @@ module ParadeDB
         order: facet_args[:order],
         missing: facet_args[:missing],
         agg: facet_args[:agg],
+        exact: exact,
         connection: connection
       )
     end
 
-    def with_facets(*fields, size: 10, order: :count_desc, missing: nil, agg: nil)
+    def with_facets(*fields, size: 10, order: :count_desc, missing: nil, agg: nil, exact: nil)
       ensure_paradedb_runtime!
+      validate_exact_option!(exact)
       facet_args = normalize_facet_inputs(fields: fields, size: size, order: order, missing: missing, agg: agg)
       opts = {
         size: facet_args[:size],
@@ -334,15 +402,16 @@ module ParadeDB
       # Add window aggregates to SELECT using native Arel nodes.
       facet_selects = facet_fields.map do |field|
         json = facet_args[:agg] || facet_json(field, opts)
-        builder.agg(json).over.as("_#{field}_facet")
+        builder.agg(json, exact: exact).over.as("_#{field}_facet")
       end
 
       rel = rel.select(klass.arel_table[::Arel.star]) if rel.select_values.empty?
       rel.select(*facet_selects)
     end
 
-    def with_agg(**named_aggregations)
+    def with_agg(exact: nil, **named_aggregations)
       ensure_paradedb_runtime!
+      validate_exact_option!(exact)
       agg_specs = normalize_named_aggregation_specs(named_aggregations)
       rel = extending(FacetRelation, AggregationRelation)
       rel._paradedb_facet_fields = agg_specs.keys
@@ -352,7 +421,7 @@ module ParadeDB
       end
 
       facet_selects = agg_specs.map do |alias_name, json|
-        builder.agg(json).over.as("_#{alias_name}_facet")
+        builder.agg(json, exact: exact).over.as("_#{alias_name}_facet")
       end
 
       rel = rel.select(klass.arel_table[::Arel.star]) if rel.select_values.empty?
@@ -482,12 +551,19 @@ module ParadeDB
         .transform_values(&:to_json)
     end
 
-    def build_aggregation_query(agg_specs)
+    def validate_exact_option!(exact)
+      return if exact.nil? || exact == true || exact == false
+
+      raise ArgumentError, "exact must be true, false, or nil"
+    end
+
+    def build_aggregation_query(agg_specs, exact: nil)
       AggregationQuery.build(
         relation: self,
         primary_key: paradedb_runtime_key_field,
         builder: builder,
         agg_specs: agg_specs,
+        exact: exact,
         connection: connection
       )
     end
@@ -603,7 +679,7 @@ module ParadeDB
     class FacetQuery
       attr_reader :relation, :connection
 
-      def self.build(relation:, primary_key:, builder:, fields:, size:, order:, missing:, agg:, connection:)
+      def self.build(relation:, primary_key:, builder:, fields:, size:, order:, missing:, agg:, exact:, connection:)
         new(
           relation: relation,
           primary_key: primary_key,
@@ -613,11 +689,12 @@ module ParadeDB
           order: order,
           missing: missing,
           agg: agg,
+          exact: exact,
           connection: connection
         )
       end
 
-      def initialize(relation:, primary_key:, builder:, fields:, size:, order:, missing:, agg:, connection:)
+      def initialize(relation:, primary_key:, builder:, fields:, size:, order:, missing:, agg:, exact:, connection:)
         @connection = connection
         @relation = build_relation(
           relation: relation,
@@ -627,7 +704,8 @@ module ParadeDB
           size: size,
           order: order,
           missing: missing,
-          agg: agg
+          agg: agg,
+          exact: exact
         )
       end
 
@@ -641,7 +719,7 @@ module ParadeDB
 
       private
 
-      def build_relation(relation:, primary_key:, builder:, fields:, size:, order:, missing:, agg:)
+      def build_relation(relation:, primary_key:, builder:, fields:, size:, order:, missing:, agg:, exact:)
         predicate_scope = relation.except(:select, :order, :limit, :offset, :group, :having, :distinct)
         predicate_scope = predicate_scope.select(relation.klass.arel_table[::Arel.star]) if predicate_scope.select_values.empty?
 
@@ -651,18 +729,18 @@ module ParadeDB
 
         source_alias = "paradedb_facet_source"
         source = predicate_scope.arel.as(source_alias)
-        projections = build_facet_projections(relation, builder, fields, size, order, missing, agg)
+        projections = build_facet_projections(relation, builder, fields, size, order, missing, agg, exact)
 
         relation.klass.unscoped.from(source).select(*projections)
       end
 
-      def build_facet_projections(relation, builder, fields, size, order, missing, agg)
-        return [builder.agg(relation.send(:normalize_agg_json, agg)).as("agg_facet")] if agg
+      def build_facet_projections(relation, builder, fields, size, order, missing, agg, exact)
+        return [builder.agg(relation.send(:normalize_agg_json, agg), exact: exact).as("agg_facet")] if agg
 
         fields.map do |field|
           opts = { size: size, order: order, missing: missing }
           json = relation.send(:facet_json, field, opts)
-          builder.agg(json).as("#{field}_facet")
+          builder.agg(json, exact: exact).as("#{field}_facet")
         end
       end
 
@@ -695,24 +773,26 @@ module ParadeDB
     class AggregationQuery
       attr_reader :relation, :connection
 
-      def self.build(relation:, primary_key:, builder:, agg_specs:, connection:)
+      def self.build(relation:, primary_key:, builder:, agg_specs:, exact:, connection:)
         new(
           relation: relation,
           primary_key: primary_key,
           builder: builder,
           agg_specs: agg_specs,
+          exact: exact,
           connection: connection
         )
       end
 
-      def initialize(relation:, primary_key:, builder:, agg_specs:, connection:)
+      def initialize(relation:, primary_key:, builder:, agg_specs:, exact:, connection:)
         @connection = connection
         @agg_specs = agg_specs
         @relation = build_relation(
           relation: relation,
           primary_key: primary_key,
           builder: builder,
-          agg_specs: agg_specs
+          agg_specs: agg_specs,
+          exact: exact
         )
       end
 
@@ -729,7 +809,7 @@ module ParadeDB
 
       attr_reader :agg_specs
 
-      def build_relation(relation:, primary_key:, builder:, agg_specs:)
+      def build_relation(relation:, primary_key:, builder:, agg_specs:, exact:)
         predicate_scope = relation.except(:select, :order, :limit, :offset, :group, :having, :distinct)
         predicate_scope = predicate_scope.select(relation.klass.arel_table[::Arel.star]) if predicate_scope.select_values.empty?
 
@@ -739,7 +819,7 @@ module ParadeDB
 
         source_alias = "paradedb_agg_source"
         source = predicate_scope.arel.as(source_alias)
-        projections = agg_specs.map { |alias_name, json| builder.agg(json).as("#{alias_name}_facet") }
+        projections = agg_specs.map { |alias_name, json| builder.agg(json, exact: exact).as("#{alias_name}_facet") }
 
         relation.klass.unscoped.from(source).select(*projections)
       end

@@ -35,24 +35,62 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
 
     assert_equal [3, 5], ids
   end
+  it "matching with tokenizer override executes" do
+    ids = BehaviorProduct.search(:description)
+                         .matching_any("running shoes", tokenizer: "whitespace")
+                         .order(:id)
+                         .pluck(:id)
+
+    assert_equal [1, 2, 6], ids
+  end
+  it "matching with tokenizer + fuzzy distance defers error to database" do
+    error = assert_raises(ActiveRecord::StatementInvalid) do
+      BehaviorProduct.search(:description)
+                     .matching_any("runing shose", tokenizer: "whitespace", distance: 1)
+                     .order(:id)
+                     .pluck(:id)
+    end
+    assert_match(/cannot cast type/i, error.message)
+  end
+  it "matching with tokenizer + fuzzy constant score defers error to database" do
+    error = assert_raises(ActiveRecord::StatementInvalid) do
+      BehaviorProduct.search(:description)
+                     .matching_any("runing shose", tokenizer: "whitespace", distance: 1, constant_score: 1.0)
+                     .order(:id)
+                     .pluck(:id)
+    end
+    assert_match(/cannot cast type/i, error.message)
+  end
   it "phrase near and phrase prefix execute" do
     phrase_ids = BehaviorProduct.search(:description).phrase("running shoes").order(:id).pluck(:id)
     near_ids = BehaviorProduct.search(:description).near("running", "shoes", distance: 1).order(:id).pluck(:id)
     prefix_ids = BehaviorProduct.search(:category).phrase_prefix("foot").order(:id).pluck(:id)
+    prefix_max_ids = BehaviorProduct.search(:category).phrase_prefix("foot", max_expansion: 100).order(:id).pluck(:id)
 
     assert_equal [1, 2], phrase_ids
     assert_equal [1, 2], near_ids
     assert_equal [1, 2, 5], prefix_ids
+    assert_equal prefix_ids, prefix_max_ids
   end
   it "parse, match all, and exists wrappers execute" do
     parse_ids = BehaviorProduct.search(:description)
                                .parse("running AND shoes", lenient: true)
                                .order(:id)
                                .pluck(:id)
+    parse_default_ids = BehaviorProduct.search(:description)
+                                       .parse("running shoes")
+                                       .order(:id)
+                                       .pluck(:id)
+    parse_conj_ids = BehaviorProduct.search(:description)
+                                    .parse("running shoes", conjunction_mode: true)
+                                    .order(:id)
+                                    .pluck(:id)
     all_ids = BehaviorProduct.search(:id).match_all.order(:id).limit(3).pluck(:id)
     exists_ids = BehaviorProduct.search(:id).exists.order(:id).limit(3).pluck(:id)
 
     assert_equal [1, 2], parse_ids
+    assert_equal [1, 2], parse_conj_ids
+    assert_operator parse_default_ids.length, :>, parse_conj_ids.length
     assert_equal [1, 2, 3], all_ids
     assert_equal [1, 2, 3], exists_ids
   end
@@ -67,12 +105,38 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
     term_ids = BehaviorProduct.search(:category).term("audio").order(:id).pluck(:id)
     term_set_ids = BehaviorProduct.search(:category).term_set(%w[audio footwear]).order(:id).pluck(:id)
     regex_ids = BehaviorProduct.search(:description).regex("run.*").order(:id).pluck(:id)
-    fuzzy_ids = BehaviorProduct.search(:description).fuzzy("shose", distance: 2).order(:id).pluck(:id)
+    fuzzy_ids = BehaviorProduct.search(:description).term("shose", distance: 2).order(:id).pluck(:id)
 
     assert_equal [3, 4], term_ids
     assert_equal [1, 2, 3, 4, 5], term_set_ids
     assert_equal [1, 2, 6], regex_ids
     assert_equal [1, 2], fuzzy_ids
+  end
+  it "fuzzy with constant score executes" do
+    baseline_ids = BehaviorProduct.search(:description)
+                                  .term("shose", distance: 2)
+                                  .order(:id)
+                                  .pluck(:id)
+
+    const_ids = BehaviorProduct.search(:description)
+                               .term("shose", distance: 2, constant_score: 1.0)
+                               .order(:id)
+                               .pluck(:id)
+
+    assert_equal baseline_ids, const_ids
+  end
+  it "phrase slop with constant score executes" do
+    baseline_ids = BehaviorProduct.search(:description)
+                                  .phrase("running shoes", slop: 2)
+                                  .order(:id)
+                                  .pluck(:id)
+
+    const_ids = BehaviorProduct.search(:description)
+                               .phrase("running shoes", slop: 2, constant_score: 1.0)
+                               .order(:id)
+                               .pluck(:id)
+
+    assert_equal baseline_ids, const_ids
   end
   it "more like this with id executes and returns similar rows" do
     ids = BehaviorProduct.more_like_this(3, fields: [:description]).limit(5).pluck(:id)
@@ -181,6 +245,20 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
     assert_kind_of Hash, rel_facets
     assert_includes rel_facets, "rating"
     assert_match(/[45]/, rel_facets["rating"].to_json)
+  end
+  it "with facets exact false executes" do
+    rel = BehaviorProduct.search(:description)
+                         .matching_all("running shoes")
+                         .with_facets(:rating, size: 10, exact: false)
+                         .order(:id)
+                         .limit(10)
+
+    rows = rel.to_a
+    assert_equal [1, 2], rows.map(&:id)
+
+    rel_facets = rel.facets
+    assert_kind_of Hash, rel_facets
+    assert_includes rel_facets, "rating"
   end
   it "with facets without topn shape raises friendly error" do
     rel = BehaviorProduct.search(:description).matching_all("running shoes").with_facets(:rating, size: 10)

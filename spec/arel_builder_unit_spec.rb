@@ -58,6 +58,14 @@ RSpec.describe "ArelBuilderUnitTest" do
     node = @builder.match(:description, "shoes", boost: 2.5)
     assert_equal %("products"."description" &&& 'shoes'::pdb.boost(2.5)), sql(node)
   end
+  it "match with tokenizer override" do
+    node = @builder.match(:description, "running shoes", tokenizer: "whitespace")
+    assert_equal %("products"."description" &&& 'running shoes'::pdb.whitespace), sql(node)
+  end
+  it "match with tokenizer override and args" do
+    node = @builder.match(:description, "running shoes", tokenizer: "whitespace('lowercase=false')")
+    assert_equal %("products"."description" &&& 'running shoes'::pdb.whitespace('lowercase=false')), sql(node)
+  end
   it "match without boost" do
     node = @builder.match(:description, "shoes", boost: nil)
     assert_equal %("products"."description" &&& 'shoes'), sql(node)
@@ -85,6 +93,10 @@ RSpec.describe "ArelBuilderUnitTest" do
   it "phrase with slop large" do
     node = @builder.phrase(:description, "running shoes", slop: 10)
     assert_equal %("products"."description" ### 'running shoes'::pdb.slop(10)), sql(node)
+  end
+  it "phrase with slop and constant score bridges through query" do
+    node = @builder.phrase(:description, "running shoes", slop: 2, constant_score: 1.0)
+    assert_equal %("products"."description" ### 'running shoes'::pdb.slop(2)::pdb.query::pdb.const(1.0)), sql(node)
   end
 
   # ---- term ----
@@ -121,31 +133,39 @@ RSpec.describe "ArelBuilderUnitTest" do
     assert_includes error.message, "term_set requires at least one value"
   end
 
-  # ---- fuzzy ----
-  it "fuzzy distance only" do
-    node = @builder.fuzzy(:description, "shose", distance: 2)
+  # ---- fuzzy options (flattened into match/term) ----
+  it "term with distance" do
+    node = @builder.term(:description, "shose", distance: 2)
     assert_equal %("products"."description" === 'shose'::pdb.fuzzy(2)), sql(node)
   end
-  it "fuzzy with prefix true" do
-    node = @builder.fuzzy(:description, "runn", distance: 1, prefix: true)
+  it "term with prefix true" do
+    node = @builder.term(:description, "runn", distance: 1, prefix: true)
     assert_equal %("products"."description" === 'runn'::pdb.fuzzy(1, "true")), sql(node)
   end
-  it "fuzzy with prefix false" do
-    node = @builder.fuzzy(:description, "shose", distance: 2, prefix: false)
+  it "term with prefix false" do
+    node = @builder.term(:description, "shose", distance: 2, prefix: false)
     # prefix: false should not emit the "true" flag
     assert_equal %("products"."description" === 'shose'::pdb.fuzzy(2)), sql(node)
   end
-  it "fuzzy with boost only" do
-    node = @builder.fuzzy(:description, "shose", distance: 2, boost: 1.5)
+  it "term with boost only" do
+    node = @builder.term(:description, "shose", distance: 2, boost: 1.5)
     assert_equal %("products"."description" === 'shose'::pdb.fuzzy(2)::pdb.boost(1.5)), sql(node)
   end
-  it "fuzzy with prefix and boost" do
-    node = @builder.fuzzy(:description, "runn", distance: 1, prefix: true, boost: 2.0)
-    assert_equal %("products"."description" === 'runn'::pdb.fuzzy(1, "true")::pdb.boost(2.0)), sql(node)
+  it "term with constant score bridges through query" do
+    node = @builder.term(:description, "shose", distance: 2, constant_score: 1.0)
+    assert_equal %("products"."description" === 'shose'::pdb.fuzzy(2)::pdb.query::pdb.const(1.0)), sql(node)
   end
-  it "fuzzy with distance zero" do
-    node = @builder.fuzzy(:description, "shoes", distance: 0)
-    assert_equal %("products"."description" === 'shoes'::pdb.fuzzy(0)), sql(node)
+  it "term with transposition cost one" do
+    node = @builder.term(:description, "shose", distance: 1, transposition_cost_one: true)
+    assert_equal %("products"."description" === 'shose'::pdb.fuzzy(1, "false", "true")), sql(node)
+  end
+  it "term with prefix and transposition cost one" do
+    node = @builder.term(:description, "shose", distance: 1, prefix: true, transposition_cost_one: true)
+    assert_equal %("products"."description" === 'shose'::pdb.fuzzy(1, "true", "true")), sql(node)
+  end
+  it "matching any with distance" do
+    node = @builder.match_any(:description, "shoes", distance: 0)
+    assert_equal %("products"."description" ||| 'shoes'::pdb.fuzzy(0)), sql(node)
   end
 
   # ---- regex ----
@@ -181,6 +201,10 @@ RSpec.describe "ArelBuilderUnitTest" do
   it "phrase prefix multiple terms" do
     node = @builder.phrase_prefix(:description, "running", "sh")
     assert_equal %("products"."description" @@@ pdb.phrase_prefix(ARRAY['running', 'sh'])), sql(node)
+  end
+  it "phrase prefix with max expansion" do
+    node = @builder.phrase_prefix(:description, "running", "sh", max_expansion: 100)
+    assert_equal %("products"."description" @@@ pdb.phrase_prefix(ARRAY['running', 'sh'], 100)), sql(node)
   end
   it "phrase prefix three terms" do
     node = @builder.phrase_prefix(:description, "trail", "running", "sh")
@@ -384,7 +408,7 @@ RSpec.describe "ArelBuilderUnitTest" do
   end
   it "term or fuzzy composed" do
     term_node = @builder.term(:description, "shoes")
-    fuzzy_node = @builder.fuzzy(:description, "shose", distance: 2)
+    fuzzy_node = @builder.term(:description, "shose", distance: 2)
     combined = term_node.or(fuzzy_node)
     rendered = sql(combined)
 

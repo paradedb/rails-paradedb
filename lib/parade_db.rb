@@ -5,6 +5,7 @@ require_relative "parade_db/errors"
 require_relative "parade_db/arel"
 require_relative "parade_db/index"
 require_relative "parade_db/aggregations"
+require_relative "parade_db/diagnostics"
 require_relative "parade_db/migration_helpers"
 require_relative "parade_db/model"
 require_relative "parade_db/search_methods"
@@ -20,6 +21,22 @@ module ParadeDB
   IndexDriftError = Errors::IndexDriftError
 
   module_function
+
+  def paradedb_indexes(connection: ActiveRecord::Base.connection)
+    Diagnostics.indexes(connection: connection)
+  end
+
+  def paradedb_index_segments(index, connection: ActiveRecord::Base.connection)
+    Diagnostics.index_segments(index, connection: connection)
+  end
+
+  def paradedb_verify_index(index, **options)
+    Diagnostics.verify_index(index, **options)
+  end
+
+  def paradedb_verify_all_indexes(**options)
+    Diagnostics.verify_all_indexes(**options)
+  end
 
   def index_validation_mode
     @index_validation_mode ||= :off
