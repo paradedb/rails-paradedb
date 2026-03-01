@@ -11,7 +11,7 @@ on:
     paths:
       - "**/*.md"
       - "**/*.mdx"
-      - ".markdownlint.yml"
+      - ".markdownlint.yaml"
       - ".prettierignore"
       - ".prettierrc"
       - ".github/workflows/lint-markdown.yml"
