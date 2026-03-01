@@ -39,5 +39,5 @@ export PGPASSWORD="${PASSWORD}"
 if [[ $# -gt 0 ]]; then
   bundle exec rspec "$@"
 else
-  bundle exec rspec spec --pattern '**/*_integration_spec.rb,**/*integration*_spec.rb'
+  bundle exec rspec spec --pattern '**/*_integration_spec.rb'
 fi

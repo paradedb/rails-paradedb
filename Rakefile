@@ -19,7 +19,7 @@ namespace :test do
     ENV["PARADEDB_TEST_DSN"] ||= "postgresql://postgres:postgres@localhost:5432/postgres"
     ENV["PGPASSWORD"] ||= "postgres"
 
-    sh "bundle exec rspec spec --pattern '**/*_integration_spec.rb,**/*integration*_spec.rb'"
+    sh "bundle exec rspec spec --pattern '**/*_integration_spec.rb'"
   end
 
   desc "Run all tests (unit + integration)"

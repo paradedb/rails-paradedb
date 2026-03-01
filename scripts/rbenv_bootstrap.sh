@@ -1,6 +1,20 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  BOOTSTRAP_SOURCED=0
+  set -euo pipefail
+else
+  BOOTSTRAP_SOURCED=1
+fi
+
+bootstrap_return() {
+  local code="${1:-0}"
+  if [[ "${BOOTSTRAP_SOURCED}" == "1" ]]; then
+    return "${code}"
+  fi
+
+  exit "${code}"
+}
 
 RUBY_VERSION="4.0.0"
 BUNDLER_VERSION="4.0.3"
@@ -13,12 +27,12 @@ if command -v ruby >/dev/null 2>&1 && ruby --version | grep -qE "ruby 4\.(0|1)";
     gem install "bundler:${BUNDLER_VERSION}"
   fi
   bundle install >/dev/null
-  exit 0
+  bootstrap_return 0
 fi
 
 if ! command -v rbenv >/dev/null 2>&1; then
   echo "rbenv is not installed. Install rbenv and retry." >&2
-  exit 1
+  bootstrap_return 1
 fi
 
 eval "$(rbenv init -)"
