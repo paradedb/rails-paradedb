@@ -26,7 +26,7 @@ Render any node with `ParadeDB::Arel.to_sql(node)`. All nodes respond to
 ## Builder Methods
 
 | Method | ParadeDB SQL |
-|--------|--------------|
+| ------ | ------------ |
 | `match(column, *terms, tokenizer: nil, distance:, prefix:, transposition_cost_one:, boost: nil)` | `column &&& 'a b'::pdb.whitespace::pdb.fuzzy(...)::pdb.boost(N)` |
 | `match_any(column, *terms, tokenizer: nil, distance:, prefix:, transposition_cost_one:, boost: nil)` | `column \|\|\| 'a b'::pdb.whitespace::pdb.fuzzy(...)::pdb.boost(N)` |
 | `phrase(column, text, slop: n)` | `column ### 'text'::pdb.slop(n)` |
