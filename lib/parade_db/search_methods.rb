@@ -478,7 +478,7 @@ module ParadeDB
       return column unless klass.respond_to?(:paradedb_indexed_fields)
       # Model.paradedb_search may already pass a normalized Arel node (e.g. alias cast).
       # Only apply indexed-field validation/mapping to raw field names.
-      return column unless column.is_a?(String) || column.is_a?(Symbol)
+      return column unless column.is_a?(Symbol) || column.instance_of?(String)
 
       validate_relation_search_field_indexed!(column)
       klass.paradedb_validate_index! if klass.respond_to?(:paradedb_validate_index!)
