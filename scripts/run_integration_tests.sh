@@ -19,10 +19,12 @@ esac
 
 echo "==> Testing with Rails ${RAILS_VERSION:-8.1} (${BUNDLE_GEMFILE})"
 
+# shellcheck source=scripts/rbenv_bootstrap.sh
 source "${SCRIPT_DIR}/rbenv_bootstrap.sh"
 
 # Only start Docker container if not in CI (CI uses services)
 if [[ -z "${CI:-}" ]]; then
+  # shellcheck source=scripts/run_paradedb.sh
   source "${SCRIPT_DIR}/run_paradedb.sh"
 fi
 
