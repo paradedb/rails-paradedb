@@ -126,6 +126,26 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
     assert_includes sql, "::pdb.alias('description_simple')"
   end
 
+  it "facets raises FieldNotIndexed for non-indexed facet fields" do
+    Object.const_set("RuntimeProduct", Class.new(ActiveRecord::Base) do
+      self.table_name = :products
+      include ParadeDB::Model
+    end)
+    Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.fields = { id: {}, description: {} }
+    end)
+
+    conn = ActiveRecord::Base.connection
+    conn.create_paradedb_index(RuntimeProductIndex, if_not_exists: true)
+
+    error = assert_raises(ParadeDB::FieldNotIndexed) do
+      RuntimeProduct.search(:description).matching_all("shoe").build_facet_query(fields: [:price]).sql
+    end
+    assert_includes error.message, "non-indexed fields"
+  end
+
   it "raise mode detects missing catalog index drift" do
     Object.const_set("DriftProduct", Class.new(ActiveRecord::Base) do
       self.table_name = :products

@@ -213,10 +213,11 @@ module ParadeDB
       positional = Array(opts.delete(:__positional)).map { |value| tokenizer_positional_arg_sql(value) }
 
       if opts.key?(:min) || opts.key?(:max)
-        if opts.key?(:min) && opts.key?(:max)
-          positional << Integer(opts.delete(:min)).to_s
-          positional << Integer(opts.delete(:max)).to_s
+        unless opts.key?(:min) && opts.key?(:max)
+          raise ArgumentError, "tokenizer named args :min and :max must be provided together"
         end
+        positional << Integer(opts.delete(:min)).to_s
+        positional << Integer(opts.delete(:max)).to_s
       end
 
       named = opts.map do |k, v|

@@ -141,6 +141,22 @@ RSpec.describe "IndexDslUnitTest" do
     assert_includes sql, "pdb.ngram(2, 5)"
   end
 
+  it "rejects partial ngram bounds in named_args" do
+    klass = Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.fields = {
+        id: {},
+        description: { tokenizer: :ngram, named_args: { min: 2 } }
+      }
+    end
+
+    error = assert_raises(ArgumentError) do
+      ActiveRecord::Base.connection.send(:build_create_sql, klass.compiled_definition, if_not_exists: false)
+    end
+    assert_includes error.message, ":min and :max must be provided together"
+  end
+
   it "renders qualified and inline tokenizer forms" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :products

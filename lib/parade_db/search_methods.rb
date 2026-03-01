@@ -599,7 +599,22 @@ module ParadeDB
         raise ArgumentError, "Facet field names must be unique."
       end
 
+      validate_facet_fields_indexed!(normalized)
       normalized
+    end
+
+    def validate_facet_fields_indexed!(fields)
+      return unless klass.respond_to?(:paradedb_indexed_fields)
+
+      indexed_fields = klass.paradedb_indexed_fields
+      return if indexed_fields.empty?
+
+      unknown = fields.reject { |field| indexed_fields.include?(field) }
+      return if unknown.empty?
+
+      raise ParadeDB::FieldNotIndexed,
+            "#{klass.name}.facets contains non-indexed fields #{unknown.join(', ')}. " \
+            "Indexed fields: #{indexed_fields.join(', ')}"
     end
 
     def normalize_facet_size(size)
