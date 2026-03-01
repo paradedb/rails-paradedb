@@ -156,4 +156,34 @@ RSpec.describe "IndexDslUnitTest" do
     assert_includes sql, "::pdb::xyz"
     assert_includes sql, "::pdb::abc(12, \"fafda\")"
   end
+
+  it "prefixes unqualified inline tokenizers with pdb namespace" do
+    klass = Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.fields = {
+        id: {},
+        description: { tokenizer: "ngram(2, 5)" }
+      }
+    end
+
+    sql = ActiveRecord::Base.connection.send(:build_create_sql, klass.compiled_definition, if_not_exists: false)
+    assert_includes sql, "::pdb.ngram(2, 5)"
+  end
+
+  it "dumps tokenizer positional args in schema ruby" do
+    entry = {
+      tokenizer: "custom",
+      options: {
+        __positional: [2, "raw"],
+        alias: "title_custom",
+        lowercase: true
+      }
+    }
+
+    ruby_config = ActiveRecord::Base.connection.send(:bm25_tokenizer_config_ruby, entry)
+    assert_includes ruby_config, "args: [2, \"raw\"]"
+    assert_includes ruby_config, "alias: \"title_custom\""
+    assert_includes ruby_config, "named_args: { :lowercase => true }"
+  end
 end

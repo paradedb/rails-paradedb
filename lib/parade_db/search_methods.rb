@@ -109,7 +109,8 @@ module ParadeDB
 
     def search(column)
       ensure_paradedb_runtime!
-      extending(SearchMethods).tap { |rel| rel._paradedb_current_field = column }
+      search_column = resolve_search_column_for_relation(column)
+      extending(SearchMethods).tap { |rel| rel._paradedb_current_field = search_column }
     end
 
     def matching_all(
@@ -468,9 +469,30 @@ module ParadeDB
 
     def more_like_this_key_value(key, runtime_key_field)
       return key.public_send(runtime_key_field) if key.respond_to?(runtime_key_field)
-      return key.id if key.respond_to?(:id)
+      return key.id if runtime_key_field.to_s == "id" && key.respond_to?(:id)
 
       key
+    end
+
+    def resolve_search_column_for_relation(column)
+      return column unless klass.respond_to?(:paradedb_indexed_fields)
+
+      validate_relation_search_field_indexed!(column)
+      klass.paradedb_validate_index! if klass.respond_to?(:paradedb_validate_index!)
+      return column unless klass.respond_to?(:paradedb_search_column, true)
+
+      klass.send(:paradedb_search_column, column)
+    end
+
+    def validate_relation_search_field_indexed!(column)
+      indexed_fields = klass.paradedb_indexed_fields
+      return if indexed_fields.empty?
+
+      column_name = column.to_s
+      return if indexed_fields.include?(column_name)
+
+      raise ParadeDB::FieldNotIndexed,
+            "#{klass.name}.search(#{column.inspect}) is not indexed. Indexed fields: #{indexed_fields.join(', ')}"
     end
 
     def ensure_paradedb_runtime!

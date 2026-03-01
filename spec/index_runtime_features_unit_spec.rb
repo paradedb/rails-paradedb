@@ -62,6 +62,26 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
     assert_includes error.message, "not indexed"
   end
 
+  it "relation search raises FieldNotIndexed for non-indexed fields" do
+    Object.const_set("RuntimeProduct", Class.new(ActiveRecord::Base) do
+      self.table_name = :products
+      include ParadeDB::Model
+    end)
+    Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.fields = { id: {}, description: {} }
+    end)
+
+    conn = ActiveRecord::Base.connection
+    conn.create_paradedb_index(RuntimeProductIndex, if_not_exists: true)
+
+    error = assert_raises(ParadeDB::FieldNotIndexed) do
+      RuntimeProduct.where(in_stock: true).search(:price)
+    end
+    assert_includes error.message, "not indexed"
+  end
+
   it "search uses alias cast for aliased index fields" do
     Object.const_set("RuntimeProduct", Class.new(ActiveRecord::Base) do
       self.table_name = :products
@@ -80,6 +100,27 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
     conn.create_paradedb_index(RuntimeProductIndex, if_not_exists: true)
 
     sql = RuntimeProduct.search(:description_simple).matching_all("shoes").to_sql
+    assert_includes sql, "::pdb.alias('description_simple')"
+  end
+
+  it "relation search uses alias cast for aliased index fields" do
+    Object.const_set("RuntimeProduct", Class.new(ActiveRecord::Base) do
+      self.table_name = :products
+      include ParadeDB::Model
+    end)
+    Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.fields = {
+        id: {},
+        description: { tokenizer: :simple, alias: "description_simple" }
+      }
+    end)
+
+    conn = ActiveRecord::Base.connection
+    conn.create_paradedb_index(RuntimeProductIndex, if_not_exists: true)
+
+    sql = RuntimeProduct.where(in_stock: true).search(:description_simple).matching_all("shoes").to_sql
     assert_includes sql, "::pdb.alias('description_simple')"
   end
 

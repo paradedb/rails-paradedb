@@ -190,8 +190,11 @@ module ParadeDB
     end
 
     def tokenizer_sql(tokenizer, options)
+      tokenizer = tokenizer.to_s.strip
       fn =
-        if tokenizer.include?("::") || tokenizer.include?(".") || tokenizer.include?("(")
+        if tokenizer.include?("(")
+          normalize_inline_tokenizer_sql(tokenizer)
+        elsif tokenizer.include?("::") || tokenizer.include?(".")
           tokenizer
         else
           "pdb.#{tokenizer}"
@@ -209,6 +212,13 @@ module ParadeDB
       positional, named = tokenizer_args(options)
       args = positional + named
       "#{fn}(#{args.join(', ')})"
+    end
+
+    def normalize_inline_tokenizer_sql(tokenizer)
+      inline = tokenizer.match(/\A([a-zA-Z_][a-zA-Z0-9_]*)(\s*\(.*\))\z/m)
+      return tokenizer unless inline
+
+      "pdb.#{inline[1]}#{inline[2]}"
     end
 
     def tokenizer_args(options)
@@ -620,12 +630,13 @@ module ParadeDB
 
     def bm25_tokenizer_config_ruby(entry)
       opts = entry[:options].dup
+      positional_args = Array(opts.delete(:__positional))
       alias_val = opts.delete(:alias)
       min_val = opts.delete(:min)
       max_val = opts.delete(:max)
-      opts.delete(:__positional)
 
       parts = ["tokenizer: #{entry[:tokenizer].to_sym.inspect}"]
+      parts << "args: #{positional_args.inspect}" unless positional_args.empty?
       parts << "min: #{min_val.inspect}" if min_val
       parts << "max: #{max_val.inspect}" if max_val
       parts << "alias: #{alias_val.inspect}" if alias_val
