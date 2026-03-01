@@ -1,0 +1,6 @@
+# Generated artifacts
+coverage/
+vendor/
+
+# Data assets
+examples/hybrid_rrf/mock_items_embeddings.csv

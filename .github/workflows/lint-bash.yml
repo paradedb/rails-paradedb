@@ -1,0 +1,78 @@
+# workflows/lint-bash.yml
+#
+# Lint Bash
+# Lint and enforce good practices for Bash scripts.
+
+name: Lint Bash
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "**/*.sh"
+      - ".github/workflows/lint-bash.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: lint-bash-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-bash:
+    name: Lint Bash Scripts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Git Repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python Environment
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install Bash Linters
+        run: |
+          pip install beautysh
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Run Beautysh
+        run: |
+          shopt -s globstar nullglob
+          if compgen -G "**/*.sh" > /dev/null; then
+            beautysh **/*.sh --indent-size 2 --check
+          fi
+          shopt -u globstar nullglob
+
+      - name: Check Bash Script Shebang
+        run: |
+          while IFS= read -r -d '' file; do
+            if head -n 1 "$file" | grep -Eq '^#!/usr/bin/env bash$|^#!/bin/bash$'; then
+              echo "[bash shebang -> Present] $file"
+            else
+              echo "[bash shebang -> NOT FOUND] $file"
+              exit 1
+            fi
+          done < <(find . -name '*.sh' -print0)
+
+      - name: Check Bash Scripts for Pipefail
+        run: |
+          while IFS= read -r -d '' file; do
+            if grep -q \
+              -e "^set -euo pipefail$" \
+              -e "^set -Eeuo pipefail$" \
+              -e "^# @paradedb-skip-check-pipefail$" \
+              "$file"; then
+              echo "[pipefail -> Present] $file"
+            else
+              echo "[pipefail -> NOT FOUND] $file"
+              exit 1
+            fi
+          done < <(find . -name '*.sh' -print0)
+
+      - name: Run ShellCheck
+        run: |
+          while IFS= read -r -d '' file; do
+            shellcheck -x "$file"
+          done < <(find . -name '*.sh' -print0)
