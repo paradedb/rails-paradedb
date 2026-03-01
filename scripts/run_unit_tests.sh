@@ -19,11 +19,13 @@ esac
 
 echo "==> Testing with Rails ${RAILS_VERSION:-8.1} (${BUNDLE_GEMFILE})"
 
+# shellcheck source=scripts/rbenv_bootstrap.sh
 source "${SCRIPT_DIR}/rbenv_bootstrap.sh"
 
 # Unit tests run against PostgreSQL only.
 # Mirror integration script defaults so both suites share adapter/runtime behavior.
 if [[ -z "${CI:-}" ]]; then
+  # shellcheck source=scripts/run_paradedb.sh
   source "${SCRIPT_DIR}/run_paradedb.sh"
 fi
 

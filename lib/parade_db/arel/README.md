@@ -25,27 +25,27 @@ Render any node with `ParadeDB::Arel.to_sql(node)`. All nodes respond to
 
 ## Builder Methods
 
-| Method | ParadeDB SQL |
-| ------ | ------------ |
-| `match(column, *terms, tokenizer: nil, distance:, prefix:, transposition_cost_one:, boost: nil)` | `column &&& 'a b'::pdb.whitespace::pdb.fuzzy(...)::pdb.boost(N)` |
-| `match_any(column, *terms, tokenizer: nil, distance:, prefix:, transposition_cost_one:, boost: nil)` | `column \|\|\| 'a b'::pdb.whitespace::pdb.fuzzy(...)::pdb.boost(N)` |
-| `phrase(column, text, slop: n)` | `column ### 'text'::pdb.slop(n)` |
-| `term(column, term, distance:, prefix:, transposition_cost_one:, boost: nil)` | `column === 'term'::pdb.fuzzy(...)::pdb.boost(N)` |
-| `term_set(column, *terms)` | `column @@@ pdb.term_set(ARRAY[...])` |
-| `regex(column, pattern)` | `column @@@ pdb.regex('pattern')` |
-| `near(column, a, b, distance:)` | `column @@@ ('a' ## d ## 'b')` |
-| `phrase_prefix(column, *terms, max_expansion: nil)` | `column @@@ pdb.phrase_prefix(ARRAY['a','b'][, 100])` |
-| `parse(column, query, lenient: nil, conjunction_mode: nil)` | `column @@@ pdb.parse('q', lenient => true, conjunction_mode => true)` |
-| `full_text(column, expr)` | `column @@@ expr` (raw right-hand value) |
-| `match_all(column)` | `column @@@ pdb.all()` |
-| `exists(column)` | `column @@@ pdb.exists()` |
-| `range(column, value = nil, gte:, gt:, lte:, lt:, type:)` | `column @@@ pdb.range(int8range(3, 5, '[)'))` |
-| `more_like_this(column, key, fields: [:f1, :f2])` | `column @@@ pdb.more_like_this(key, ARRAY['f1','f2'])` |
-| `score(key_field)` | `pdb.score(key_field)` |
-| `snippet(column, start, finish, max)` | `pdb.snippet(column, start, finish, max)` |
-| `snippets(column, start_tag:, end_tag:, max_num_chars:, limit:, offset:, sort_by:)` | `pdb.snippets(column, ...)` |
-| `snippet_positions(column)` | `pdb.snippet_positions(column)` |
-| `agg(json, exact: nil)` | `pdb.agg(json[, false])` |
+| Method                                                                                               | ParadeDB SQL                                                           |
+| ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `match(column, *terms, tokenizer: nil, distance:, prefix:, transposition_cost_one:, boost: nil)`     | `column &&& 'a b'::pdb.whitespace::pdb.fuzzy(...)::pdb.boost(N)`       |
+| `match_any(column, *terms, tokenizer: nil, distance:, prefix:, transposition_cost_one:, boost: nil)` | `column \|\|\| 'a b'::pdb.whitespace::pdb.fuzzy(...)::pdb.boost(N)`    |
+| `phrase(column, text, slop: n)`                                                                      | `column ### 'text'::pdb.slop(n)`                                       |
+| `term(column, term, distance:, prefix:, transposition_cost_one:, boost: nil)`                        | `column === 'term'::pdb.fuzzy(...)::pdb.boost(N)`                      |
+| `term_set(column, *terms)`                                                                           | `column @@@ pdb.term_set(ARRAY[...])`                                  |
+| `regex(column, pattern)`                                                                             | `column @@@ pdb.regex('pattern')`                                      |
+| `near(column, a, b, distance:)`                                                                      | `column @@@ ('a' ## d ## 'b')`                                         |
+| `phrase_prefix(column, *terms, max_expansion: nil)`                                                  | `column @@@ pdb.phrase_prefix(ARRAY['a','b'][, 100])`                  |
+| `parse(column, query, lenient: nil, conjunction_mode: nil)`                                          | `column @@@ pdb.parse('q', lenient => true, conjunction_mode => true)` |
+| `full_text(column, expr)`                                                                            | `column @@@ expr` (raw right-hand value)                               |
+| `match_all(column)`                                                                                  | `column @@@ pdb.all()`                                                 |
+| `exists(column)`                                                                                     | `column @@@ pdb.exists()`                                              |
+| `range(column, value = nil, gte:, gt:, lte:, lt:, type:)`                                            | `column @@@ pdb.range(int8range(3, 5, '[)'))`                          |
+| `more_like_this(column, key, fields: [:f1, :f2])`                                                    | `column @@@ pdb.more_like_this(key, ARRAY['f1','f2'])`                 |
+| `score(key_field)`                                                                                   | `pdb.score(key_field)`                                                 |
+| `snippet(column, start, finish, max)`                                                                | `pdb.snippet(column, start, finish, max)`                              |
+| `snippets(column, start_tag:, end_tag:, max_num_chars:, limit:, offset:, sort_by:)`                  | `pdb.snippets(column, ...)`                                            |
+| `snippet_positions(column)`                                                                          | `pdb.snippet_positions(column)`                                        |
+| `agg(json, exact: nil)`                                                                              | `pdb.agg(json[, false])`                                               |
 
 `Builder#[]` returns a column node for manual composition: `arel[:description]`.
 
