@@ -59,8 +59,8 @@ bash scripts/run_unit_tests.sh spec/user_api_unit_spec.rb
 
 ### Linting and Formatting
 
-This repo currently enforces markdown/style checks via `prek`.
-This repository uses `.pre-commit-config.yaml`, which `prek` supports directly.
+This repository enforces markdown/style checks via `prek` and
+`.pre-commit-config.yaml`.
 Common commands:
 
 ```bash

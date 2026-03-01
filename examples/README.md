@@ -18,11 +18,8 @@ Each example folder uses a Rails-like layout:
 BUNDLE_GEMFILE=examples/Gemfile bundle install
 ```
 
-The hybrid RRF example uses pgvector via `neighbor`, which is included in `examples/Gemfile`:
-
-```bash
-BUNDLE_GEMFILE=examples/Gemfile bundle install
-```
+The hybrid RRF example uses pgvector via `neighbor`, which is already included
+in `examples/Gemfile`.
 
 ### 2. Start ParadeDB
 
