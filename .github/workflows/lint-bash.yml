@@ -60,9 +60,9 @@ jobs:
         run: |
           while IFS= read -r -d '' file; do
             if grep -q \
-              -e "^set -euo pipefail$" \
-              -e "^set -Eeuo pipefail$" \
-              -e "^# @paradedb-skip-check-pipefail$" \
+              -e "^[[:space:]]*set -euo pipefail$" \
+              -e "^[[:space:]]*set -Eeuo pipefail$" \
+              -e "^[[:space:]]*# @paradedb-skip-check-pipefail$" \
               "$file"; then
               echo "[pipefail -> Present] $file"
             else

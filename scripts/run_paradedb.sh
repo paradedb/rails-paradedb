@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# @paradedb-skip-check-pipefail
 
 # Check if script is being run directly or sourced
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
