@@ -1,0 +1,42 @@
+# workflows/lint-format.yml
+#
+# Lint Format
+# Lint file line endings and trailing whitespace.
+
+name: Lint Format
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+concurrency:
+  group: lint-format-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-format:
+    name: Lint File Endings & Trailing Whitespaces
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Git Repository
+        uses: actions/checkout@v6
+
+      - name: Check for CRLF Files
+        run: |
+          FILES=$(git ls-files --eol | grep crlf || true)
+          if [[ -n "$FILES" ]]; then
+            echo "The following files have incorrect line endings:"
+            echo "$FILES"
+            exit 1
+          fi
+
+      - name: Check for Trailing Whitespaces
+        run: |
+          FILES=$(git grep -Ilr '[[:blank:]]$' -- . || true)
+          if [[ -n "$FILES" ]]; then
+            echo "The following files have trailing whitespaces:"
+            echo "$FILES"
+            exit 1
+          fi
