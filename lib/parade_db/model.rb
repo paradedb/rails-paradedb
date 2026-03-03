@@ -58,9 +58,7 @@ module ParadeDB
     module ClassMethods
       def paradedb_search(column)
         ensure_postgres!
-        validate_field_indexed!(column)
-        paradedb_validate_index!
-        all.extending(SearchMethods).search(paradedb_search_column(column))
+        all.extending(SearchMethods).search(paradedb_normalize_search_column(column))
       end
 
       def more_like_this(key, fields: nil, **options)
@@ -208,6 +206,12 @@ module ParadeDB
 
         raise ParadeDB::FieldNotIndexed,
               "#{name}.search(#{column.inspect}) is not indexed. Indexed fields: #{indexed_fields.join(', ')}"
+      end
+
+      def paradedb_normalize_search_column(column)
+        validate_field_indexed!(column)
+        paradedb_validate_index!
+        paradedb_search_column(column)
       end
 
       def paradedb_search_column(column)

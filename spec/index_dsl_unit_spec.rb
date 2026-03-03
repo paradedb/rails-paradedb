@@ -171,19 +171,61 @@ RSpec.describe "IndexDslUnitTest" do
     assert_includes sql, "::pdb.ngram(2, 5)"
   end
 
-  it "dumps tokenizer positional args in schema ruby" do
-    entry = {
-      tokenizer: "custom",
-      options: {
-        __positional: [2, "raw"],
-        alias: "title_custom",
-        lowercase: true
+  it "round-trips tokenizer args through schema ruby" do
+    klass = Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.fields = {
+        id: {},
+        description: {
+          tokenizer: :ngram,
+          args: [2, 5],
+          named_args: { prefix_only: true },
+          alias: "description_ngram"
+        }
       }
-    }
+    end
 
-    ruby_config = ActiveRecord::Base.connection.send(:bm25_tokenizer_config_ruby, entry)
-    assert_includes ruby_config, "args: [2, \"raw\"]"
-    assert_includes ruby_config, "alias: \"title_custom\""
-    assert_includes ruby_config, "named_args: { :lowercase => true }"
+    conn = ActiveRecord::Base.connection
+    compiled = klass.compiled_definition
+    indexdef = conn.send(:build_create_sql, compiled, if_not_exists: false)
+    ruby_stmt = conn.send(
+      :bm25_index_to_ruby,
+      {
+        "indexdef" => indexdef,
+        "table_name" => compiled.table_name.to_s,
+        "index_name" => compiled.index_name.to_s
+      }
+    )
+
+    recorder = Class.new do
+      attr_reader :captured
+
+      def add_bm25_index(table, fields:, key_field:, name:, index_options: nil, if_not_exists: false)
+        @captured = {
+          table: table,
+          fields: fields,
+          key_field: key_field,
+          name: name,
+          index_options: index_options,
+          if_not_exists: if_not_exists
+        }
+      end
+    end.new
+
+    recorder.instance_eval(ruby_stmt)
+
+    reloaded = Class.new(ParadeDB::Index) do
+      self.table_name = recorder.captured[:table]
+      self.key_field = recorder.captured[:key_field]
+      self.index_name = recorder.captured[:name]
+      self.fields = recorder.captured[:fields]
+      self.index_options = recorder.captured[:index_options] if recorder.captured[:index_options]
+    end
+
+    original_entries = compiled.entries.map { |entry| [entry.source, entry.tokenizer, entry.options, entry.query_key] }
+    reloaded_entries = reloaded.compiled_definition.entries.map { |entry| [entry.source, entry.tokenizer, entry.options, entry.query_key] }
+
+    assert_equal original_entries, reloaded_entries
   end
 end

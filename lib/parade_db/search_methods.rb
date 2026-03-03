@@ -109,7 +109,13 @@ module ParadeDB
 
     def search(column)
       ensure_paradedb_runtime!
-      search_column = resolve_search_column_for_relation(column)
+      search_column =
+        if (column.is_a?(Symbol) || column.is_a?(String)) &&
+           klass.respond_to?(:paradedb_normalize_search_column, true)
+          klass.send(:paradedb_normalize_search_column, column)
+        else
+          column
+        end
       extending(SearchMethods).tap { |rel| rel._paradedb_current_field = search_column }
     end
 
@@ -470,32 +476,14 @@ module ParadeDB
     def more_like_this_key_value(key, runtime_key_field)
       return key.public_send(runtime_key_field) if key.respond_to?(runtime_key_field)
       return key.id if runtime_key_field.to_s == "id" && key.respond_to?(:id)
+      return key if scalar_more_like_this_key?(key)
 
-      key
+      raise ArgumentError,
+            "more_like_this key object must respond to #{runtime_key_field.inspect} or be a scalar id/document value"
     end
 
-    def resolve_search_column_for_relation(column)
-      return column unless klass.respond_to?(:paradedb_indexed_fields)
-      # Model.paradedb_search may already pass a normalized Arel node (e.g. alias cast).
-      # Only apply indexed-field validation/mapping to raw field names.
-      return column unless column.is_a?(Symbol) || column.instance_of?(String)
-
-      validate_relation_search_field_indexed!(column)
-      klass.paradedb_validate_index! if klass.respond_to?(:paradedb_validate_index!)
-      return column unless klass.respond_to?(:paradedb_search_column, true)
-
-      klass.send(:paradedb_search_column, column)
-    end
-
-    def validate_relation_search_field_indexed!(column)
-      indexed_fields = klass.paradedb_indexed_fields
-      return if indexed_fields.empty?
-
-      column_name = column.to_s
-      return if indexed_fields.include?(column_name)
-
-      raise ParadeDB::FieldNotIndexed,
-            "#{klass.name}.search(#{column.inspect}) is not indexed. Indexed fields: #{indexed_fields.join(', ')}"
+    def scalar_more_like_this_key?(key)
+      key.nil? || key == true || key == false || key.is_a?(Numeric) || key.is_a?(String)
     end
 
     def ensure_paradedb_runtime!

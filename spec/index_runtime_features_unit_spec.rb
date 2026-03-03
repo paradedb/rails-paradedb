@@ -77,7 +77,7 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
     conn.create_paradedb_index(RuntimeProductIndex, if_not_exists: true)
 
     error = assert_raises(ParadeDB::FieldNotIndexed) do
-      RuntimeProduct.where(in_stock: true).search(:price)
+      RuntimeProduct.search(:description).search(:price)
     end
     assert_includes error.message, "not indexed"
   end
@@ -120,7 +120,7 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
     conn = ActiveRecord::Base.connection
     conn.create_paradedb_index(RuntimeProductIndex, if_not_exists: true)
 
-    sql = RuntimeProduct.where(in_stock: true).search(:description_simple).matching_all("shoes").to_sql
+    sql = RuntimeProduct.search(:description).search(:description_simple).matching_all("shoes").to_sql
     assert_includes sql, "::pdb.alias('description_simple')"
   end
 

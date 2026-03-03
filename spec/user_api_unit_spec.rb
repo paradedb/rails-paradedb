@@ -138,7 +138,8 @@ RSpec.describe "UserApiUnitTest" do
     relation = UnitProduct.all.extending(ParadeDB::SearchMethods)
     key = Struct.new(:id).new(42)
 
-    assert_equal key, relation.send(:more_like_this_key_value, key, :external_id)
+    error = assert_raises(ArgumentError) { relation.send(:more_like_this_key_value, key, :external_id) }
+    assert_includes error.message, "external_id"
     assert_equal 42, relation.send(:more_like_this_key_value, key, :id)
   end
   it "excluding" do

@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 require "json"
+require_relative "tokenizer_sql"
 
 module ParadeDB
   module MigrationHelpers
@@ -191,14 +192,7 @@ module ParadeDB
 
     def tokenizer_sql(tokenizer, options)
       tokenizer = tokenizer.to_s.strip
-      fn =
-        if tokenizer.include?("(")
-          normalize_inline_tokenizer_sql(tokenizer)
-        elsif tokenizer.include?("::") || tokenizer.include?(".")
-          tokenizer
-        else
-          "pdb.#{tokenizer}"
-        end
+      fn = ParadeDB::TokenizerSQL.qualify(tokenizer)
 
       if tokenizer.include?("(")
         unless options.empty?
@@ -212,13 +206,6 @@ module ParadeDB
       positional, named = tokenizer_args(options)
       args = positional + named
       "#{fn}(#{args.join(', ')})"
-    end
-
-    def normalize_inline_tokenizer_sql(tokenizer)
-      inline = tokenizer.match(/\A([a-zA-Z_][a-zA-Z0-9_]*)(\s*\(.*\))\z/m)
-      return tokenizer unless inline
-
-      "pdb.#{inline[1]}#{inline[2]}"
     end
 
     def tokenizer_args(options)
@@ -634,11 +621,10 @@ module ParadeDB
       alias_val = opts.delete(:alias)
       min_val = opts.delete(:min)
       max_val = opts.delete(:max)
+      positional_args = [min_val, max_val] + positional_args if min_val && max_val
 
       parts = ["tokenizer: #{entry[:tokenizer].to_sym.inspect}"]
       parts << "args: #{positional_args.inspect}" unless positional_args.empty?
-      parts << "min: #{min_val.inspect}" if min_val
-      parts << "max: #{max_val.inspect}" if max_val
       parts << "alias: #{alias_val.inspect}" if alias_val
 
       unless opts.empty?
