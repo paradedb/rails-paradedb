@@ -110,7 +110,7 @@ module ParadeDB
     def search(column)
       ensure_paradedb_runtime!
       search_column =
-        if (column.is_a?(Symbol) || column.is_a?(String)) &&
+        if (column.is_a?(Symbol) || column.instance_of?(String)) &&
            klass.respond_to?(:paradedb_normalize_search_column, true)
           klass.send(:paradedb_normalize_search_column, column)
         else

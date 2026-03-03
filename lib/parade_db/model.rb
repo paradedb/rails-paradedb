@@ -58,7 +58,7 @@ module ParadeDB
     module ClassMethods
       def paradedb_search(column)
         ensure_postgres!
-        all.extending(SearchMethods).search(paradedb_normalize_search_column(column))
+        all.extending(SearchMethods).search(column)
       end
 
       def more_like_this(key, fields: nil, **options)

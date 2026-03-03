@@ -92,6 +92,7 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
       self.key_field = :id
       self.fields = {
         id: {},
+        category: {},
         description: { tokenizer: :simple, alias: "description_simple" }
       }
     end)
@@ -113,6 +114,7 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
       self.key_field = :id
       self.fields = {
         id: {},
+        category: {},
         description: { tokenizer: :simple, alias: "description_simple" }
       }
     end)
@@ -120,7 +122,7 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
     conn = ActiveRecord::Base.connection
     conn.create_paradedb_index(RuntimeProductIndex, if_not_exists: true)
 
-    sql = RuntimeProduct.search(:description).search(:description_simple).matching_all("shoes").to_sql
+    sql = RuntimeProduct.search(:category).search(:description_simple).matching_all("shoes").to_sql
     assert_includes sql, "::pdb.alias('description_simple')"
   end
 
