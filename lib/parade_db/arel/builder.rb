@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 require "date"
+require_relative "../tokenizer_sql"
 
 module ParadeDB
   module Arel
@@ -442,19 +443,7 @@ module ParadeDB
           raise ArgumentError, "invalid tokenizer expression: #{tokenizer.inspect}"
         end
 
-        if value.include?("(")
-          function_name, rest = value.split("(", 2)
-          normalized_name = normalize_tokenizer_function_name(function_name)
-          return "#{normalized_name}(#{rest}"
-        end
-
-        normalize_tokenizer_function_name(value)
-      end
-
-      def normalize_tokenizer_function_name(function_name)
-        return function_name if function_name.include?(".") || function_name.include?("::")
-
-        "pdb.#{function_name}"
+        ParadeDB::TokenizerSQL.qualify(value)
       end
 
       def arel_table

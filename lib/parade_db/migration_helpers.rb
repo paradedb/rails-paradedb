@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 require "json"
+require_relative "tokenizer_sql"
 
 module ParadeDB
   module MigrationHelpers
@@ -190,12 +191,8 @@ module ParadeDB
     end
 
     def tokenizer_sql(tokenizer, options)
-      fn =
-        if tokenizer.include?("::") || tokenizer.include?(".") || tokenizer.include?("(")
-          tokenizer
-        else
-          "pdb.#{tokenizer}"
-        end
+      tokenizer = tokenizer.to_s.strip
+      fn = ParadeDB::TokenizerSQL.qualify(tokenizer)
 
       if tokenizer.include?("(")
         unless options.empty?
@@ -620,14 +617,14 @@ module ParadeDB
 
     def bm25_tokenizer_config_ruby(entry)
       opts = entry[:options].dup
+      positional_args = Array(opts.delete(:__positional))
       alias_val = opts.delete(:alias)
       min_val = opts.delete(:min)
       max_val = opts.delete(:max)
-      opts.delete(:__positional)
+      positional_args = [min_val, max_val] + positional_args if min_val && max_val
 
       parts = ["tokenizer: #{entry[:tokenizer].to_sym.inspect}"]
-      parts << "min: #{min_val.inspect}" if min_val
-      parts << "max: #{max_val.inspect}" if max_val
+      parts << "args: #{positional_args.inspect}" unless positional_args.empty?
       parts << "alias: #{alias_val.inspect}" if alias_val
 
       unless opts.empty?

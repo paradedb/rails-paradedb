@@ -134,6 +134,14 @@ RSpec.describe "UserApiUnitTest" do
     expected = %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.more_like_this(5, ARRAY['description'], min_term_frequency => 2, max_query_terms => 10, min_doc_frequency => 1, max_term_frequency => 20, max_doc_frequency => 200, min_word_length => 3, max_word_length => 15, stopwords => ARRAY['the', 'a'])))
     assert_sql_equal expected, sql
   end
+  it "more like this key extraction does not fallback to id for non-id key fields" do
+    relation = UnitProduct.all.extending(ParadeDB::SearchMethods)
+    key = Struct.new(:id).new(42)
+
+    error = assert_raises(ArgumentError) { relation.send(:more_like_this_key_value, key, :external_id) }
+    assert_includes error.message, "external_id"
+    assert_equal 42, relation.send(:more_like_this_key_value, key, :id)
+  end
   it "excluding" do
     sql = UnitProduct.search(:description).matching_all("shoes").excluding("cheap").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" &&& 'shoes') AND (NOT ("products"."description" &&& 'cheap'))), sql

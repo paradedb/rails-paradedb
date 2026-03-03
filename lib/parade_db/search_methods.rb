@@ -109,7 +109,14 @@ module ParadeDB
 
     def search(column)
       ensure_paradedb_runtime!
-      extending(SearchMethods).tap { |rel| rel._paradedb_current_field = column }
+      search_column =
+        if (column.is_a?(Symbol) || column.instance_of?(String)) &&
+           klass.respond_to?(:paradedb_normalize_search_column, true)
+          klass.send(:paradedb_normalize_search_column, column)
+        else
+          column
+        end
+      extending(SearchMethods).tap { |rel| rel._paradedb_current_field = search_column }
     end
 
     def matching_all(
@@ -468,9 +475,15 @@ module ParadeDB
 
     def more_like_this_key_value(key, runtime_key_field)
       return key.public_send(runtime_key_field) if key.respond_to?(runtime_key_field)
-      return key.id if key.respond_to?(:id)
+      return key.id if runtime_key_field.to_s == "id" && key.respond_to?(:id)
+      return key if scalar_more_like_this_key?(key)
 
-      key
+      raise ArgumentError,
+            "more_like_this key object must respond to #{runtime_key_field.inspect} or be a scalar id/document value"
+    end
+
+    def scalar_more_like_this_key?(key)
+      key.nil? || key == true || key == false || key.is_a?(Numeric) || key.is_a?(String)
     end
 
     def ensure_paradedb_runtime!
