@@ -20,7 +20,7 @@ The release workflow validates that the requested version matches this value.
 ## Compatibility Targets
 
 - Ruby: 3.2+
-- ActiveRecord: 8.1+
+- ActiveRecord: 7.2+
 - PostgreSQL: ParadeDB-supported versions
 - ParadeDB: latest tested minor (and previous minor when feasible)
 
