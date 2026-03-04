@@ -102,6 +102,9 @@ Product.search(:id).exists
 Product.search(:rating).range(gte: 3, lt: 5)
 
 Product.more_like_this(42, fields: [:description])
+
+# Build query JSON payloads (for @@@ ...::pdb.query usage)
+ParadeDB::Query.regex("key.*")
 ```
 
 ## Scoring and Highlighting
@@ -152,6 +155,34 @@ Product.search(:description).matching_all("shoes").facets_agg(
   docs: ParadeDB::Aggregations.value_count(:id),
   avg_rating: ParadeDB::Aggregations.avg(:rating)
 )
+
+# Named aggregations with FILTER (WHERE ...)
+Product.facets_agg(
+  electronics_count: ParadeDB::Aggregations.filtered(
+    ParadeDB::Aggregations.value_count(:id),
+    field: :category,
+    term: "electronics"
+  ),
+  footwear_count: ParadeDB::Aggregations.filtered(
+    ParadeDB::Aggregations.value_count(:id),
+    field: :category,
+    term: "footwear"
+  )
+)
+
+# Grouped aggregations
+Product.search(:id)
+       .match_all
+       .aggregate_by(
+         :rating,
+         docs: ParadeDB::Aggregations.value_count(:id),
+         top_hits: ParadeDB::Aggregations.top_hits(
+           size: 3,
+           sort: [{ price: "desc" }],
+           docvalue_fields: %w[id price]
+         )
+       )
+       .order(:rating)
 
 # Non-exact window named aggregations
 Product.search(:description).matching_all("shoes").with_agg(
