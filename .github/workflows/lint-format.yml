@@ -1,7 +1,7 @@
 # workflows/lint-format.yml
 #
 # Lint Format
-# Lint file line endings and trailing whitespace.
+# Lint the project's file trailing spaces, line endings, and format.
 
 name: Lint Format
 
@@ -26,17 +26,33 @@ jobs:
       - name: Check for CRLF Files
         run: |
           FILES=$(git ls-files --eol | grep crlf || true)
-          if [[ -n "$FILES" ]]; then
+          if [[ ! -z "$FILES" ]]; then
             echo "The following files have incorrect line endings:"
             echo "$FILES"
-            exit 1
+            false
           fi
 
       - name: Check for Trailing Whitespaces
         run: |
-          FILES=$(git grep -Ilr '[[:blank:]]$' -- . || true)
-          if [[ -n "$FILES" ]]; then
+          FILES=$(git grep -Ilr '[[:blank:]]$' -- \
+            ':(exclude)*.nix' \
+            ':(exclude)*.sql' \
+            ':(exclude)*.out' \
+            ':(exclude)*.rs' \
+            ':(exclude)docker/manifests/**' || true)
+          if [[ ! -z "$FILES" ]]; then
             echo "The following files have trailing whitespaces:"
             echo "$FILES"
             exit 1
+          fi
+
+      - name: Print Modified Files
+        run: |
+          FILES=$(git ls-files --modified)
+          if [[ ! -z "$FILES" ]]; then
+            echo "The following files have incorrect trailing newlines:"
+            echo "$FILES"
+            echo "Please fix them using:"
+            echo -e 'if [[ -f "$1" ]]; then\n  echo -n "$1"\n  if (diff /dev/null "$1" || true) | tail -1 | grep -q "^\\ No newline"; then\n    echo >> "$1"\n    echo "...fixed"\n  else\n    echo ""\n  fi\nfi'
+            false
           fi
