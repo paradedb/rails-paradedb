@@ -3,7 +3,10 @@
 module ParadeDB
   # Typed helpers for building agg JSON payloads passed to pdb.agg(...).
   module Aggregations
-    FilteredSpec = Struct.new(:spec, :filter, keyword_init: true)
+    FilteredSpec = Struct.new(:spec, :agg_filter, keyword_init: true) do
+      # Backward-compatible reader for code that accessed `filtered_spec.filter`.
+      alias filter agg_filter
+    end
     FieldTermFilter = Struct.new(
       :field,
       :term,
@@ -161,7 +164,7 @@ module ParadeDB
         prefix: prefix,
         transposition_cost_one: transposition_cost_one
       )
-      FilteredSpec.new(spec: normalized_spec, filter: normalized_filter)
+      FilteredSpec.new(spec: normalized_spec, agg_filter: normalized_filter)
     end
 
     def metric(name, field)
@@ -172,7 +175,7 @@ module ParadeDB
     def normalize_named_spec(spec)
       case spec
       when FilteredSpec
-        FilteredSpec.new(spec: normalize_spec(spec.spec), filter: spec.filter)
+        FilteredSpec.new(spec: normalize_spec(spec.spec), agg_filter: spec.agg_filter)
       else
         normalize_spec(spec)
       end

@@ -584,7 +584,7 @@ module ParadeDB
           if spec.is_a?(ParadeDB::Aggregations::FilteredSpec)
             {
               json: spec.spec.to_json,
-              filter: normalize_agg_filter_descriptor(spec.filter)
+              filter: normalize_agg_filter_descriptor(spec.agg_filter)
             }
           else
             {
