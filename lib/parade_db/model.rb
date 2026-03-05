@@ -14,6 +14,7 @@ module ParadeDB
       :facets,
       :with_agg,
       :facets_agg,
+      :aggregate_by,
       :paradedb_arel,
       :paradedb_index,
       :paradedb_index_class,
@@ -89,6 +90,16 @@ module ParadeDB
         ensure_postgres!
         paradedb_validate_index!
         all.extending(SearchMethods).facets_agg(**named_aggregations)
+      end
+
+      def aggregate_by(*group_fields, exact: nil, **named_aggregations)
+        ensure_postgres!
+        paradedb_validate_index!
+        all.extending(SearchMethods).aggregate_by(
+          *group_fields,
+          exact: exact,
+          **named_aggregations
+        )
       end
 
       def paradedb_arel

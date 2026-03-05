@@ -3,6 +3,19 @@
 module ParadeDB
   # Typed helpers for building agg JSON payloads passed to pdb.agg(...).
   module Aggregations
+    FilteredSpec = Struct.new(:spec, :agg_filter, keyword_init: true) do
+      # Backward-compatible reader for code that accessed `filtered_spec.filter`.
+      alias filter agg_filter
+    end
+    FieldTermFilter = Struct.new(
+      :field,
+      :term,
+      :distance,
+      :prefix,
+      :transposition_cost_one,
+      keyword_init: true
+    )
+
     TERMS_ORDER = {
       count_desc: { "_count" => "desc" },
       count_asc: { "_count" => "asc" },
@@ -18,7 +31,7 @@ module ParadeDB
 
       specs.each_with_object({}) do |(alias_name, spec), payload|
         alias_key = normalize_alias(alias_name)
-        payload[alias_key] = normalize_spec(spec)
+        payload[alias_key] = normalize_named_spec(spec)
       end
     end
 
@@ -132,10 +145,42 @@ module ParadeDB
       }
     end
 
+    def top_hits(size: nil, from: nil, sort: nil, docvalue_fields: nil)
+      payload = {}
+      payload["size"] = normalize_non_negative_integer(size, "size") unless size.nil?
+      payload["from"] = normalize_non_negative_integer(from, "from") unless from.nil?
+      payload["sort"] = normalize_top_hits_sort(sort) unless sort.nil?
+      payload["docvalue_fields"] = normalize_docvalue_fields(docvalue_fields) unless docvalue_fields.nil?
+      { "top_hits" => payload }
+    end
+
+    def filtered(spec, filter: nil, field: nil, term: nil, distance: nil, prefix: nil, transposition_cost_one: nil)
+      normalized_spec = normalize_spec(spec)
+      normalized_filter = normalize_filter(
+        filter: filter,
+        field: field,
+        term: term,
+        distance: distance,
+        prefix: prefix,
+        transposition_cost_one: transposition_cost_one
+      )
+      FilteredSpec.new(spec: normalized_spec, agg_filter: normalized_filter)
+    end
+
     def metric(name, field)
       { name => { "field" => normalize_field(field) } }
     end
     private_class_method :metric
+
+    def normalize_named_spec(spec)
+      case spec
+      when FilteredSpec
+        FilteredSpec.new(spec: normalize_spec(spec.spec), agg_filter: spec.agg_filter)
+      else
+        normalize_spec(spec)
+      end
+    end
+    private_class_method :normalize_named_spec
 
     def normalize_alias(alias_name)
       value =
@@ -165,6 +210,32 @@ module ParadeDB
       end
     end
     private_class_method :normalize_spec
+
+    def normalize_filter(filter:, field:, term:, distance:, prefix:, transposition_cost_one:)
+      if filter
+        if !field.nil? || !term.nil?
+          raise ArgumentError, "filtered aggregation accepts either filter: or field/term arguments, not both"
+        end
+        return filter
+      end
+
+      if field.nil? || term.nil?
+        raise ArgumentError, "filtered aggregation requires filter: or both field: and term:"
+      end
+
+      normalized_distance = distance.nil? ? nil : normalize_non_negative_integer(distance, "distance")
+      normalized_prefix = normalize_boolean_option(prefix, "prefix")
+      normalized_transposition = normalize_boolean_option(transposition_cost_one, "transposition_cost_one")
+
+      FieldTermFilter.new(
+        field: normalize_field(field),
+        term: term,
+        distance: normalized_distance,
+        prefix: normalized_prefix,
+        transposition_cost_one: normalized_transposition
+      )
+    end
+    private_class_method :normalize_filter
 
     def normalize_field(field)
       case field
@@ -214,6 +285,46 @@ module ParadeDB
       normalized
     end
     private_class_method :normalize_bounds
+
+    def normalize_top_hits_sort(sort)
+      entries = Array(sort)
+      raise ArgumentError, "top_hits sort must include at least one field" if entries.empty?
+
+      entries.map do |entry|
+        raise ArgumentError, "top_hits sort entries must be Hash values" unless entry.is_a?(Hash)
+        raise ArgumentError, "top_hits sort entries must include exactly one field" unless entry.size == 1
+
+        field, direction = entry.first
+        {
+          normalize_field(field) => normalize_sort_direction(direction)
+        }
+      end
+    end
+    private_class_method :normalize_top_hits_sort
+
+    def normalize_docvalue_fields(fields)
+      values = Array(fields)
+      raise ArgumentError, "top_hits docvalue_fields must include at least one field" if values.empty?
+
+      values.map { |field| normalize_field(field) }
+    end
+    private_class_method :normalize_docvalue_fields
+
+    def normalize_sort_direction(direction)
+      value = direction.to_s
+      return value if %w[asc desc].include?(value)
+
+      raise ArgumentError, "sort direction must be 'asc' or 'desc'"
+    end
+    private_class_method :normalize_sort_direction
+
+    def normalize_boolean_option(value, name)
+      return nil if value.nil?
+      return value if value == true || value == false
+
+      raise ArgumentError, "#{name} must be true, false, or nil"
+    end
+    private_class_method :normalize_boolean_option
 
     def deep_stringify(value)
       case value
