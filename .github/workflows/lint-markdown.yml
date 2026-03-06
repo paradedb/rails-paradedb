@@ -11,10 +11,10 @@ on:
     paths:
       - "**/*.md"
       - "**/*.mdx"
+      - ".github/workflows/lint-markdown.yml"
       - ".markdownlint.yaml"
       - ".prettierignore"
       - ".prettierrc"
-      - ".github/workflows/lint-markdown.yml"
   workflow_dispatch:
 
 concurrency:
@@ -33,11 +33,11 @@ jobs:
       - name: Set up NodeJS Environment
         uses: actions/setup-node@v6
 
-      - name: Install Markdown Linters
+      - name: Install Prettier and markdownlint
         run: npm install -g prettier markdownlint-cli
 
       - name: Run Markdown Lint
-        run: markdownlint '**/*.md'
+        run: markdownlint "**/*.md"
 
       - name: Run Prettier
-        run: prettier --check '{**/*.md,**/*.mdx}' --ignore-path .prettierignore
+        run: prettier --check "{**/*.md,**/*.mdx}" --ignore-path .prettierignore

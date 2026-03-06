@@ -31,48 +31,69 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Bash Linters
-        run: |
-          pip install beautysh
-          sudo apt-get update
-          sudo apt-get install -y shellcheck
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
 
       - name: Run Beautysh
         run: |
           shopt -s globstar nullglob
           if compgen -G "**/*.sh" > /dev/null; then
-            beautysh **/*.sh --indent-size 2 --check
+            uv tool run --from beautysh beautysh **/*.sh --indent-size 2 --check
           fi
           shopt -u globstar nullglob
 
-      - name: Check Bash Script Shebang
+      - name: Check Bash Scripts for bash shebang
         run: |
-          while IFS= read -r -d '' file; do
-            if head -n 1 "$file" | grep -Eq '^#!/usr/bin/env bash$|^#!/bin/bash$'; then
+          while read -r file
+          do
+            shebang="$(head -n 1 "$file")"
+            if [[ "$shebang" = "#!/bin/bash" || "$shebang" = "#!/usr/bin/env bash" ]]
+            then
               echo "[bash shebang -> Present] $file"
             else
-              echo "[bash shebang -> NOT FOUND] $file"
-              exit 1
+              echo "[bash shebang -> NOT FOUND] $file" && exit 1
             fi
-          done < <(find . -name '*.sh' -print0)
+          done < <(find . -name '*.sh')
 
-      - name: Check Bash Scripts for Pipefail
+      - name: Check Bash Scripts for strict mode opt-in
         run: |
-          while IFS= read -r -d '' file; do
+          while read -r file
+          do
             if grep -q \
               -e "^[[:space:]]*set -euo pipefail$" \
               -e "^[[:space:]]*set -Eeuo pipefail$" \
-              -e "^[[:space:]]*# @paradedb-skip-check-pipefail$" \
-              "$file"; then
-              echo "[pipefail -> Present] $file"
+              -e "^# @paradedb-skip-check-pipefail$" \
+              "$file"
+            then
+              echo "[strict mode -> Present] $file"
             else
-              echo "[pipefail -> NOT FOUND] $file"
-              exit 1
+              echo "[strict mode -> NOT FOUND] $file" && exit 1
             fi
-          done < <(find . -name '*.sh' -print0)
+          done < <(find . -name '*.sh')
 
       - name: Run ShellCheck
         run: |
-          while IFS= read -r -d '' file; do
-            shellcheck -x "$file"
-          done < <(find . -name '*.sh' -print0)
+          uv run --no-sync python - <<'PY'
+          import glob
+          import subprocess
+          import sys
+
+          sh_files = sorted(set(glob.glob("**/*.sh", recursive=True)))
+          if not sh_files:
+              print("[Shellcheck skipped] No shell scripts found.")
+              sys.exit(0)
+          for file in sh_files:
+              p = subprocess.run(
+                  f"shellcheck -x -P scripts {file}",
+                  shell=True,
+                  capture_output=True,
+                  check=False,
+              )
+              print(p.stdout.decode())
+              if p.returncode != 0:
+                  print(f"[Shellcheck did not pass] {file}")
+                  sys.exit(1)
+          print(f"[Shellcheck passed] {len(sh_files)} script(s)")
+          PY
