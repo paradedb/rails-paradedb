@@ -12,6 +12,9 @@ on:
       - "**/*.md"
       - "**/*.mdx"
       - ".github/workflows/lint-markdown.yml"
+      - ".markdownlint.yaml"
+      - ".prettierignore"
+      - ".prettierrc"
   workflow_dispatch:
 
 concurrency:
