@@ -14,7 +14,7 @@ if $PROGRAM_NAME == __FILE__
   search_query = "shoes"
   puts "\nQuery: '#{search_query}'"
 
-  puts "\n--- Facets + Rows (Top-N) ---"
+  puts "\n--- Facets + Rows (Top K) ---"
   relation = MockItem.search(:description)
                      .matching_all(search_query)
                      .with_facets(:category, :rating, :metadata_color)

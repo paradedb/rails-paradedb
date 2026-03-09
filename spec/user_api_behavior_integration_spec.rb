@@ -260,7 +260,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
     assert_kind_of Hash, rel_facets
     assert_includes rel_facets, "rating"
   end
-  it "with facets without topn shape raises friendly error" do
+  it "with facets without topk shape raises friendly error" do
     rel = BehaviorProduct.search(:description).matching_all("running shoes").with_facets(:rating, size: 10)
     error = assert_raises(ParadeDB::FacetQueryError) { rel.to_a }
     assert_includes error.message, "ORDER BY and LIMIT"
