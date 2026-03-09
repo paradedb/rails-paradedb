@@ -901,7 +901,7 @@ module ParadeDB
         return if missing.empty?
 
         raise ParadeDB::FacetQueryError,
-              "with_facets requires #{missing.join(' and ')} for ParadeDB TopN pushdown. " \
+              "with_facets requires #{missing.join(' and ')} for ParadeDB Top-K pushdown. " \
               "Use .order(...).limit(...)."
       end
 
