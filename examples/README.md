@@ -61,7 +61,7 @@ BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/quickstart/quickstart.
 
 1. Faceted Search (`faceted_search/faceted_search.rb`)
 
-Top-K rows plus facet buckets in one flow.
+Top K rows plus facet buckets in one flow.
 
 ```bash
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/faceted_search/faceted_search.rb
