@@ -427,12 +427,31 @@ module ParadeDB
         rel = rel.ensure_paradedb_predicate
       end
 
-      facet_selects = agg_specs.map do |alias_name, json|
-        builder.agg(json, exact: exact).over.as("_#{alias_name}_facet")
+      facet_selects = agg_specs.map do |alias_name, agg_spec|
+        render_aggregation_node(agg_spec, exact: exact).over.as("_#{alias_name}_facet")
       end
 
       rel = rel.select(klass.arel_table[::Arel.star]) if rel.select_values.empty?
       rel.select(*facet_selects)
+    end
+
+    # Grouped ParadeDB aggregations:
+    #   Product.search(:id).match_all.aggregate_by(:rating, agg: ParadeDB::Aggregations.value_count(:id))
+    def aggregate_by(*group_fields, exact: nil, **named_aggregations)
+      ensure_paradedb_runtime!
+      validate_exact_option!(exact)
+      normalized_group_fields = normalize_group_fields(group_fields)
+      agg_specs = normalize_named_aggregation_specs(named_aggregations)
+
+      rel = self
+      rel = rel.ensure_paradedb_predicate unless rel.has_paradedb_predicate?
+
+      group_nodes = normalized_group_fields.map { |field| builder[field] }
+      aggregate_nodes = agg_specs.map do |alias_name, agg_spec|
+        render_aggregation_node(agg_spec, exact: exact).as(alias_name.to_s)
+      end
+
+      rel.except(:select, :group).select(*group_nodes, *aggregate_nodes).group(*group_nodes)
     end
 
     def has_paradedb_predicate?
@@ -561,7 +580,59 @@ module ParadeDB
     def normalize_named_aggregation_specs(named_aggregations)
       ParadeDB::Aggregations
         .build_named_payload(named_aggregations)
-        .transform_values(&:to_json)
+        .transform_values do |spec|
+          if spec.is_a?(ParadeDB::Aggregations::FilteredSpec)
+            {
+              json: spec.spec.to_json,
+              filter: normalize_agg_filter_descriptor(spec.agg_filter)
+            }
+          else
+            {
+              json: spec.to_json,
+              filter: nil
+            }
+          end
+        end
+    end
+
+    def render_aggregation_node(agg_spec, exact:, builder_override: builder)
+      agg_node = builder_override.agg(agg_spec[:json], exact: exact)
+      filter = resolve_agg_filter_node(agg_spec[:filter], builder_override)
+      return agg_node if filter.nil?
+
+      agg_node.filter(filter)
+    end
+
+    def normalize_agg_filter_descriptor(filter)
+      case filter
+      when ::Arel::Nodes::Node
+        filter
+      when ParadeDB::Aggregations::FieldTermFilter
+        filter
+      else
+        raise ArgumentError,
+              "filtered aggregation filter must be an Arel node or ParadeDB::Aggregations.filtered(...) descriptor"
+      end
+    end
+
+    def resolve_agg_filter_node(filter, builder_override)
+      case filter
+      when nil
+        nil
+      when ::Arel::Nodes::Node
+        filter
+      when ParadeDB::Aggregations::FieldTermFilter
+        builder_override.term(
+          filter.field,
+          filter.term,
+          distance: filter.distance,
+          prefix: filter.prefix,
+          transposition_cost_one: filter.transposition_cost_one
+        )
+      else
+        raise ArgumentError,
+              "filtered aggregation filter must be an Arel node or ParadeDB::Aggregations.filtered(...) descriptor"
+      end
     end
 
     def validate_exact_option!(exact)
@@ -597,6 +668,27 @@ module ParadeDB
 
       if normalized.uniq.length != normalized.length
         raise ArgumentError, "Facet field names must be unique."
+      end
+
+      validate_facet_fields_indexed!(normalized)
+      normalized
+    end
+
+    def normalize_group_fields(group_fields)
+      fields = Array(group_fields).flatten
+      raise ArgumentError, "aggregate_by requires at least one group field" if fields.empty?
+
+      normalized = fields.map do |field|
+        case field
+        when String then field
+        when Symbol then field.to_s
+        else
+          raise TypeError, "aggregate_by group fields must be strings or symbols, got #{field.class}"
+        end
+      end
+
+      if normalized.uniq.length != normalized.length
+        raise ArgumentError, "aggregate_by group fields must be unique"
       end
 
       validate_facet_fields_indexed!(normalized)
@@ -847,7 +939,16 @@ module ParadeDB
 
         source_alias = "paradedb_agg_source"
         source = predicate_scope.arel.as(source_alias)
-        projections = agg_specs.map { |alias_name, json| builder.agg(json, exact: exact).as("#{alias_name}_facet") }
+        projection_builder = ParadeDB::Arel::Builder.new(source_alias)
+        projections = agg_specs.map do |alias_name, agg_spec|
+          agg_node = relation.send(
+            :render_aggregation_node,
+            agg_spec,
+            exact: exact,
+            builder_override: projection_builder
+          )
+          agg_node.as("#{alias_name}_facet")
+        end
 
         relation.klass.unscoped.from(source).select(*projections)
       end

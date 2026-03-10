@@ -398,6 +398,38 @@ RSpec.describe "UserApiUnitTest" do
 
     assert_includes sql, %(pdb.agg('{"value_count":{"field":"id"}}', FALSE) OVER () AS _docs_facet)
   end
+  it "with_agg supports filtered named aggregations" do
+    sql = UnitProduct.with_agg(
+      electronics_count: ParadeDB::Aggregations.filtered(
+        ParadeDB::Aggregations.value_count(:id),
+        field: :category,
+        term: "electronics"
+      )
+    ).to_sql
+
+    assert_includes sql, %(pdb.agg('{"value_count":{"field":"id"}}') FILTER (WHERE "products"."category" === 'electronics') OVER () AS _electronics_count_facet)
+    assert_includes sql, %("products"."id" @@@ pdb.all())
+  end
+  it "facets_agg supports filtered named aggregations" do
+    facet_sql = UnitProduct.search(:description)
+                           .matching_all("shoes")
+                           .send(
+                             :build_aggregation_query,
+                             UnitProduct.search(:description)
+                                        .matching_all("shoes")
+                                        .send(
+                                          :normalize_named_aggregation_specs,
+                                          electronics_count: ParadeDB::Aggregations.filtered(
+                                            ParadeDB::Aggregations.value_count(:id),
+                                            field: :category,
+                                            term: "electronics"
+                                          )
+                                        )
+                           )
+                           .sql
+
+    assert_includes facet_sql, %(pdb.agg('{"value_count":{"field":"id"}}') FILTER (WHERE "paradedb_agg_source"."category" === 'electronics') AS electronics_count_facet)
+  end
   it "facets_agg exact false raises" do
     error = assert_raises(ArgumentError) do
       UnitProduct.search(:description).matching_all("shoes").facets_agg(
@@ -412,6 +444,34 @@ RSpec.describe "UserApiUnitTest" do
 
     assert_includes sql, %(pdb.agg('{"value_count":{"field":"id"}}') OVER () AS _docs_facet)
     assert_includes sql, %("products"."id" @@@ pdb.all())
+  end
+  it "aggregate_by builds grouped aggregation query" do
+    sql = UnitProduct.search(:category)
+                     .term("electronics")
+                     .aggregate_by(
+                       :rating,
+                       agg: ParadeDB::Aggregations.value_count(:id)
+                     )
+                     .order(:rating)
+                     .limit(5)
+                     .to_sql
+
+    expected = <<~SQL.strip
+      SELECT "products"."rating", pdb.agg('{"value_count":{"field":"id"}}') AS agg FROM "products"
+      WHERE ("products"."category" === 'electronics')
+      GROUP BY "products"."rating"
+      ORDER BY "products"."rating" ASC
+      LIMIT 5
+    SQL
+
+    assert_sql_equal expected, sql
+  end
+  it "model aggregate_by adds match all when no paradedb predicate exists" do
+    sql = UnitProduct.aggregate_by(:rating, agg: ParadeDB::Aggregations.value_count(:id)).to_sql
+
+    assert_includes sql, %("products"."id" @@@ pdb.all())
+    assert_includes sql, %(GROUP BY "products"."rating")
+    assert_includes sql, %(pdb.agg('{"value_count":{"field":"id"}}') AS agg)
   end
   it "with facets load requires order and limit" do
     rel = UnitProduct.search(:description)
