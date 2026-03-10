@@ -112,7 +112,7 @@ rails-paradedb, and can be done in under a minute by signing in with your
 GitHub account.
 
 If you have any questions about the CLA, please reach out to us in the
-[ParadeDB Community Slack](https://join.slack.com/t/paradedbcommunity/shared_invite/zt-32abtyjg4-yoYoi~RPh9MSW8tDbl0BQw)
+[ParadeDB Community Slack](https://paradedb.com/slack)
 or via email at [legal@paradedb.com](mailto:legal@paradedb.com).
 
 ### License
