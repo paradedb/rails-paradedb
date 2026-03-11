@@ -42,6 +42,10 @@ RSpec.describe "GuardsUnitTest" do
     error = assert_raises(RuntimeError) { bare_relation.regex("run.*") }
     assert_includes error.message, "No search field set"
   end
+  it "regex phrase without search raises" do
+    error = assert_raises(RuntimeError) { bare_relation.regex_phrase("run.*", "sho.*") }
+    assert_includes error.message, "No search field set"
+  end
   it "term without search raises" do
     error = assert_raises(RuntimeError) { bare_relation.term("shoes") }
     assert_includes error.message, "No search field set"
@@ -51,7 +55,11 @@ RSpec.describe "GuardsUnitTest" do
     assert_includes error.message, "No search field set"
   end
   it "near without search raises" do
-    error = assert_raises(RuntimeError) { bare_relation.near("running", "shoes") }
+    error = assert_raises(RuntimeError) { bare_relation.near("running", anchor: "shoes", distance: 1) }
+    assert_includes error.message, "No search field set"
+  end
+  it "near regex without search raises" do
+    error = assert_raises(RuntimeError) { bare_relation.near_regex("sl.*", anchor: "shoes", distance: 1) }
     assert_includes error.message, "No search field set"
   end
   it "phrase prefix without search raises" do
@@ -72,6 +80,10 @@ RSpec.describe "GuardsUnitTest" do
   end
   it "range without search raises" do
     error = assert_raises(RuntimeError) { bare_relation.range(3..5) }
+    assert_includes error.message, "No search field set"
+  end
+  it "range term without search raises" do
+    error = assert_raises(RuntimeError) { bare_relation.range_term(1) }
     assert_includes error.message, "No search field set"
   end
 
@@ -106,6 +118,18 @@ RSpec.describe "GuardsUnitTest" do
     error = assert_raises(ArgumentError) { builder.phrase(:description, "running shoes", slop: "lots") }
     assert_includes error.message, "slop must be numeric"
   end
+  it "phrase tokenizer rejects non-string" do
+    error = assert_raises(ArgumentError) { builder.phrase(:description, "running shoes", tokenizer: 123) }
+    assert_includes error.message, "tokenizer must be a string"
+  end
+  it "phrase tokenizer rejects invalid expression" do
+    error = assert_raises(ArgumentError) { builder.phrase(:description, "running shoes", tokenizer: "whitespace;drop") }
+    assert_includes error.message, "invalid tokenizer expression"
+  end
+  it "phrase array rejects tokenizer" do
+    error = assert_raises(ArgumentError) { builder.phrase(:description, %w[running shoes], tokenizer: "whitespace") }
+    assert_includes error.message, "tokenizer is not supported for pretokenized phrase arrays"
+  end
   it "phrase slop accepts integer" do
     node = builder.phrase(:description, "running shoes", slop: 2)
     refute_nil node
@@ -139,12 +163,20 @@ RSpec.describe "GuardsUnitTest" do
     assert_includes error.message, "term_set requires at least one value"
   end
   it "near distance rejects non numeric" do
-    error = assert_raises(ArgumentError) { builder.near(:description, "a", "b", distance: "close") }
+    error = assert_raises(ArgumentError) { builder.near(:description, "a", anchor: "b", distance: "close") }
     assert_includes error.message, "distance must be numeric"
   end
   it "near distance accepts integer" do
-    node = builder.near(:description, "a", "b", distance: 3)
+    node = builder.near(:description, "a", anchor: "b", distance: 3)
     refute_nil node
+  end
+  it "near regex max expansions rejects non integer" do
+    error = assert_raises(ArgumentError) { builder.near_regex(:description, "sl.*", anchor: "shoes", distance: 1, max_expansions: "100") }
+    assert_includes error.message, "max_expansions must be an integer"
+  end
+  it "near rejects array right operand" do
+    error = assert_raises(ArgumentError) { builder.near(:description, anchor: "shoes", distance: 1) }
+    assert_includes error.message, "near requires at least one term"
   end
   it "range with no bounds raises" do
     error = assert_raises(ArgumentError) { builder.range(:rating) }
@@ -161,6 +193,14 @@ RSpec.describe "GuardsUnitTest" do
   it "range with explicit unknown type raises" do
     error = assert_raises(ArgumentError) { builder.range(:rating, 1..2, type: :bad) }
     assert_includes error.message, "Unknown range type"
+  end
+  it "range term relation requires range type" do
+    error = assert_raises(ArgumentError) { builder.range_term(:weight_range, "(10, 12]", relation: "Intersects") }
+    assert_includes error.message, "relation requires range_type"
+  end
+  it "range term rejects unknown relation" do
+    error = assert_raises(ArgumentError) { builder.range_term(:weight_range, "(10, 12]", relation: "Overlap", range_type: "int4range") }
+    assert_includes error.message, "Unknown range relation"
   end
 
   # ──────────────────────────────────────────────
@@ -198,6 +238,14 @@ RSpec.describe "GuardsUnitTest" do
   it "phrase prefix with nil terms raises" do
     error = assert_raises(ArgumentError) { builder.phrase_prefix(:description, nil, nil) }
     assert_includes error.message, "phrase_prefix requires at least one term"
+  end
+  it "phrase array with no terms raises" do
+    error = assert_raises(ArgumentError) { builder.phrase(:description, []) }
+    assert_includes error.message, "phrase array input requires at least one term"
+  end
+  it "regex phrase with no patterns raises" do
+    error = assert_raises(ArgumentError) { builder.regex_phrase(:description) }
+    assert_includes error.message, "regex_phrase requires at least one pattern"
   end
   it "phrase prefix max expansion must be integer" do
     error = assert_raises(ArgumentError) { builder.phrase_prefix(:description, "run", max_expansion: "100") }

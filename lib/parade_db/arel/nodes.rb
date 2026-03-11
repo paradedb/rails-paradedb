@@ -144,6 +144,26 @@ module ParadeDB
         alias == eql?
       end
 
+      class TypeCast < ::Arel::Nodes::Node
+        attr_reader :expr, :type_sql
+
+        def initialize(expr, type_sql)
+          @expr = expr
+          @type_sql = type_sql
+        end
+
+        def hash
+          [self.class, expr, type_sql].hash
+        end
+
+        def eql?(other)
+          self.class == other.class &&
+            expr == other.expr &&
+            type_sql == other.type_sql
+        end
+        alias == eql?
+      end
+
       class ParseNode < ::Arel::Nodes::Node
         attr_reader :query, :lenient, :conjunction_mode
 

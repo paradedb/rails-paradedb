@@ -94,9 +94,21 @@ RSpec.describe "ArelBuilderUnitTest" do
     node = @builder.phrase(:description, "running shoes", slop: 10)
     assert_equal %("products"."description" ### 'running shoes'::pdb.slop(10)), sql(node)
   end
+  it "phrase with tokenizer override" do
+    node = @builder.phrase(:description, "running shoes", tokenizer: "whitespace")
+    assert_equal %("products"."description" ### 'running shoes'::pdb.whitespace), sql(node)
+  end
   it "phrase with slop and constant score bridges through query" do
     node = @builder.phrase(:description, "running shoes", slop: 2, constant_score: 1.0)
     assert_equal %("products"."description" ### 'running shoes'::pdb.slop(2)::pdb.query::pdb.const(1.0)), sql(node)
+  end
+  it "phrase array renders array literal" do
+    node = @builder.phrase(:description, %w[running shoes])
+    assert_equal %("products"."description" ### ARRAY['running', 'shoes']), sql(node)
+  end
+  it "phrase array with slop and constant score bridges through query" do
+    node = @builder.phrase(:description, %w[shoes running], slop: 2, constant_score: 1.0)
+    assert_equal %("products"."description" ### ARRAY['shoes', 'running']::pdb.slop(2)::pdb.query::pdb.const(1.0)), sql(node)
   end
 
   # ---- term ----
@@ -177,20 +189,45 @@ RSpec.describe "ArelBuilderUnitTest" do
     node = @builder.regex(:description, "(wireless|bluetooth).*earbuds")
     assert_equal %("products"."description" @@@ pdb.regex('(wireless|bluetooth).*earbuds')), sql(node)
   end
+  it "regex phrase" do
+    node = @builder.regex_phrase(:description, "run.*", "sho.*")
+    assert_equal %("products"."description" @@@ pdb.regex_phrase(ARRAY['run.*', 'sho.*'])), sql(node)
+  end
+  it "regex phrase with options" do
+    node = @builder.regex_phrase(:description, "run.*", "sho.*", slop: 2, max_expansions: 100)
+    assert_equal %("products"."description" @@@ pdb.regex_phrase(ARRAY['run.*', 'sho.*'], slop => 2, max_expansions => 100)), sql(node)
+  end
 
   # ---- near ----
-  it "near default distance" do
-    node = @builder.near(:description, "running", "shoes", distance: 1)
+  it "near distance 1" do
+    node = @builder.near(:description, "running", anchor: "shoes", distance: 1)
     assert_equal %("products"."description" @@@ ('running' ## 1 ## 'shoes')), sql(node)
   end
+  it "near ordered" do
+    node = @builder.near(:description, "running", anchor: "shoes", distance: 1, ordered: true)
+    assert_equal %("products"."description" @@@ ('running' ##> 1 ##> 'shoes')), sql(node)
+  end
   it "near large distance" do
-    node = @builder.near(:description, "running", "shoes", distance: 5)
+    node = @builder.near(:description, "running", anchor: "shoes", distance: 5)
     assert_equal %("products"."description" @@@ ('running' ## 5 ## 'shoes')), sql(node)
   end
-  it "near requires exactly two terms" do
-    assert_raises(ArgumentError) do
-      @builder.near(:description, "one", "two", "three", distance: 1)
+  it "near regex" do
+    node = @builder.near_regex(:description, "sl.*", anchor: "shoes", distance: 1)
+    assert_equal %("products"."description" @@@ (pdb.prox_regex('sl.*') ## 1 ## 'shoes')), sql(node)
+  end
+  it "near regex with max expansions" do
+    node = @builder.near_regex(:description, "sl.*", anchor: "shoes", distance: 1, max_expansions: 100)
+    assert_equal %("products"."description" @@@ (pdb.prox_regex('sl.*', 100) ## 1 ## 'shoes')), sql(node)
+  end
+  it "near with array left operand" do
+    node = @builder.near(:description, "sleek", "white", anchor: "shoes", distance: 1)
+    assert_equal %("products"."description" @@@ (pdb.prox_array('sleek', 'white') ## 1 ## 'shoes')), sql(node)
+  end
+  it "near rejects empty terms" do
+    error = assert_raises(ArgumentError) do
+      @builder.near(:description, anchor: "shoes", distance: 1)
     end
+    assert_includes error.message, "near requires at least one term"
   end
 
   # ---- phrase_prefix ----
@@ -225,6 +262,14 @@ RSpec.describe "ArelBuilderUnitTest" do
   it "range wrapper with bound options" do
     node = @builder.range(:rating, nil, gte: 3, lt: 5)
     assert_equal %q{"products"."rating" @@@ pdb.range(int8range(3, 5, '[)'))}, sql(node)
+  end
+  it "range term scalar value" do
+    node = @builder.range_term(:weight_range, 1)
+    assert_equal %("products"."weight_range" @@@ pdb.range_term(1)), sql(node)
+  end
+  it "range term with relation" do
+    node = @builder.range_term(:weight_range, "(10, 12]", relation: "Intersects", range_type: "int4range")
+    assert_equal %q{"products"."weight_range" @@@ pdb.range_term('(10, 12]'::int4range, 'Intersects')}, sql(node)
   end
 
   # ---- more_like_this ----

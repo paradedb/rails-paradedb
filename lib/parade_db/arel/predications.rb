@@ -5,6 +5,7 @@ module ParadeDB
   module Arel
     module Predications
       TOKENIZER_EXPRESSION = /\A[a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\s*[a-zA-Z0-9_'".,=\s:-]*\s*\))?\z/.freeze
+      BUILDER = Builder.new.freeze
 
       def pdb_match(*terms, tokenizer: nil, distance: nil, prefix: nil, transposition_cost_one: nil, boost: nil)
         rhs = pdb_quoted(pdb_join_terms(terms))
@@ -27,9 +28,8 @@ module ParadeDB
         ::Arel::Nodes::InfixOperation.new("@@@", self, rhs)
       end
 
-      def pdb_phrase(text, slop: nil)
-        rhs = pdb_apply_slop(pdb_quoted(text), slop)
-        ::Arel::Nodes::InfixOperation.new("###", self, rhs)
+      def pdb_phrase(text, slop: nil, tokenizer: nil)
+        BUILDER.phrase(self, text, slop: slop, tokenizer: tokenizer)
       end
 
       def pdb_term(term, distance: nil, prefix: nil, transposition_cost_one: nil, boost: nil)
@@ -40,7 +40,7 @@ module ParadeDB
       end
 
       def pdb_term_set(*terms)
-        ParadeDB::Arel::Builder.new.term_set(self, *terms)
+        BUILDER.term_set(self, *terms)
       end
 
       def pdb_regex(pattern)
@@ -48,14 +48,23 @@ module ParadeDB
         ::Arel::Nodes::InfixOperation.new("@@@", self, rhs)
       end
 
-      def pdb_near(left_term, right_term, distance: 1)
-        pdb_validate_numeric!(distance, :distance)
-        near_chain = ::Arel::Nodes::InfixOperation.new(
-          "##",
-          ::Arel::Nodes::InfixOperation.new("##", pdb_quoted(left_term), pdb_quoted(distance)),
-          pdb_quoted(right_term)
+      def pdb_regex_phrase(*patterns, slop: nil, max_expansions: nil)
+        BUILDER.regex_phrase(self, *patterns, slop: slop, max_expansions: max_expansions)
+      end
+
+      def pdb_near(*terms, anchor:, distance:, ordered: false)
+        BUILDER.near(self, *terms, anchor: anchor, distance: distance, ordered: ordered)
+      end
+
+      def pdb_near_regex(pattern, anchor:, distance:, ordered: false, max_expansions: nil)
+        BUILDER.near_regex(
+          self,
+          pattern,
+          anchor: anchor,
+          distance: distance,
+          ordered: ordered,
+          max_expansions: max_expansions
         )
-        ::Arel::Nodes::InfixOperation.new("@@@", self, ::Arel::Nodes::Grouping.new(near_chain))
       end
 
       def pdb_phrase_prefix(*terms, max_expansion: nil)
@@ -92,7 +101,11 @@ module ParadeDB
       end
 
       def pdb_range(value = nil, gte: nil, gt: nil, lte: nil, lt: nil, type: nil)
-        ParadeDB::Arel::Builder.new.range(self, value, gte: gte, gt: gt, lte: lte, lt: lt, type: type)
+        BUILDER.range(self, value, gte: gte, gt: gt, lte: lte, lt: lt, type: type)
+      end
+
+      def pdb_range_term(value, relation: nil, range_type: nil)
+        BUILDER.range_term(self, value, relation: relation, range_type: range_type)
       end
 
       def pdb_more_like_this(key, fields: nil, options: {})
@@ -134,7 +147,7 @@ module ParadeDB
         offset: nil,
         sort_by: nil
       )
-        ParadeDB::Arel::Builder.new.snippets(
+        BUILDER.snippets(
           self,
           start_tag: start_tag,
           end_tag: end_tag,

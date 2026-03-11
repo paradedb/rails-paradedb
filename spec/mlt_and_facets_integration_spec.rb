@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "spec_helper"
+require "json"
 
 class MltFacetProduct < ActiveRecord::Base
   include ParadeDB::Model
@@ -105,6 +106,92 @@ RSpec.describe "MltAndFacetsIntegrationTest" do
     assert_includes aggs, "docs"
     assert_includes aggs, "by_rating"
   end
+  context "docs parity aggregations" do
+    before do
+      seed_docs_parity_products!
+    end
+
+    it "aggregate_by grouped value_count matches raw SQL" do
+      raw_sql = <<~SQL
+        SELECT rating, pdb.agg('{"value_count": {"field": "id"}}') AS agg
+        FROM products
+        WHERE category === 'electronics'
+        GROUP BY rating
+        ORDER BY rating
+        LIMIT 5
+      SQL
+
+      expected = normalized_grouped_rows(raw_sql)
+      actual = MltFacetProduct.search(:category)
+                              .term("electronics")
+                              .aggregate_by(
+                                :rating,
+                                agg: ParadeDB::Aggregations.value_count(:id)
+                              )
+                              .order(:rating)
+                              .limit(5)
+                              .map { |row| [row.rating, parse_json_value(row.attributes["agg"])] }
+
+      assert_equal expected, actual
+    end
+
+    it "filtered facets_agg matches raw SQL FILTER counts" do
+      raw_sql = <<~SQL
+        SELECT
+            pdb.agg('{"value_count": {"field": "id"}}')
+            FILTER (WHERE category === 'electronics') AS electronics_count,
+            pdb.agg('{"value_count": {"field": "id"}}')
+            FILTER (WHERE category === 'footwear') AS footwear_count
+        FROM products
+      SQL
+
+      expected_row = ActiveRecord::Base.connection.exec_query(raw_sql).first
+      expected_electronics = parse_json_value(expected_row["electronics_count"])
+      expected_footwear = parse_json_value(expected_row["footwear_count"])
+
+      actual = MltFacetProduct.facets_agg(
+        electronics_count: ParadeDB::Aggregations.filtered(
+          ParadeDB::Aggregations.value_count(:id),
+          field: :category,
+          term: "electronics"
+        ),
+        footwear_count: ParadeDB::Aggregations.filtered(
+          ParadeDB::Aggregations.value_count(:id),
+          field: :category,
+          term: "footwear"
+        )
+      )
+
+      assert_equal expected_electronics, actual["electronics_count"]
+      assert_equal expected_footwear, actual["footwear_count"]
+    end
+
+    it "top_hits aggregate_by matches raw SQL" do
+      raw_sql = <<~SQL
+        SELECT pdb.agg('{"top_hits": {"size": 3, "sort": [{"price": "desc"}], "docvalue_fields": ["id", "price"]}}') AS agg
+        FROM products
+        WHERE id @@@ pdb.all()
+        GROUP BY rating
+        ORDER BY rating
+      SQL
+
+      expected = normalized_single_agg_rows(raw_sql)
+      actual = MltFacetProduct.search(:id)
+                              .match_all
+                              .aggregate_by(
+                                :rating,
+                                agg: ParadeDB::Aggregations.top_hits(
+                                  size: 3,
+                                  sort: [{ price: "desc" }],
+                                  docvalue_fields: %w[id price]
+                                )
+                              )
+                              .order(:rating)
+                              .map { |row| parse_json_value(row.attributes["agg"]) }
+
+      assert_equal expected, actual
+    end
+  end
 
   private
 
@@ -136,5 +223,42 @@ RSpec.describe "MltAndFacetsIntegrationTest" do
     MltFacetProduct.create!(description: "budget wired earbuds", category: "audio", rating: 3, in_stock: false, price: 20)
     MltFacetProduct.create!(description: "hiking boots waterproof", category: "footwear", rating: 4, in_stock: true, price: 110)
     MltFacetProduct.create!(description: "running socks breathable", category: "apparel", rating: 2, in_stock: true, price: 15)
+  end
+
+  def seed_docs_parity_products!
+    MltFacetProduct.connection.execute("TRUNCATE TABLE products RESTART IDENTITY;")
+
+    MltFacetProduct.create!(description: "sleek running shoes", category: "footwear", rating: 5, in_stock: true, price: 120)
+    MltFacetProduct.create!(description: "running sleek shoes", category: "footwear", rating: 4, in_stock: true, price: 90)
+    MltFacetProduct.create!(description: "shoes running", category: "footwear", rating: 3, in_stock: true, price: 70)
+    MltFacetProduct.create!(description: "white shoes", category: "footwear", rating: 4, in_stock: true, price: 95)
+    MltFacetProduct.create!(description: "trail running shoes grip", category: "footwear", rating: 4, in_stock: true, price: 85)
+    MltFacetProduct.create!(description: "wireless bluetooth earbuds", category: "electronics", rating: 5, in_stock: true, price: 80)
+    MltFacetProduct.create!(description: "budget wired earbuds", category: "electronics", rating: 3, in_stock: false, price: 20)
+    MltFacetProduct.create!(description: "gaming keyboard", category: "electronics", rating: 4, in_stock: true, price: 110)
+    MltFacetProduct.create!(description: "running socks breathable", category: "apparel", rating: 2, in_stock: true, price: 15)
+  end
+
+  def parse_json_value(value)
+    case value
+    when nil
+      nil
+    when String
+      JSON.parse(value)
+    else
+      value
+    end
+  end
+
+  def normalized_grouped_rows(sql)
+    ActiveRecord::Base.connection.exec_query(sql).rows.map do |row|
+      [row[0], parse_json_value(row[1])]
+    end
+  end
+
+  def normalized_single_agg_rows(sql)
+    ActiveRecord::Base.connection.exec_query(sql).rows.map do |row|
+      parse_json_value(row[0])
+    end
   end
 end

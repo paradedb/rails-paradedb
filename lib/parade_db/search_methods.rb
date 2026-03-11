@@ -45,8 +45,8 @@ module ParadeDB
     attr_accessor :_paradedb_facet_fields
 
     module PredicateInspector
-      PARADEDB_INFIX_OPERATORS = %w[&&& ||| ### @@@ === ##].freeze
-      PARADEDB_SQL_PATTERN = /(&&&|\|\|\||###|@@@|===|##|pdb\.)/
+      PARADEDB_INFIX_OPERATORS = %w[&&& ||| ### @@@ === ## ##>].freeze
+      PARADEDB_SQL_PATTERN = /(&&&|\|\|\||###|@@@|===|##>|##|pdb\.)/
 
       module_function
 
@@ -174,10 +174,17 @@ module ParadeDB
       where(grouped(neg.not))
     end
 
-    def phrase(text, slop: nil, boost: nil, constant_score: nil)
+    def phrase(text, slop: nil, tokenizer: nil, boost: nil, constant_score: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      node = builder.phrase(_paradedb_current_field, text, slop: slop, boost: boost, constant_score: constant_score)
+      node = builder.phrase(
+        _paradedb_current_field,
+        text,
+        slop: slop,
+        tokenizer: tokenizer,
+        boost: boost,
+        constant_score: constant_score
+      )
       where(grouped(node))
     end
 
@@ -185,6 +192,20 @@ module ParadeDB
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
       node = builder.regex(_paradedb_current_field, pattern, boost: boost, constant_score: constant_score)
+      where(grouped(node))
+    end
+
+    def regex_phrase(*patterns, slop: nil, max_expansions: nil, boost: nil, constant_score: nil)
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+
+      node = builder.regex_phrase(
+        _paradedb_current_field,
+        *patterns,
+        slop: slop,
+        max_expansions: max_expansions,
+        boost: boost,
+        constant_score: constant_score
+      )
       where(grouped(node))
     end
 
@@ -217,10 +238,42 @@ module ParadeDB
       where(grouped(node))
     end
 
-    def near(left_term, right_term, distance: 1, boost: nil, constant_score: nil)
+    def near(*terms, anchor:, distance:, ordered: false, boost: nil, constant_score: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
-      node = builder.near(_paradedb_current_field, left_term, right_term, distance: distance, boost: boost, constant_score: constant_score)
+      node = builder.near(
+        _paradedb_current_field,
+        *terms,
+        anchor: anchor,
+        distance: distance,
+        ordered: ordered,
+        boost: boost,
+        constant_score: constant_score
+      )
+      where(grouped(node))
+    end
+
+    def near_regex(
+      pattern,
+      anchor:,
+      distance:,
+      ordered: false,
+      max_expansions: nil,
+      boost: nil,
+      constant_score: nil
+    )
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+
+      node = builder.near_regex(
+        _paradedb_current_field,
+        pattern,
+        anchor: anchor,
+        distance: distance,
+        ordered: ordered,
+        max_expansions: max_expansions,
+        boost: boost,
+        constant_score: constant_score
+      )
       where(grouped(node))
     end
 
@@ -276,6 +329,21 @@ module ParadeDB
 
       inferred_type = type || default_range_type_for_field(_paradedb_current_field)
       node = builder.range(_paradedb_current_field, value, gte: gte, gt: gt, lte: lte, lt: lt, type: inferred_type, boost: boost, constant_score: constant_score)
+      where(grouped(node))
+    end
+
+    def range_term(value, relation: nil, range_type: nil, boost: nil, constant_score: nil)
+      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+
+      inferred_range_type = range_type || (relation && infer_range_type_for_field(_paradedb_current_field))
+      node = builder.range_term(
+        _paradedb_current_field,
+        value,
+        relation: relation,
+        range_type: inferred_range_type,
+        boost: boost,
+        constant_score: constant_score
+      )
       where(grouped(node))
     end
 
@@ -478,6 +546,9 @@ module ParadeDB
       column = klass.columns_hash[field.to_s]
       return nil unless column
 
+      sql_type = column.sql_type.to_s
+      return sql_type if ParadeDB::Arel::Builder::RANGE_TYPES.include?(sql_type)
+
       case column.type
       when :integer
         "int8range"
@@ -490,6 +561,14 @@ module ParadeDB
       else
         nil
       end
+    end
+
+    def infer_range_type_for_field(field)
+      column = klass.columns_hash[field.to_s]
+      return nil unless column
+
+      sql_type = column.sql_type.to_s
+      sql_type if ParadeDB::Arel::Builder::RANGE_TYPES.include?(sql_type)
     end
 
     def more_like_this_key_value(key, runtime_key_field)
