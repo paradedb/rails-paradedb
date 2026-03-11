@@ -26,6 +26,14 @@ RSpec.describe "ArelVisitorTest" do
     node = @builder.phrase(:description, "running shoes", slop: 2)
     assert_equal %("products"."description" ### 'running shoes'::pdb.slop(2)), sql(node)
   end
+  it "phrase with tokenizer" do
+    node = @builder.phrase(:description, "running shoes", tokenizer: "whitespace")
+    assert_equal %("products"."description" ### 'running shoes'::pdb.whitespace), sql(node)
+  end
+  it "phrase with array" do
+    node = @builder.phrase(:description, %w[running shoes])
+    assert_equal %("products"."description" ### ARRAY['running', 'shoes']), sql(node)
+  end
   it "term exact" do
     node = @builder.term(:description, "shoes")
     assert_equal %("products"."description" === 'shoes'), sql(node)
@@ -59,8 +67,20 @@ RSpec.describe "ArelVisitorTest" do
     assert_equal %("products"."description" @@@ pdb.regex('run.*shoes')), sql(node)
   end
   it "near" do
-    node = @builder.near(:description, "sleek", "shoes", distance: 1)
+    node = @builder.near(:description, "sleek", anchor: "shoes", distance: 1)
     assert_equal %("products"."description" @@@ ('sleek' ## 1 ## 'shoes')), sql(node)
+  end
+  it "near ordered" do
+    node = @builder.near(:description, "sleek", anchor: "shoes", distance: 1, ordered: true)
+    assert_equal %("products"."description" @@@ ('sleek' ##> 1 ##> 'shoes')), sql(node)
+  end
+  it "near with array left operand" do
+    node = @builder.near(:description, "sleek", "white", anchor: "shoes", distance: 1)
+    assert_equal %("products"."description" @@@ (pdb.prox_array('sleek', 'white') ## 1 ## 'shoes')), sql(node)
+  end
+  it "regex phrase" do
+    node = @builder.regex_phrase(:description, "run.*", "sho.*")
+    assert_equal %("products"."description" @@@ pdb.regex_phrase(ARRAY['run.*', 'sho.*'])), sql(node)
   end
   it "phrase prefix" do
     node = @builder.phrase_prefix(:description, "running", "sh")
@@ -73,6 +93,10 @@ RSpec.describe "ArelVisitorTest" do
   it "parse with conjunction mode" do
     node = @builder.parse(:description, "running shoes", conjunction_mode: true)
     assert_equal %("products"."description" @@@ pdb.parse('running shoes', conjunction_mode => true)), sql(node)
+  end
+  it "range term relation" do
+    node = @builder.range_term(:weight_range, "(10, 12]", relation: "Intersects", range_type: "int4range")
+    assert_equal %q{"products"."weight_range" @@@ pdb.range_term('(10, 12]'::int4range, 'Intersects')}, sql(node)
   end
   it "more like this" do
     node = @builder.more_like_this(:id, 3, fields: [:description])

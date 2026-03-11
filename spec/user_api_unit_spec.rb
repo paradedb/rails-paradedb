@@ -40,6 +40,14 @@ RSpec.describe "UserApiUnitTest" do
     sql = UnitProduct.search(:description).phrase("running shoes", slop: 2).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ### 'running shoes'::pdb.slop(2))), sql
   end
+  it "phrase tokenizer override" do
+    sql = UnitProduct.search(:description).phrase("running shoes", tokenizer: "whitespace").to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ### 'running shoes'::pdb.whitespace)), sql
+  end
+  it "phrase with pretokenized array" do
+    sql = UnitProduct.search(:description).phrase(%w[running shoes]).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ### ARRAY['running', 'shoes'])), sql
+  end
   it "fuzzy prefix boost" do
     sql = UnitProduct.search(:description).term("shose", distance: 2, prefix: false, boost: 2).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" === 'shose'::pdb.fuzzy(2)::pdb.boost(2))), sql
@@ -56,9 +64,25 @@ RSpec.describe "UserApiUnitTest" do
     sql = UnitProduct.search(:description).regex("run.*").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.regex('run.*'))), sql
   end
+  it "regex phrase" do
+    sql = UnitProduct.search(:description).regex_phrase("run.*", "sho.*", slop: 2, max_expansions: 100).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.regex_phrase(ARRAY['run.*', 'sho.*'], slop => 2, max_expansions => 100))), sql
+  end
   it "near" do
-    sql = UnitProduct.search(:description).near("sleek", "shoes", distance: 1).to_sql
+    sql = UnitProduct.search(:description).near("sleek", anchor: "shoes", distance: 1).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('sleek' ## 1 ## 'shoes'))), sql
+  end
+  it "near ordered" do
+    sql = UnitProduct.search(:description).near("sleek", anchor: "shoes", distance: 1, ordered: true).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('sleek' ##> 1 ##> 'shoes'))), sql
+  end
+  it "near regex" do
+    sql = UnitProduct.search(:description).near_regex("sl.*", anchor: "shoes", distance: 1).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ (pdb.prox_regex('sl.*') ## 1 ## 'shoes'))), sql
+  end
+  it "near with array left operand" do
+    sql = UnitProduct.search(:description).near("sleek", "white", anchor: "shoes", distance: 1).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ (pdb.prox_array('sleek', 'white') ## 1 ## 'shoes'))), sql
   end
   it "phrase prefix" do
     sql = UnitProduct.search(:description).phrase_prefix("run", "sh").to_sql
@@ -99,6 +123,14 @@ RSpec.describe "UserApiUnitTest" do
   it "range wrapper with bound options" do
     sql = UnitProduct.search(:rating).range(gte: 3, lt: 5).to_sql
     assert_sql_equal %q{SELECT products.* FROM products WHERE ("products"."rating" @@@ pdb.range(int8range(3, 5, '[)')))}, sql
+  end
+  it "range term scalar value" do
+    sql = UnitProduct.search(:weight_range).range_term(1).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."weight_range" @@@ pdb.range_term(1))), sql
+  end
+  it "range term relation" do
+    sql = UnitProduct.search(:weight_range).range_term("(10, 12]", relation: "Intersects", range_type: "int4range").to_sql
+    assert_sql_equal %q{SELECT products.* FROM products WHERE ("products"."weight_range" @@@ pdb.range_term('(10, 12]'::int4range, 'Intersects'))}, sql
   end
   it "more like this with id" do
     sql = UnitProduct.more_like_this(5, fields: [:description]).to_sql

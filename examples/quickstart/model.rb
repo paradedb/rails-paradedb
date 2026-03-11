@@ -14,13 +14,15 @@ end
 class MockItemIndex < ParadeDB::Index
   self.table_name = :mock_items
   self.key_field = :id
-  self.index_name = :mock_items_bm25_idx
+  self.index_name = :search_idx
   self.fields = {
     id: nil,
     description: nil,
+    category: nil,
     rating: nil,
-    category: { tokenizer: :literal },
-    "metadata->>'color'" => { tokenizer: :literal, alias: "metadata_color" },
-    "metadata->>'location'" => { tokenizer: :literal, alias: "metadata_location" }
+    in_stock: nil,
+    created_at: nil,
+    metadata: nil,
+    weight_range: nil
   }
 end

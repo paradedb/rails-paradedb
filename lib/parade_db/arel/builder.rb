@@ -6,6 +6,7 @@ module ParadeDB
   module Arel
     class Builder
       RANGE_TYPES = %w[int4range int8range numrange daterange tsrange tstzrange].freeze
+      RANGE_RELATIONS = %w[Intersects Contains Within].freeze
       TOKENIZER_EXPRESSION = /\A[a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\s*[a-zA-Z0-9_'".,=\s:-]*\s*\))?\z/.freeze
 
       attr_reader :table
@@ -69,8 +70,17 @@ module ParadeDB
         infix("@@@", column_node(column), rhs)
       end
 
-      def phrase(column, text, slop: nil, boost: nil, constant_score: nil)
-        rhs = apply_slop(quoted_value(text), slop)
+      def phrase(column, text, slop: nil, tokenizer: nil, boost: nil, constant_score: nil)
+        rhs =
+          if text.is_a?(::Array)
+            raise ArgumentError, "tokenizer is not supported for pretokenized phrase arrays" unless tokenizer.nil?
+
+            Nodes::ArrayLiteral.new(normalize_phrase_terms(text).map { |term| quoted_value(term) })
+          else
+            apply_tokenizer(quoted_value(text), tokenizer)
+          end
+
+        rhs = apply_slop(rhs, slop)
         # ParadeDB cannot cast pdb.slop directly to pdb.const. Bridge through pdb.query.
         rhs = Nodes::QueryCast.new(rhs) if !constant_score.nil? && !slop.nil?
         rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
@@ -112,12 +122,62 @@ module ParadeDB
         infix("@@@", column_node(column), rhs)
       end
 
-      def near(column, left_term, right_term, distance: 1, boost: nil, constant_score: nil)
-        validate_numeric!(distance, :distance)
-        # Produce: (left ## distance) ## right
-        near_chain = infix("##", infix("##", quoted_value(left_term), quoted_value(distance)), quoted_value(right_term))
-        rhs = apply_score_modifier(::Arel::Nodes::Grouping.new(near_chain), boost: boost, constant_score: constant_score)
+      def regex_phrase(column, *patterns, slop: nil, max_expansions: nil, boost: nil, constant_score: nil)
+        normalized_patterns = normalize_regex_patterns(patterns)
+        args = [Nodes::ArrayLiteral.new(normalized_patterns.map { |pattern| quoted_value(pattern) })]
+        unless slop.nil?
+          validate_numeric!(slop, :slop)
+          args << keyword_arg_node("slop", slop)
+        end
+        unless max_expansions.nil?
+          validate_integer!(max_expansions, :max_expansions)
+          args << keyword_arg_node("max_expansions", max_expansions)
+        end
+        rhs = ::Arel::Nodes::NamedFunction.new("pdb.regex_phrase", args)
+        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("@@@", column_node(column), rhs)
+      end
+
+      def near(column, *terms, anchor:, distance:, ordered: false, boost: nil, constant_score: nil)
+        raise ArgumentError, "near requires at least one term" if terms.empty?
+
+        left_operand =
+          if terms.length == 1 && !terms.first.is_a?(::Array)
+            quoted_value(terms.first)
+          else
+            prox_array_node(terms.flatten)
+          end
+
+        build_proximity_query(
+          column,
+          left_operand: left_operand,
+          right_operand: quoted_value(anchor),
+          distance: distance,
+          ordered: ordered,
+          boost: boost,
+          constant_score: constant_score
+        )
+      end
+
+      def near_regex(
+        column,
+        pattern,
+        anchor:,
+        distance:,
+        ordered: false,
+        max_expansions: nil,
+        boost: nil,
+        constant_score: nil
+      )
+        build_proximity_query(
+          column,
+          left_operand: prox_regex_node(pattern, max_expansions),
+          right_operand: quoted_value(anchor),
+          distance: distance,
+          ordered: ordered,
+          boost: boost,
+          constant_score: constant_score
+        )
       end
 
       def phrase_prefix(column, *terms, max_expansion: nil, boost: nil, constant_score: nil)
@@ -159,6 +219,12 @@ module ParadeDB
       def range(column, value = nil, gte: nil, gt: nil, lte: nil, lt: nil, type: nil, boost: nil, constant_score: nil)
         range_node = build_range_node(value, gte: gte, gt: gt, lte: lte, lt: lt, type: type)
         rhs = ::Arel::Nodes::NamedFunction.new("pdb.range", [range_node])
+        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
+        infix("@@@", column_node(column), rhs)
+      end
+
+      def range_term(column, value, relation: nil, range_type: nil, boost: nil, constant_score: nil)
+        rhs = build_range_term_node(value, relation: relation, range_type: range_type)
         rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("@@@", column_node(column), rhs)
       end
@@ -298,6 +364,31 @@ module ParadeDB
         ::Arel::Nodes.build_quoted(value)
       end
 
+      def build_proximity_query(column, left_operand:, right_operand:, distance:, ordered:, boost:, constant_score:)
+        validate_numeric!(distance, :distance)
+        operator = ordered ? "##>" : "##"
+        near_chain = infix(operator, infix(operator, left_operand, quoted_value(distance)), right_operand)
+        rhs = apply_score_modifier(::Arel::Nodes::Grouping.new(near_chain), boost: boost, constant_score: constant_score)
+        infix("@@@", column_node(column), rhs)
+      end
+
+      def prox_regex_node(pattern, max_expansions)
+        args = [quoted_value(pattern)]
+        unless max_expansions.nil?
+          validate_integer!(max_expansions, :max_expansions)
+          args << quoted_value(max_expansions)
+        end
+        ::Arel::Nodes::NamedFunction.new("pdb.prox_regex", args)
+      end
+
+      def prox_array_node(left_terms)
+        terms = normalize_proximity_terms(left_terms)
+        values = terms.map { |term| quoted_value(term) }
+        raise ArgumentError, "near requires at least one left-side term" if values.empty?
+
+        ::Arel::Nodes::NamedFunction.new("pdb.prox_array", values)
+      end
+
       def build_range_node(value, gte:, gt:, lte:, lt:, type:)
         lower, upper, lower_inclusive, upper_inclusive = normalize_range_bounds(value, gte: gte, gt: gt, lte: lte, lt: lt)
         normalized_type = normalize_range_type(type || infer_range_type(lower, upper))
@@ -373,6 +464,30 @@ module ParadeDB
         value
       end
 
+      def normalize_range_relation(relation)
+        value = relation.to_s.capitalize
+        unless RANGE_RELATIONS.include?(value)
+          raise ArgumentError, "Unknown range relation: #{relation.inspect}. Expected one of: #{RANGE_RELATIONS.join(', ')}"
+        end
+        value
+      end
+
+      def build_range_term_node(value, relation:, range_type:)
+        if relation.nil?
+          raise ArgumentError, "range_type is only valid when relation is provided" unless range_type.nil?
+
+          return ::Arel::Nodes::NamedFunction.new("pdb.range_term", [quoted_value(value)])
+        end
+
+        raise ArgumentError, "relation requires range_type" if range_type.nil?
+
+        normalized_relation = normalize_range_relation(relation)
+        normalized_type = normalize_range_type(range_type)
+        cast_value = Nodes::TypeCast.new(quoted_value(value), normalized_type)
+
+        ::Arel::Nodes::NamedFunction.new("pdb.range_term", [cast_value, quoted_value(normalized_relation)])
+      end
+
       def range_bound_node(value)
         return ::Arel.sql("NULL") if value.nil?
 
@@ -412,6 +527,24 @@ module ParadeDB
         raise ArgumentError, "term_set requires at least one value" if values.empty?
 
         values
+      end
+
+      def normalize_phrase_terms(terms)
+        values = Array(terms).flatten.compact.map(&:to_s)
+        raise ArgumentError, "phrase array input requires at least one term" if values.empty? || values.all?(&:empty?)
+
+        values
+      end
+
+      def normalize_regex_patterns(patterns)
+        values = Array(patterns).flatten.compact.map(&:to_s)
+        raise ArgumentError, "regex_phrase requires at least one pattern" if values.empty? || values.all?(&:empty?)
+
+        values
+      end
+
+      def normalize_proximity_terms(terms)
+        Array(terms).flatten.compact
       end
 
       def validate_numeric!(value, name)

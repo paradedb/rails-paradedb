@@ -219,27 +219,27 @@ module ParadeDB
               "#{name}.search(#{column.inspect}) is not indexed. Indexed fields: #{indexed_fields.join(', ')}"
       end
 
-      def paradedb_normalize_search_column(column)
+      def paradedb_normalize_search_column(column, table_name: self.table_name)
         validate_field_indexed!(column)
         paradedb_validate_index!
-        paradedb_search_column(column)
+        paradedb_search_column(column, table_name: table_name)
       end
 
-      def paradedb_search_column(column)
-        definition = paradedb_index_definition
-        return column if definition.nil?
+      def paradedb_group_column(column, table_name: self.table_name)
+        validate_field_indexed!(column)
+        paradedb_validate_index!
 
-        column_name = column.to_s
-        entry = definition.entries.find { |candidate| candidate.query_key == column_name }
+        entry = paradedb_index_entry(column)
         return column if entry.nil?
-        return entry.source.to_sym if entry.query_key == entry.source && !entry.expression
+        return paradedb_entry_source_node(entry, table_name: table_name)
+      end
 
-        source_sql =
-          if entry.expression
-            "(#{entry.source})"
-          else
-            "#{connection.quote_table_name(table_name)}.#{connection.quote_column_name(entry.source)}"
-          end
+      def paradedb_search_column(column, table_name: self.table_name)
+        entry = paradedb_index_entry(column)
+        return column if entry.nil?
+        return paradedb_entry_source_node(entry, table_name: table_name) if entry.query_key == entry.source && !entry.expression
+
+        source_sql = paradedb_entry_source_sql(entry, table_name: table_name)
         alias_value = connection.quote(entry.query_key)
 
         Arel.sql("(#{source_sql}::pdb.alias(#{alias_value}))")
@@ -269,6 +269,27 @@ module ParadeDB
         SQL
 
         !connection.select_value(sql).nil?
+      end
+
+      def paradedb_index_entry(column)
+        definition = paradedb_index_definition
+        return nil if definition.nil?
+
+        definition.entries.find { |candidate| candidate.query_key == column.to_s }
+      end
+
+      def paradedb_entry_source_node(entry, table_name: self.table_name)
+        return entry.source.to_sym if !entry.expression && table_name.to_s == self.table_name.to_s
+
+        Arel.sql(paradedb_entry_source_sql(entry, table_name: table_name))
+      end
+
+      def paradedb_entry_source_sql(entry, table_name: self.table_name)
+        if entry.expression
+          "(#{entry.source})"
+        else
+          "#{connection.quote_table_name(table_name)}.#{connection.quote_column_name(entry.source)}"
+        end
       end
     end
   end

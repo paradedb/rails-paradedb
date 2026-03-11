@@ -63,6 +63,14 @@ RSpec.describe "ArelPredicationsUnitTest" do
     node = @t[:description].pdb_phrase("running shoes", slop: 10)
     assert_equal %("products"."description" ### 'running shoes'::pdb.slop(10)), sql(node)
   end
+  it "pdb_phrase with tokenizer" do
+    node = @t[:description].pdb_phrase("running shoes", tokenizer: "whitespace")
+    assert_equal %("products"."description" ### 'running shoes'::pdb.whitespace), sql(node)
+  end
+  it "pdb_phrase with pretokenized array" do
+    node = @t[:description].pdb_phrase(%w[running shoes])
+    assert_equal %("products"."description" ### ARRAY['running', 'shoes']), sql(node)
+  end
 
   # ---- pdb_term ----
   it "pdb_term without boost" do
@@ -117,15 +125,31 @@ RSpec.describe "ArelPredicationsUnitTest" do
     node = @t[:description].pdb_regex("(wireless|bluetooth).*earbuds")
     assert_equal %("products"."description" @@@ pdb.regex('(wireless|bluetooth).*earbuds')), sql(node)
   end
+  it "pdb_regex_phrase" do
+    node = @t[:description].pdb_regex_phrase("run.*", "sho.*", slop: 2, max_expansions: 100)
+    assert_equal %("products"."description" @@@ pdb.regex_phrase(ARRAY['run.*', 'sho.*'], slop => 2, max_expansions => 100)), sql(node)
+  end
 
   # ---- pdb_near ----
-  it "pdb_near default distance" do
-    node = @t[:description].pdb_near("running", "shoes", distance: 1)
+  it "pdb_near distance 1" do
+    node = @t[:description].pdb_near("running", anchor: "shoes", distance: 1)
     assert_equal %("products"."description" @@@ ('running' ## 1 ## 'shoes')), sql(node)
   end
+  it "pdb_near ordered" do
+    node = @t[:description].pdb_near("running", anchor: "shoes", distance: 1, ordered: true)
+    assert_equal %("products"."description" @@@ ('running' ##> 1 ##> 'shoes')), sql(node)
+  end
   it "pdb_near large distance" do
-    node = @t[:description].pdb_near("running", "shoes", distance: 5)
+    node = @t[:description].pdb_near("running", anchor: "shoes", distance: 5)
     assert_equal %("products"."description" @@@ ('running' ## 5 ## 'shoes')), sql(node)
+  end
+  it "pdb_near_regex" do
+    node = @t[:description].pdb_near_regex("sl.*", anchor: "shoes", distance: 1)
+    assert_equal %("products"."description" @@@ (pdb.prox_regex('sl.*') ## 1 ## 'shoes')), sql(node)
+  end
+  it "pdb_near with array left operand" do
+    node = @t[:description].pdb_near("sleek", "white", anchor: "shoes", distance: 1)
+    assert_equal %("products"."description" @@@ (pdb.prox_array('sleek', 'white') ## 1 ## 'shoes')), sql(node)
   end
 
   # ---- pdb_phrase_prefix ----
@@ -179,6 +203,10 @@ RSpec.describe "ArelPredicationsUnitTest" do
   it "pdb_range with bound options" do
     node = @t[:rating].pdb_range(gte: 3, lt: 5)
     assert_equal %q{"products"."rating" @@@ pdb.range(int8range(3, 5, '[)'))}, sql(node)
+  end
+  it "pdb_range_term" do
+    node = @t[:weight_range].pdb_range_term("(10, 12]", relation: "Intersects", range_type: "int4range")
+    assert_equal %q{"products"."weight_range" @@@ pdb.range_term('(10, 12]'::int4range, 'Intersects')}, sql(node)
   end
 
   # ---- pdb_more_like_this ----

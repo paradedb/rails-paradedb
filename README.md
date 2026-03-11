@@ -44,19 +44,23 @@ Product.search(:description).term("electronics")
 class ProductIndex < ParadeDB::Index
   self.table_name = :products
   self.key_field = :id
+  self.index_name = :search_idx
   self.fields = {
-    id: {},
-    description: {
-      tokenizers: [
-        { tokenizer: :literal },
-        { tokenizer: :simple, alias: "description_simple", filters: [:lowercase] }
-      ]
-    },
+    id: nil,
+    description: nil,
     category: { tokenizer: :literal },
-    rating: {}
+    rating: nil,
+    in_stock: nil,
+    created_at: nil,
+    metadata: nil,
+    weight_range: nil
   }
 end
 ```
+
+For text or JSON fields you plan to use in Top K queries, facets, grouped
+aggregations, or `top_hits` docvalue fields, use `:literal` or
+`:literal_normalized`.
 
 Create in migration:
 
@@ -67,7 +71,7 @@ class AddProductBm25Index < ActiveRecord::Migration[8.1]
   end
 
   def down
-    remove_bm25_index :products, name: :products_bm25_idx, if_exists: true
+    remove_bm25_index :products, name: :search_idx, if_exists: true
   end
 end
 ```
@@ -90,8 +94,14 @@ Product.search(:description).term("shose", distance: 1, transposition_cost_one: 
 
 # Other query types
 Product.search(:description).phrase("running shoes", slop: 2)
+Product.search(:description).phrase("running shoes", tokenizer: "whitespace")
+Product.search(:description).phrase(%w[running shoes])
 Product.search(:description).regex("run.*")
-Product.search(:description).near("running", "shoes", distance: 3)
+Product.search(:description).near("running", anchor: "shoes", distance: 3)
+Product.search(:description).near("running", anchor: "shoes", distance: 3, ordered: true)
+Product.search(:description).near_regex("run.*", anchor: "shoes", distance: 3)
+Product.search(:description).near("running", "trail", anchor: "shoes", distance: 3)
+Product.search(:description).regex_phrase("run.*", "shoes")
 Product.search(:description).phrase_prefix("run", "sh")
 Product.search(:description).phrase_prefix("run", "sh", max_expansion: 100)
 Product.search(:description).parse("running AND shoes", lenient: true)
@@ -100,6 +110,7 @@ Product.search(:description).parse("running shoes", conjunction_mode: true)
 Product.search(:id).match_all
 Product.search(:id).exists
 Product.search(:rating).range(gte: 3, lt: 5)
+Product.search(:weight_range).range_term("(10, 12]", relation: "Intersects")
 
 Product.more_like_this(42, fields: [:description])
 ```
@@ -166,18 +177,18 @@ Ruby helpers:
 
 ```ruby
 ParadeDB.paradedb_indexes
-ParadeDB.paradedb_index_segments("products_bm25_idx")
-ParadeDB.paradedb_verify_index("products_bm25_idx", sample_rate: 0.1)
-ParadeDB.paradedb_verify_all_indexes(index_pattern: "products_bm25_idx")
+ParadeDB.paradedb_index_segments("search_idx")
+ParadeDB.paradedb_verify_index("search_idx", sample_rate: 0.1)
+ParadeDB.paradedb_verify_all_indexes(index_pattern: "search_idx")
 ```
 
 Rake tasks:
 
 ```bash
 rake paradedb:diagnostics:indexes
-rake "paradedb:diagnostics:index_segments[products_bm25_idx]"
-rake "paradedb:diagnostics:verify_index[products_bm25_idx]" SAMPLE_RATE=0.1
-rake paradedb:diagnostics:verify_all_indexes INDEX_PATTERN=products_bm25_idx
+rake "paradedb:diagnostics:index_segments[search_idx]"
+rake "paradedb:diagnostics:verify_index[search_idx]" SAMPLE_RATE=0.1
+rake paradedb:diagnostics:verify_all_indexes INDEX_PATTERN=search_idx
 ```
 
 Note: availability depends on your installed `pg_search` version.

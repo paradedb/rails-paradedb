@@ -151,16 +151,16 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
 
   # ---- near ----
   it "near adjacent words" do
-    ids = search(:description).near("running", "shoes", distance: 1).order(:id).pluck(:id)
+    ids = search(:description).near("running", anchor: "shoes", distance: 1).order(:id).pluck(:id)
     assert_equal [1, 2], ids
   end
   it "near larger distance" do
-    ids = search(:description).near("running", "shoes", distance: 5).order(:id).pluck(:id)
+    ids = search(:description).near("running", anchor: "shoes", distance: 5).order(:id).pluck(:id)
     # Same set — "running shoes" are always adjacent
     assert_equal [1, 2], ids
   end
   it "near no match" do
-    ids = search(:description).near("running", "earbuds", distance: 1).order(:id).pluck(:id)
+    ids = search(:description).near("running", anchor: "earbuds", distance: 1).order(:id).pluck(:id)
     assert_empty ids
   end
 

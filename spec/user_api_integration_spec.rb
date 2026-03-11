@@ -98,6 +98,14 @@ RSpec.describe "UserApiIntegrationTest" do
     sql = Product.search(:description).phrase("running shoes", slop: 2).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ### 'running shoes'::pdb.slop(2))), sql
   end
+  it "phrase with tokenizer" do
+    sql = Product.search(:description).phrase("running shoes", tokenizer: "whitespace").to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ### 'running shoes'::pdb.whitespace)), sql
+  end
+  it "phrase with pretokenized array" do
+    sql = Product.search(:description).phrase(%w[running shoes]).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ### ARRAY['running', 'shoes'])), sql
+  end
   it "fuzzy with prefix" do
     sql = Product.search(:description).term("runn", distance: 1, prefix: true).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" === 'runn'::pdb.fuzzy(1, "true"))), sql
@@ -105,6 +113,10 @@ RSpec.describe "UserApiIntegrationTest" do
   it "regex" do
     sql = Product.search(:description).regex("run.*shoes").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.regex('run.*shoes'))), sql
+  end
+  it "regex phrase" do
+    sql = Product.search(:description).regex_phrase("run.*", "sho.*", slop: 2, max_expansions: 100).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.regex_phrase(ARRAY['run.*', 'sho.*'], slop => 2, max_expansions => 100))), sql
   end
   it "term exact" do
     sql = Product.search(:description).term("shoes").to_sql
@@ -115,8 +127,20 @@ RSpec.describe "UserApiIntegrationTest" do
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."category" @@@ pdb.term_set(ARRAY['audio', 'footwear']))), sql
   end
   it "near proximity" do
-    sql = Product.search(:description).near("sleek", "shoes", distance: 1).to_sql
+    sql = Product.search(:description).near("sleek", anchor: "shoes", distance: 1).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('sleek' ## 1 ## 'shoes'))), sql
+  end
+  it "near ordered proximity" do
+    sql = Product.search(:description).near("sleek", anchor: "shoes", distance: 1, ordered: true).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('sleek' ##> 1 ##> 'shoes'))), sql
+  end
+  it "near regex proximity" do
+    sql = Product.search(:description).near_regex("sl.*", anchor: "shoes", distance: 1).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ (pdb.prox_regex('sl.*') ## 1 ## 'shoes'))), sql
+  end
+  it "near array proximity" do
+    sql = Product.search(:description).near("sleek", "white", anchor: "shoes", distance: 1).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ (pdb.prox_array('sleek', 'white') ## 1 ## 'shoes'))), sql
   end
   it "phrase prefix" do
     sql = Product.search(:description).phrase_prefix("run", "sh").to_sql
@@ -149,6 +173,10 @@ RSpec.describe "UserApiIntegrationTest" do
   it "range wrapper with bound options" do
     sql = Product.search(:rating).range(gte: 3, lt: 5).to_sql
     assert_sql_equal %q{SELECT products.* FROM products WHERE ("products"."rating" @@@ pdb.range(int8range(3, 5, '[)')))}, sql
+  end
+  it "range term relation" do
+    sql = Product.search(:weight_range).range_term("(10, 12]", relation: "Intersects", range_type: "int4range").to_sql
+    assert_sql_equal %q{SELECT products.* FROM products WHERE ("products"."weight_range" @@@ pdb.range_term('(10, 12]'::int4range, 'Intersects'))}, sql
   end
   it "more like this" do
     sql = Product.more_like_this(3, fields: [:description]).to_sql

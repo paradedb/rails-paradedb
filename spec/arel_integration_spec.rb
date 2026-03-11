@@ -19,7 +19,7 @@ RSpec.describe "ArelIntegrationTest" do
     nodes << @builder.term(:description, "literal")
     nodes << @builder.term_set(:category, %w[audio footwear])
     nodes << @builder.regex(:description, "run.*")
-    nodes << @builder.near(:description, "sleek", "shoes", distance: 1)
+    nodes << @builder.near(:description, "sleek", anchor: "shoes", distance: 1)
     nodes << @builder.phrase_prefix(:description, "run", "sh")
     nodes << @builder.more_like_this(:id, 5, fields: [:description, :category])
     nodes << @builder.full_text(:description, "pdb.all()")
