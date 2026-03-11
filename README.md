@@ -48,7 +48,7 @@ class ProductIndex < ParadeDB::Index
   self.fields = {
     id: nil,
     description: nil,
-    category: nil,
+    category: { tokenizer: :literal },
     rating: nil,
     in_stock: nil,
     created_at: nil,
@@ -57,6 +57,10 @@ class ProductIndex < ParadeDB::Index
   }
 end
 ```
+
+For text or JSON fields you plan to use in Top K queries, facets, grouped
+aggregations, or `top_hits` docvalue fields, use `:literal` or
+`:literal_normalized`.
 
 Create in migration:
 

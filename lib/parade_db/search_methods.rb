@@ -6,6 +6,7 @@ module ParadeDB
   # SearchMethods extends ActiveRecord::Relation to add ParadeDB full-text search capabilities.
   # This module is mixed into relations via .search() to provide chainable query methods.
   module SearchMethods
+    AGGREGATE_SAFE_TEXT_TOKENIZERS = %w[literal literal_normalized].freeze
     MLT_OPTION_ALIASES = {
       min_term_freq: :min_term_frequency,
       min_term_frequency: :min_term_frequency,
@@ -514,7 +515,7 @@ module ParadeDB
       rel = self
       rel = rel.ensure_paradedb_predicate unless rel.has_paradedb_predicate?
 
-      group_nodes = normalized_group_fields.map { |field| builder[field] }
+      group_nodes = normalized_group_fields.map { |field| resolve_group_field_node(field) }
       aggregate_nodes = agg_specs.map do |alias_name, agg_spec|
         render_aggregation_node(agg_spec, exact: exact).as(alias_name.to_s)
       end
@@ -701,8 +702,9 @@ module ParadeDB
       when ::Arel::Nodes::Node
         filter
       when ParadeDB::Aggregations::FieldTermFilter
+        resolved_field = resolve_search_field_node(filter.field, table_name: builder_override.table)
         builder_override.term(
-          filter.field,
+          resolved_field,
           filter.term,
           distance: filter.distance,
           prefix: filter.prefix,
@@ -749,7 +751,7 @@ module ParadeDB
         raise ArgumentError, "Facet field names must be unique."
       end
 
-      validate_facet_fields_indexed!(normalized)
+      validate_indexed_query_fields!(normalized, context: "facets")
       normalized
     end
 
@@ -770,11 +772,12 @@ module ParadeDB
         raise ArgumentError, "aggregate_by group fields must be unique"
       end
 
-      validate_facet_fields_indexed!(normalized)
+      validate_indexed_query_fields!(normalized, context: "aggregate_by")
+      validate_group_fields_aggregate_safe!(normalized)
       normalized
     end
 
-    def validate_facet_fields_indexed!(fields)
+    def validate_indexed_query_fields!(fields, context:)
       return unless klass.respond_to?(:paradedb_indexed_fields)
 
       indexed_fields = klass.paradedb_indexed_fields
@@ -784,8 +787,62 @@ module ParadeDB
       return if unknown.empty?
 
       raise ParadeDB::FieldNotIndexed,
-            "#{klass.name}.facets contains non-indexed fields #{unknown.join(', ')}. " \
+            "#{klass.name}.#{context} contains non-indexed fields #{unknown.join(', ')}. " \
             "Indexed fields: #{indexed_fields.join(', ')}"
+    end
+
+    def validate_group_fields_aggregate_safe!(fields)
+      return unless klass.respond_to?(:paradedb_index_entry, true)
+
+      fields.each do |field|
+        entry = klass.send(:paradedb_index_entry, field)
+        next if entry.nil?
+        next unless group_field_requires_literal_tokenizer?(entry)
+        next if aggregate_safe_text_tokenizer?(entry.tokenizer)
+
+        current_tokenizer = entry.tokenizer.nil? ? "default tokenizer" : entry.tokenizer.inspect
+        raise ParadeDB::InvalidIndexDefinition,
+              "#{klass.name}.aggregate_by(#{field.inspect}) requires text/JSON group fields to be indexed " \
+              "with :literal or :literal_normalized. Current tokenizer: #{current_tokenizer}"
+      end
+    end
+
+    def group_field_requires_literal_tokenizer?(entry)
+      return !entry.tokenizer.nil? if entry.expression
+
+      column = klass.columns_hash[entry.source.to_s]
+      return false if column.nil?
+
+      text_or_json_column?(column)
+    end
+
+    def text_or_json_column?(column)
+      return true if %i[string text json jsonb].include?(column.type)
+
+      sql_type = column.sql_type.to_s.downcase
+      sql_type.include?("json")
+    end
+
+    def aggregate_safe_text_tokenizer?(tokenizer)
+      return false if tokenizer.nil?
+
+      name = tokenizer.to_s.strip.split("(").first
+      name = name.sub(/\A(?:pdb::|pdb\.)/, "")
+      AGGREGATE_SAFE_TEXT_TOKENIZERS.include?(name)
+    end
+
+    def resolve_group_field_node(field)
+      return builder[field] unless field.is_a?(String) || field.is_a?(Symbol)
+      return builder[field] unless klass.respond_to?(:paradedb_group_column, true)
+
+      builder[klass.send(:paradedb_group_column, field, table_name: table_name)]
+    end
+
+    def resolve_search_field_node(field, table_name:)
+      return field unless field.is_a?(String) || field.is_a?(Symbol)
+      return field unless klass.respond_to?(:paradedb_normalize_search_column, true)
+
+      klass.send(:paradedb_normalize_search_column, field, table_name: table_name)
     end
 
     def normalize_facet_size(size)

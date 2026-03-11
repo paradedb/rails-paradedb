@@ -126,6 +126,141 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
     assert_includes sql, "::pdb.alias('description_simple')"
   end
 
+  it "aggregate_by rejects text fields without a literal tokenizer" do
+    Object.const_set("RuntimeProduct", Class.new(ActiveRecord::Base) do
+      self.table_name = :products
+      include ParadeDB::Model
+    end)
+    Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.fields = {
+        id: {},
+        category: {}
+      }
+    end)
+
+    conn = ActiveRecord::Base.connection
+    conn.create_paradedb_index(RuntimeProductIndex, if_not_exists: true)
+
+    error = assert_raises(ParadeDB::InvalidIndexDefinition) do
+      RuntimeProduct.aggregate_by(:category, agg: ParadeDB::Aggregations.value_count(:id)).to_sql
+    end
+
+    assert_includes error.message, ":literal"
+    assert_includes error.message, "category"
+  end
+
+  it "aggregate_by rejects aliased text fields with a non-literal tokenizer" do
+    Object.const_set("RuntimeProduct", Class.new(ActiveRecord::Base) do
+      self.table_name = :products
+      include ParadeDB::Model
+    end)
+    Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.fields = {
+        id: {},
+        description: { tokenizer: :simple, alias: "description_simple" }
+      }
+    end)
+
+    conn = ActiveRecord::Base.connection
+    conn.create_paradedb_index(RuntimeProductIndex, if_not_exists: true)
+
+    error = assert_raises(ParadeDB::InvalidIndexDefinition) do
+      RuntimeProduct.aggregate_by(:description_simple, agg: ParadeDB::Aggregations.value_count(:id)).to_sql
+    end
+
+    assert_includes error.message, "description_simple"
+    assert_includes error.message, ":literal"
+  end
+
+  it "aggregate_by resolves literal-tokenized aliased fields to the indexed source column" do
+    Object.const_set("RuntimeProduct", Class.new(ActiveRecord::Base) do
+      self.table_name = :products
+      include ParadeDB::Model
+    end)
+    Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.fields = {
+        id: {},
+        description: { tokenizer: :literal, alias: "description_exact" }
+      }
+    end)
+
+    conn = ActiveRecord::Base.connection
+    conn.create_paradedb_index(RuntimeProductIndex, if_not_exists: true)
+
+    sql = RuntimeProduct.aggregate_by(:description_exact, agg: ParadeDB::Aggregations.value_count(:id)).to_sql
+    assert_includes sql, %("products"."description")
+    refute_includes sql, %("products"."description_exact")
+  end
+
+  it "filtered with_agg resolves aliased fields to a search alias cast" do
+    Object.const_set("RuntimeProduct", Class.new(ActiveRecord::Base) do
+      self.table_name = :products
+      include ParadeDB::Model
+    end)
+    Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.fields = {
+        id: {},
+        description: { tokenizer: :simple, alias: "description_simple" }
+      }
+    end)
+
+    conn = ActiveRecord::Base.connection
+    conn.create_paradedb_index(RuntimeProductIndex, if_not_exists: true)
+
+    sql = RuntimeProduct.with_agg(
+      hits: ParadeDB::Aggregations.filtered(
+        ParadeDB::Aggregations.value_count(:id),
+        field: :description_simple,
+        term: "shoes"
+      )
+    ).to_sql
+
+    assert_includes sql, "::pdb.alias('description_simple')"
+    refute_includes sql, %("products"."description_simple" === 'shoes')
+  end
+
+  it "filtered facets_agg resolves aliased fields against the aggregation source alias" do
+    Object.const_set("RuntimeProduct", Class.new(ActiveRecord::Base) do
+      self.table_name = :products
+      include ParadeDB::Model
+    end)
+    Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.fields = {
+        id: {},
+        description: { tokenizer: :simple, alias: "description_simple" }
+      }
+    end)
+
+    conn = ActiveRecord::Base.connection
+    conn.create_paradedb_index(RuntimeProductIndex, if_not_exists: true)
+
+    relation = RuntimeProduct.search(:id).match_all
+    sql = relation.send(
+      :build_aggregation_query,
+      relation.send(
+        :normalize_named_aggregation_specs,
+        hits: ParadeDB::Aggregations.filtered(
+          ParadeDB::Aggregations.value_count(:id),
+          field: :description_simple,
+          term: "shoes"
+        )
+      )
+    ).sql
+
+    assert_includes sql, "::pdb.alias('description_simple')"
+    refute_includes sql, %("paradedb_agg_source"."description_simple" === 'shoes')
+  end
+
   it "facets raises FieldNotIndexed for non-indexed facet fields" do
     Object.const_set("RuntimeProduct", Class.new(ActiveRecord::Base) do
       self.table_name = :products
