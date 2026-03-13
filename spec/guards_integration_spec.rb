@@ -58,10 +58,6 @@ RSpec.describe "GuardsUnitTest" do
     error = assert_raises(RuntimeError) { bare_relation.near("running", anchor: "shoes", distance: 1) }
     assert_includes error.message, "No search field set"
   end
-  it "near regex without search raises" do
-    error = assert_raises(RuntimeError) { bare_relation.near_regex("sl.*", anchor: "shoes", distance: 1) }
-    assert_includes error.message, "No search field set"
-  end
   it "phrase prefix without search raises" do
     error = assert_raises(RuntimeError) { bare_relation.phrase_prefix("run") }
     assert_includes error.message, "No search field set"
@@ -171,7 +167,9 @@ RSpec.describe "GuardsUnitTest" do
     refute_nil node
   end
   it "near regex max expansions rejects non integer" do
-    error = assert_raises(ArgumentError) { builder.near_regex(:description, "sl.*", anchor: "shoes", distance: 1, max_expansions: "100") }
+    error = assert_raises(ArgumentError) do
+      builder.near(:description, ParadeDB.regex_term("sl.*", max_expansions: "100"), anchor: "shoes", distance: 1)
+    end
     assert_includes error.message, "max_expansions must be an integer"
   end
   it "near rejects array right operand" do

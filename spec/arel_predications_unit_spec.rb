@@ -143,13 +143,13 @@ RSpec.describe "ArelPredicationsUnitTest" do
     node = @t[:description].pdb_near("running", anchor: "shoes", distance: 5)
     assert_equal %("products"."description" @@@ ('running' ## 5 ## 'shoes')), sql(node)
   end
-  it "pdb_near_regex" do
-    node = @t[:description].pdb_near_regex("sl.*", anchor: "shoes", distance: 1)
-    assert_equal %("products"."description" @@@ (pdb.prox_regex('sl.*') ## 1 ## 'shoes')), sql(node)
-  end
   it "pdb_near with array left operand" do
     node = @t[:description].pdb_near("sleek", "white", anchor: "shoes", distance: 1)
     assert_equal %("products"."description" @@@ (pdb.prox_array('sleek', 'white') ## 1 ## 'shoes')), sql(node)
+  end
+  it "pdb_near with regex wrapper" do
+    node = @t[:description].pdb_near(ParadeDB.regex_term("sl.*"), "white", anchor: "shoes", distance: 1)
+    assert_equal %("products"."description" @@@ (pdb.prox_array(pdb.prox_regex('sl.*'), 'white') ## 1 ## 'shoes')), sql(node)
   end
 
   # ---- pdb_phrase_prefix ----

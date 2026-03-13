@@ -143,7 +143,7 @@ module ParadeDB
 
         left_operand =
           if terms.length == 1 && !terms.first.is_a?(::Array)
-            quoted_value(terms.first)
+            proximity_term_node(terms.first)
           else
             prox_array_node(terms.flatten)
           end
@@ -151,27 +151,6 @@ module ParadeDB
         build_proximity_query(
           column,
           left_operand: left_operand,
-          right_operand: quoted_value(anchor),
-          distance: distance,
-          ordered: ordered,
-          boost: boost,
-          constant_score: constant_score
-        )
-      end
-
-      def near_regex(
-        column,
-        pattern,
-        anchor:,
-        distance:,
-        ordered: false,
-        max_expansions: nil,
-        boost: nil,
-        constant_score: nil
-      )
-        build_proximity_query(
-          column,
-          left_operand: prox_regex_node(pattern, max_expansions),
           right_operand: quoted_value(anchor),
           distance: distance,
           ordered: ordered,
@@ -383,10 +362,18 @@ module ParadeDB
 
       def prox_array_node(left_terms)
         terms = normalize_proximity_terms(left_terms)
-        values = terms.map { |term| quoted_value(term) }
+        values = terms.map { |term| proximity_term_node(term) }
         raise ArgumentError, "near requires at least one left-side term" if values.empty?
 
         ::Arel::Nodes::NamedFunction.new("pdb.prox_array", values)
+      end
+
+      def proximity_term_node(term)
+        if term.is_a?(ParadeDB::Proximity::RegexTerm)
+          prox_regex_node(term.pattern, term.max_expansions)
+        else
+          quoted_value(term)
+        end
       end
 
       def build_range_node(value, gte:, gt:, lte:, lt:, type:)

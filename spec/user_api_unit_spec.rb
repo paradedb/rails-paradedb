@@ -76,13 +76,17 @@ RSpec.describe "UserApiUnitTest" do
     sql = UnitProduct.search(:description).near("sleek", anchor: "shoes", distance: 1, ordered: true).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('sleek' ##> 1 ##> 'shoes'))), sql
   end
-  it "near regex" do
-    sql = UnitProduct.search(:description).near_regex("sl.*", anchor: "shoes", distance: 1).to_sql
-    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ (pdb.prox_regex('sl.*') ## 1 ## 'shoes'))), sql
-  end
   it "near with array left operand" do
     sql = UnitProduct.search(:description).near("sleek", "white", anchor: "shoes", distance: 1).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ (pdb.prox_array('sleek', 'white') ## 1 ## 'shoes'))), sql
+  end
+  it "near with regex wrapper" do
+    sql = UnitProduct.search(:description).near(ParadeDB.regex_term("sl.*"), anchor: "shoes", distance: 1).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ (pdb.prox_regex('sl.*') ## 1 ## 'shoes'))), sql
+  end
+  it "near with mixed array left operand" do
+    sql = UnitProduct.search(:description).near(ParadeDB.regex_term("sl.*"), "white", anchor: "shoes", distance: 1).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ (pdb.prox_array(pdb.prox_regex('sl.*'), 'white') ## 1 ## 'shoes'))), sql
   end
   it "phrase prefix" do
     sql = UnitProduct.search(:description).phrase_prefix("run", "sh").to_sql

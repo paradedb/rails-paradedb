@@ -5,6 +5,7 @@ require_relative "parade_db/errors"
 require_relative "parade_db/arel"
 require_relative "parade_db/index"
 require_relative "parade_db/aggregations"
+require_relative "parade_db/proximity"
 require_relative "parade_db/query"
 require_relative "parade_db/diagnostics"
 require_relative "parade_db/migration_helpers"
@@ -60,5 +61,9 @@ module ParadeDB
 
     raise Errors::UnsupportedAdapterError,
           "#{context} only supports PostgreSQL. Current adapter: #{adapter_name.inspect}"
+  end
+
+  def regex_term(pattern, max_expansions: nil)
+    Proximity::RegexTerm.new(pattern, max_expansions: max_expansions)
   end
 end
