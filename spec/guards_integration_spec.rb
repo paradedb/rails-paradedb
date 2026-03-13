@@ -168,7 +168,7 @@ RSpec.describe "GuardsUnitTest" do
   end
   it "near regex max expansions rejects non integer" do
     error = assert_raises(ArgumentError) do
-      builder.near(:description, ParadeDB.regex("sl.*", max_expansions: "100"), anchor: "shoes", distance: 1)
+      builder.near(:description, ParadeDB.regex_term("sl.*", max_expansions: "100"), anchor: "shoes", distance: 1)
     end
     assert_includes error.message, "max_expansions must be an integer"
   end

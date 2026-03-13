@@ -139,11 +139,11 @@ RSpec.describe "UserApiIntegrationTest" do
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ (pdb.prox_array('sleek', 'white') ## 1 ## 'shoes'))), sql
   end
   it "near with regex wrapper" do
-    sql = Product.search(:description).near(ParadeDB.regex("sl.*"), anchor: "shoes", distance: 1).to_sql
+    sql = Product.search(:description).near(ParadeDB.regex_term("sl.*"), anchor: "shoes", distance: 1).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ (pdb.prox_regex('sl.*') ## 1 ## 'shoes'))), sql
   end
   it "near with mixed array left operand" do
-    sql = Product.search(:description).near(ParadeDB.regex("sl.*"), "white", anchor: "shoes", distance: 1).to_sql
+    sql = Product.search(:description).near(ParadeDB.regex_term("sl.*"), "white", anchor: "shoes", distance: 1).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ (pdb.prox_array(pdb.prox_regex('sl.*'), 'white') ## 1 ## 'shoes'))), sql
   end
   it "phrase prefix" do
