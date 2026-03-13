@@ -8,11 +8,45 @@ All notable changes to this project will be documented in this file. The format 
 
 ### Added
 
-- Support for passing regexes into proximity queries using `ParadeDB.regex_term`
+- Rails 7.2 support and CI coverage
+- New search/query APIs: `regex_phrase`, `phrase_prefix`, `parse`,
+  grouped `aggregate_by`, and `ParadeDB::Query.regex`
+- Expanded snippet support with `with_snippets` and
+  `with_snippet_positions`
+- ParadeDB diagnostics helpers:
+  `paradedb_indexes`, `paradedb_index_segments`,
+  `paradedb_verify_index`, and `paradedb_verify_all_indexes`
+- Additional aggregation helpers:
+  `percentiles`, `histogram`, `date_histogram`, `top_hits`, and
+  `filtered`
+- Support for passing regexes into proximity queries using
+  `ParadeDB.regex_term`
+
+### Changed
+
+- Fuzzy search controls are now flattened across the relation and Arel
+  DSLs with direct `distance`, `prefix`, and
+  `transposition_cost_one` options
+- `matching_all` and `matching_any` now accept explicit `tokenizer:`
+  overrides
+- Runtime index validation now includes index-class discovery, drift
+  checks, indexed-field validation, and model helpers for
+  `paradedb_index_classes`, `paradedb_indexed_fields`,
+  `paradedb_key_field`, and `paradedb_index_name`
+- Facet and aggregation APIs now support `exact:` controls for exact
+  versus windowed execution
+- README, examples, and Arel documentation were expanded to cover the
+  newer query, snippet, aggregation, and diagnostics APIs
+
+### Fixed
+
+- Search/runtime tokenizer handling now renders tokenizer SQL safely and
+  validates unsupported tokenizer and facet combinations earlier
 
 ### Removed
 
-- **BREAKING**: `near_regex` has been removed in favor of calling `near` with a regex argument using `ParadeDB.regex_term`
+- **BREAKING**: `near_regex` has been removed in favor of calling
+  `near` with a regex argument using `ParadeDB.regex_term`
 
 ## [0.1.0] - 2026-02-07
 
