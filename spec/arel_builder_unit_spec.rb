@@ -223,6 +223,18 @@ RSpec.describe "ArelBuilderUnitTest" do
     node = @builder.near(:description, "sleek", "white", anchor: "shoes", distance: 1)
     assert_equal %("products"."description" @@@ (pdb.prox_array('sleek', 'white') ## 1 ## 'shoes')), sql(node)
   end
+  it "near with prox regex wrapper" do
+    node = @builder.near(:description, ParadeDB.prox_regex("sl.*"), anchor: "shoes", distance: 1)
+    assert_equal %("products"."description" @@@ (pdb.prox_regex('sl.*') ## 1 ## 'shoes')), sql(node)
+  end
+  it "near with mixed array left operand" do
+    node = @builder.near(:description, ParadeDB.prox_regex("sl.*"), "white", anchor: "shoes", distance: 1)
+    assert_equal %("products"."description" @@@ (pdb.prox_array(pdb.prox_regex('sl.*'), 'white') ## 1 ## 'shoes')), sql(node)
+  end
+  it "near with prox regex wrapper max expansions" do
+    node = @builder.near(:description, ParadeDB.prox_regex("sl.*", max_expansions: 100), anchor: "shoes", distance: 1)
+    assert_equal %("products"."description" @@@ (pdb.prox_regex('sl.*', 100) ## 1 ## 'shoes')), sql(node)
+  end
   it "near rejects empty terms" do
     error = assert_raises(ArgumentError) do
       @builder.near(:description, anchor: "shoes", distance: 1)
