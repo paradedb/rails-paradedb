@@ -27,28 +27,32 @@ bundle install
 ## Quick Start
 
 ```ruby
-class Product < ApplicationRecord
+class MockItem < ActiveRecord::Base
   include ParadeDB::Model
+
+  self.table_name = "mock_items"
+  self.primary_key = "id"
+  self.has_paradedb_index = true
 end
 ```
 
 ```ruby
-Product.search(:description).matching_all("running shoes")
-Product.search(:description).matching_any("wireless", "bluetooth")
-Product.search(:description).term("electronics")
+MockItem.search(:description).matching_all("running shoes")
+MockItem.search(:description).matching_any("wireless", "bluetooth")
+MockItem.search(:description).term("electronics")
 ```
 
 ## Index Definition
 
 ```ruby
-class ProductIndex < ParadeDB::Index
-  self.table_name = :products
+class MockItemIndex < ParadeDB::Index
+  self.table_name = :mock_items
   self.key_field = :id
   self.index_name = :search_idx
   self.fields = {
     id: nil,
     description: nil,
-    category: { tokenizer: :literal },
+    category: nil,
     rating: nil,
     in_stock: nil,
     created_at: nil,
@@ -65,13 +69,13 @@ aggregations, or `top_hits` docvalue fields, use `:literal` or
 Create in migration:
 
 ```ruby
-class AddProductBm25Index < ActiveRecord::Migration[8.1]
+class AddMockItemBm25Index < ActiveRecord::Migration[8.1]
   def up
-    create_paradedb_index(ProductIndex, if_not_exists: true)
+    create_paradedb_index(MockItemIndex, if_not_exists: true)
   end
 
   def down
-    remove_bm25_index :products, name: :search_idx, if_exists: true
+    remove_bm25_index :mock_items, name: :search_idx, if_exists: true
   end
 end
 ```
@@ -80,58 +84,58 @@ end
 
 ```ruby
 # Full-text
-Product.search(:description).matching_all("running shoes")
-Product.search(:description).matching_any("wireless bluetooth")
+MockItem.search(:description).matching_all("running shoes")
+MockItem.search(:description).matching_any("wireless bluetooth")
 
 # Query-time tokenizer override
-Product.search(:description).matching_any("running shoes", tokenizer: "whitespace")
-Product.search(:description).matching_any("running shoes", tokenizer: "whitespace('lowercase=false')")
+MockItem.search(:description).matching_any("running shoes", tokenizer: "whitespace")
+MockItem.search(:description).matching_any("running shoes", tokenizer: "whitespace('lowercase=false')")
 
 # Fuzzy options on match/term
-Product.search(:description).matching_any("runing shose", distance: 1)
-Product.search(:description).matching_all("runing", distance: 1, prefix: true)
-Product.search(:description).term("shose", distance: 1, transposition_cost_one: true)
+MockItem.search(:description).matching_any("runing shose", distance: 1)
+MockItem.search(:description).matching_all("runing", distance: 1, prefix: true)
+MockItem.search(:description).term("shose", distance: 1, transposition_cost_one: true)
 
 # Other query types
-Product.search(:description).phrase("running shoes", slop: 2)
-Product.search(:description).phrase("running shoes", tokenizer: "whitespace")
-Product.search(:description).phrase(%w[running shoes])
-Product.search(:description).regex("run.*")
-Product.search(:description).near("running", anchor: "shoes", distance: 3)
-Product.search(:description).near("running", anchor: "shoes", distance: 3, ordered: true)
-Product.search(:description).near_regex("run.*", anchor: "shoes", distance: 3)
-Product.search(:description).near("running", "trail", anchor: "shoes", distance: 3)
-Product.search(:description).regex_phrase("run.*", "shoes")
-Product.search(:description).phrase_prefix("run", "sh")
-Product.search(:description).phrase_prefix("run", "sh", max_expansion: 100)
-Product.search(:description).parse("running AND shoes", lenient: true)
-Product.search(:description).parse("running shoes", conjunction_mode: true)
+MockItem.search(:description).phrase("running shoes", slop: 2)
+MockItem.search(:description).phrase("running shoes", tokenizer: "whitespace")
+MockItem.search(:description).phrase(%w[running shoes])
+MockItem.search(:description).regex("run.*")
+MockItem.search(:description).near("running", anchor: "shoes", distance: 3)
+MockItem.search(:description).near("running", anchor: "shoes", distance: 3, ordered: true)
+MockItem.search(:description).near_regex("run.*", anchor: "shoes", distance: 3)
+MockItem.search(:description).near("running", "trail", anchor: "shoes", distance: 3)
+MockItem.search(:description).regex_phrase("run.*", "shoes")
+MockItem.search(:description).phrase_prefix("run", "sh")
+MockItem.search(:description).phrase_prefix("run", "sh", max_expansion: 100)
+MockItem.search(:description).parse("running AND shoes", lenient: true)
+MockItem.search(:description).parse("running shoes", conjunction_mode: true)
 
-Product.search(:id).match_all
-Product.search(:id).exists
-Product.search(:rating).range(gte: 3, lt: 5)
-Product.search(:weight_range).range_term("(10, 12]", relation: "Intersects")
+MockItem.search(:id).match_all
+MockItem.search(:id).exists
+MockItem.search(:rating).range(gte: 3, lt: 5)
+MockItem.search(:weight_range).range_term("(10, 12]", relation: "Intersects")
 
-Product.more_like_this(42, fields: [:description])
+MockItem.more_like_this(42, fields: [:description])
 ```
 
 ## Scoring and Highlighting
 
 ```ruby
-results = Product.search(:description)
+results = MockItem.search(:description)
                  .matching_all("shoes")
                  .with_score
                  .order(search_score: :desc)
 
-Product.search(:description)
+MockItem.search(:description)
        .matching_all("shoes")
        .with_snippet(:description, start_tag: "<b>", end_tag: "</b>", max_chars: 80)
 
-Product.search(:description)
+MockItem.search(:description)
        .matching_all("running")
        .with_snippets(:description, max_chars: 15, limit: 2, offset: 0, sort_by: :position)
 
-Product.search(:description)
+MockItem.search(:description)
        .matching_all("running")
        .with_snippet_positions(:description)
 ```
@@ -140,7 +144,7 @@ Product.search(:description)
 
 ```ruby
 # Rows + facets (requires order + limit)
-relation = Product.search(:description)
+relation = MockItem.search(:description)
                   .matching_all("shoes")
                   .with_facets(:category, size: 10)
                   .order(:id)
@@ -149,23 +153,23 @@ rows = relation.to_a
 facets = relation.facets
 
 # Non-exact window facets
-relation = Product.search(:description)
+relation = MockItem.search(:description)
                   .matching_all("shoes")
                   .with_facets(:category, size: 10, exact: false)
                   .order(:id)
                   .limit(10)
 
 # Facets-only aggregate
-Product.search(:description).matching_all("shoes").facets(:category)
+MockItem.search(:description).matching_all("shoes").facets(:category)
 
 # Named aggregations
-Product.search(:description).matching_all("shoes").facets_agg(
+MockItem.search(:description).matching_all("shoes").facets_agg(
   docs: ParadeDB::Aggregations.value_count(:id),
   avg_rating: ParadeDB::Aggregations.avg(:rating)
 )
 
 # Non-exact window named aggregations
-Product.search(:description).matching_all("shoes").with_agg(
+MockItem.search(:description).matching_all("shoes").with_agg(
   exact: false,
   docs: ParadeDB::Aggregations.value_count(:id)
 ).order(:id).limit(10)
