@@ -547,6 +547,23 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       assert_equal expected_ids, relation.pluck(:id)
     end
 
+    it "proximity array with regex term matches raw SQL" do
+      raw_sql = <<~SQL
+        SELECT id
+        FROM products
+        WHERE description @@@ (pdb.prox_array(pdb.prox_regex('sl.*'), 'white') ## 1 ## 'shoes')
+        ORDER BY id
+      SQL
+
+      relation = BehaviorProduct.search(:description)
+                                .near(ParadeDB.regex("sl.*"), "white", anchor: "shoes", distance: 1)
+                                .order(:id)
+
+      expected_ids = [1, 2, 4]
+      assert_equal expected_ids, ids_from_sql(raw_sql)
+      assert_equal expected_ids, relation.pluck(:id)
+    end
+
     it "regex phrase matches raw SQL" do
       raw_sql = <<~SQL
         SELECT id
