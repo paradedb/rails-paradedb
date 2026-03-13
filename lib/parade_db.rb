@@ -63,7 +63,7 @@ module ParadeDB
           "#{context} only supports PostgreSQL. Current adapter: #{adapter_name.inspect}"
   end
 
-  def prox_regex(pattern, max_expansions: nil)
+  def regex(pattern, max_expansions: nil)
     Proximity::RegexTerm.new(pattern, max_expansions: max_expansions)
   end
 end
