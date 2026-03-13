@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-13
+
+### Added
+
+- Support for passing regexes into proximity queries using `ParadeDB.regex_term`
+
+### Removed
+
+- **BREAKING**: `near_regex` has been removed in favor of calling `near` with a regex argument using `ParadeDB.regex_term`
+
 ## [0.1.0] - 2026-02-07
 
 ### Added
@@ -46,5 +56,6 @@ All notable changes to this project will be documented in this file. The format 
 - Schema dump/load round-trip for tokenizer configuration and index options
   (including `target_segment_count`)
 
-[Unreleased]: https://github.com/paradedb/rails-paradedb/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/paradedb/rails-paradedb/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.2.0
 [0.1.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.1.0
