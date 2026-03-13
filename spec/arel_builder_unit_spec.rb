@@ -211,14 +211,6 @@ RSpec.describe "ArelBuilderUnitTest" do
     node = @builder.near(:description, "running", anchor: "shoes", distance: 5)
     assert_equal %("products"."description" @@@ ('running' ## 5 ## 'shoes')), sql(node)
   end
-  it "near regex" do
-    node = @builder.near_regex(:description, "sl.*", anchor: "shoes", distance: 1)
-    assert_equal %("products"."description" @@@ (pdb.prox_regex('sl.*') ## 1 ## 'shoes')), sql(node)
-  end
-  it "near regex with max expansions" do
-    node = @builder.near_regex(:description, "sl.*", anchor: "shoes", distance: 1, max_expansions: 100)
-    assert_equal %("products"."description" @@@ (pdb.prox_regex('sl.*', 100) ## 1 ## 'shoes')), sql(node)
-  end
   it "near with array left operand" do
     node = @builder.near(:description, "sleek", "white", anchor: "shoes", distance: 1)
     assert_equal %("products"."description" @@@ (pdb.prox_array('sleek', 'white') ## 1 ## 'shoes')), sql(node)

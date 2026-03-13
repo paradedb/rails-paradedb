@@ -134,10 +134,6 @@ RSpec.describe "UserApiIntegrationTest" do
     sql = Product.search(:description).near("sleek", anchor: "shoes", distance: 1, ordered: true).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('sleek' ##> 1 ##> 'shoes'))), sql
   end
-  it "near regex proximity" do
-    sql = Product.search(:description).near_regex("sl.*", anchor: "shoes", distance: 1).to_sql
-    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ (pdb.prox_regex('sl.*') ## 1 ## 'shoes'))), sql
-  end
   it "near array proximity" do
     sql = Product.search(:description).near("sleek", "white", anchor: "shoes", distance: 1).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ (pdb.prox_array('sleek', 'white') ## 1 ## 'shoes'))), sql

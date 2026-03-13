@@ -522,7 +522,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       SQL
 
       relation = BehaviorProduct.search(:description)
-                                .near_regex("sl.*", anchor: "shoes", distance: 1)
+                                .near(ParadeDB.regex("sl.*"), anchor: "shoes", distance: 1)
                                 .order(:id)
 
       expected_ids = [1, 2]

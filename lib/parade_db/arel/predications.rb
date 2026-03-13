@@ -56,17 +56,6 @@ module ParadeDB
         BUILDER.near(self, *terms, anchor: anchor, distance: distance, ordered: ordered)
       end
 
-      def pdb_near_regex(pattern, anchor:, distance:, ordered: false, max_expansions: nil)
-        BUILDER.near_regex(
-          self,
-          pattern,
-          anchor: anchor,
-          distance: distance,
-          ordered: ordered,
-          max_expansions: max_expansions
-        )
-      end
-
       def pdb_phrase_prefix(*terms, max_expansion: nil)
         flat = terms.flatten.compact
         raise ArgumentError, "phrase_prefix requires at least one term" if flat.empty?

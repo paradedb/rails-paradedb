@@ -159,27 +159,6 @@ module ParadeDB
         )
       end
 
-      def near_regex(
-        column,
-        pattern,
-        anchor:,
-        distance:,
-        ordered: false,
-        max_expansions: nil,
-        boost: nil,
-        constant_score: nil
-      )
-        build_proximity_query(
-          column,
-          left_operand: prox_regex_node(pattern, max_expansions),
-          right_operand: quoted_value(anchor),
-          distance: distance,
-          ordered: ordered,
-          boost: boost,
-          constant_score: constant_score
-        )
-      end
-
       def phrase_prefix(column, *terms, max_expansion: nil, boost: nil, constant_score: nil)
         flat = terms.flatten.compact
         raise ArgumentError, "phrase_prefix requires at least one term" if flat.empty?

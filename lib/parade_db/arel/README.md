@@ -35,7 +35,6 @@ Render any node with `ParadeDB::Arel.to_sql(node)`. All nodes respond to
 | `regex(column, pattern)`                                                                             | `column @@@ pdb.regex('pattern')`                                                     |
 | `regex_phrase(column, *patterns, slop: nil, max_expansions: nil)`                                    | `column @@@ pdb.regex_phrase(ARRAY['a', 'b'], slop => 2)`                             |
 | `near(column, *terms, anchor:, distance:, ordered: false)`                                           | `column @@@ ('a' ## d ## 'b')` / `(pdb.prox_array('a', 'b') ## d ## 'c')`             |
-| `near_regex(column, pattern, anchor:, distance:, max_expansions: nil)`                               | `column @@@ (pdb.prox_regex('a'[, 100]) ## d ## 'b')`                                 |
 | `near(column, ParadeDB.regex('a'), 'b', anchor:, distance:)`                                         | `column @@@ (pdb.prox_array(pdb.prox_regex('a'), 'b') ## d ## 'c')`                   |
 | `phrase_prefix(column, *terms, max_expansion: nil)`                                                  | `column @@@ pdb.phrase_prefix(ARRAY['a','b'][, 100])`                                 |
 | `parse(column, query, lenient: nil, conjunction_mode: nil)`                                          | `column @@@ pdb.parse('q', lenient => true, conjunction_mode => true)`                |

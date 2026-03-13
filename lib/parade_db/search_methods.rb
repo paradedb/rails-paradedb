@@ -254,30 +254,6 @@ module ParadeDB
       where(grouped(node))
     end
 
-    def near_regex(
-      pattern,
-      anchor:,
-      distance:,
-      ordered: false,
-      max_expansions: nil,
-      boost: nil,
-      constant_score: nil
-    )
-      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
-
-      node = builder.near_regex(
-        _paradedb_current_field,
-        pattern,
-        anchor: anchor,
-        distance: distance,
-        ordered: ordered,
-        max_expansions: max_expansions,
-        boost: boost,
-        constant_score: constant_score
-      )
-      where(grouped(node))
-    end
-
     def phrase_prefix(*terms, max_expansion: nil, boost: nil, constant_score: nil)
       raise "No search field set. Call .search(column) first." unless _paradedb_current_field
 
