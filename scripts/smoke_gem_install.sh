@@ -32,13 +32,16 @@ gem install --no-document --install-dir "${GEM_HOME_DIR}" "${GEM_FILE}" >/dev/nu
 
 EXPECTED_VERSION="${VERSION}" GEM_HOME="${GEM_HOME_DIR}" GEM_PATH="${GEM_HOME_DIR}" ruby <<'RUBY'
 require "parade_db"
+require "arel"
 
 expected = ENV.fetch("EXPECTED_VERSION")
 abort("Version mismatch: expected #{expected}, got #{ParadeDB::VERSION}") unless ParadeDB::VERSION == expected
 
 builder = ParadeDB::Arel::Builder.new("mock_items")
-sql = ParadeDB::Arel.to_sql(builder.match(:description, "running shoes"))
-abort("Generated SQL is missing ParadeDB match operator: #{sql}") unless sql.include?("&&&")
+node = builder.match(:description, "running shoes")
+unless node.is_a?(Arel::Nodes::InfixOperation) && node.operator.to_s == "&&&"
+  abort("Generated node is not a ParadeDB match infix operation")
+end
 
 puts "✅ Gem smoke install passed for rails-paradedb #{ParadeDB::VERSION}"
 RUBY
