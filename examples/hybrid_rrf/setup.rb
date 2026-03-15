@@ -6,6 +6,7 @@ require "logger"
 require "rails"
 require "active_record"
 require_relative "../../lib/parade_db"
+require_relative "../support/setup_helpers"
 
 class HybridRrfExampleApp < Rails::Application
   config.root = File.expand_path("../..", __dir__)
@@ -19,6 +20,7 @@ HybridRrfExampleApp.initialize!
 require_relative "model"
 
 module HybridRrfSetup
+  extend ParadeDBExamples::SetupHelpers
   module_function
 
   QUERY_SEED_TEXT = {
@@ -27,35 +29,8 @@ module HybridRrfSetup
     "wireless earbuds" => "Innovative wireless earbuds"
   }.freeze
 
-  def database_url
-    return ENV["DATABASE_URL"] if ENV["DATABASE_URL"]
-
-    host = ENV.fetch("PGHOST", "localhost")
-    port = ENV.fetch("PGPORT", "5432")
-    user = ENV.fetch("PGUSER", "postgres")
-    password = ENV.fetch("PGPASSWORD", "postgres")
-    database = ENV.fetch("PGDATABASE", "postgres")
-
-    "postgresql://#{user}:#{password}@#{host}:#{port}/#{database}"
-  end
-
-  def connect!
-    return if ActiveRecord::Base.connected?
-
-    ActiveRecord::Base.establish_connection(database_url)
-    ActiveRecord::Base.logger = nil
-  end
-
   def setup_mock_items!
-    connect!
-
-    conn = ActiveRecord::Base.connection
-    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search;")
-    conn.execute(
-      "CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');"
-    )
-    conn.execute("DROP TABLE IF EXISTS mock_items_hybrid_rrf CASCADE;")
-    conn.execute("CREATE TABLE mock_items_hybrid_rrf AS TABLE mock_items;")
+    conn = recreate_mock_items_copy!(:mock_items_hybrid_rrf)
     conn.remove_bm25_index(:mock_items_hybrid_rrf, name: :mock_items_hybrid_rrf_bm25_idx, if_exists: true)
     conn.create_paradedb_index(MockItemIndex, if_not_exists: true)
 
