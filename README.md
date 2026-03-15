@@ -356,8 +356,8 @@ For commercial support, contact [sales@paradedb.com](mailto:sales@paradedb.com).
 We would like to thank the following members of the community for their valuable feedback and reviews during the development of this package:
 
 - [Eric Barendt](https://github.com/ebarendt) - Engineering at Modern Treasury
-- [Matthew Higgins](https://github.com/matthuhiggins) - Engineering at Shopify
-- [Patrick Schmitz](https://gist.github.com/bullfight) - Engineering at Modern Treasury
+- [Matthew Higgins](https://github.com/matthuhiggins) - Engineering at Modern Treasury
+- [Patrick Schmitz](https://github.com/bullfight) - Engineering at Modern Treasury
 
 ## License
 
