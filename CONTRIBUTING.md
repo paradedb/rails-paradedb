@@ -68,8 +68,6 @@ prek run --all-files
 prek install -f
 ```
 
-If you are migrating from `pre-commit`, replace `pre-commit` commands with
-`prek` and reinstall hooks once with `prek install -f`.
 If you change Ruby code, keep style consistent with existing files and tests.
 
 ### Pull Request Workflow
