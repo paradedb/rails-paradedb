@@ -255,14 +255,11 @@ module ParadeDB
       def paradedb_catalog_index_valid?(definition)
         sql = <<~SQL
           SELECT 1
-          FROM pg_class c
-          JOIN pg_namespace n ON n.oid = c.relnamespace
-          JOIN pg_index i ON i.indexrelid = c.oid
-          JOIN pg_class t ON t.oid = i.indrelid
+          FROM pg_index i
+          JOIN pg_class c ON c.oid = i.indexrelid
           JOIN pg_am am ON am.oid = c.relam
-          WHERE c.relname = #{connection.quote(definition.index_name.to_s)}
-            AND t.relname = #{connection.quote(definition.table_name.to_s)}
-            AND n.nspname = current_schema()
+          WHERE i.indexrelid = to_regclass(#{connection.quote(definition.index_name.to_s)})
+            AND i.indrelid = to_regclass(#{connection.quote(definition.table_name.to_s)})
             AND am.amname = 'bm25'
           LIMIT 1
         SQL

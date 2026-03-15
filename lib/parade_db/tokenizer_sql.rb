@@ -2,6 +2,8 @@
 
 module ParadeDB
   module TokenizerSQL
+    TOKENIZER_EXPRESSION = /\A[a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\s*[a-zA-Z0-9_'".,=\s:-]*\s*\))?\z/.freeze
+
     module_function
 
     def qualify(tokenizer)

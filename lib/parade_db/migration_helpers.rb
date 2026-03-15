@@ -508,9 +508,7 @@ module ParadeDB
     def tokenizer_like?(tokenizer_sql)
       return false if tokenizer_sql.empty?
 
-      tokenizer_sql.match?(ParadeDB::Index::TokenizerParser::TOKENIZER_EXPRESSION)
-    rescue NameError
-      tokenizer_sql.match?(/\A[a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\s*[a-zA-Z0-9_'".,=\s:-]*\s*\))?\z/)
+      tokenizer_sql.match?(ParadeDB::TokenizerSQL::TOKENIZER_EXPRESSION)
     end
 
     def unwrap_surrounding_groupings(sql)

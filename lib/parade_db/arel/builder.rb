@@ -7,7 +7,6 @@ module ParadeDB
     class Builder
       RANGE_TYPES = %w[int4range int8range numrange daterange tsrange tstzrange].freeze
       RANGE_RELATIONS = %w[Intersects Contains Within].freeze
-      TOKENIZER_EXPRESSION = /\A[a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\s*[a-zA-Z0-9_'".,=\s:-]*\s*\))?\z/.freeze
 
       attr_reader :table
 
@@ -595,7 +594,7 @@ module ParadeDB
         if value.empty?
           raise ArgumentError, "tokenizer cannot be blank"
         end
-        unless TOKENIZER_EXPRESSION.match?(value)
+        unless ParadeDB::TokenizerSQL::TOKENIZER_EXPRESSION.match?(value)
           raise ArgumentError, "invalid tokenizer expression: #{tokenizer.inspect}"
         end
 
