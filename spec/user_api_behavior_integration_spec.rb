@@ -57,23 +57,23 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
 
     assert_equal [1, 2, 6], ids
   end
-  it "matching with tokenizer + fuzzy distance defers error to database" do
-    error = assert_raises(ActiveRecord::StatementInvalid) do
+  it "matching with tokenizer + fuzzy distance raises argument error" do
+    error = assert_raises(ArgumentError) do
       BehaviorProduct.search(:description)
                      .matching_any("runing shose", tokenizer: "whitespace", distance: 1)
                      .order(:id)
                      .pluck(:id)
     end
-    assert_match(/cannot cast type/i, error.message)
+    assert_includes error.message, "tokenizer cannot be combined with fuzzy options"
   end
-  it "matching with tokenizer + fuzzy constant score defers error to database" do
-    error = assert_raises(ActiveRecord::StatementInvalid) do
+  it "matching with tokenizer + fuzzy constant score raises argument error" do
+    error = assert_raises(ArgumentError) do
       BehaviorProduct.search(:description)
                      .matching_any("runing shose", tokenizer: "whitespace", distance: 1, constant_score: 1.0)
                      .order(:id)
                      .pluck(:id)
     end
-    assert_match(/cannot cast type/i, error.message)
+    assert_includes error.message, "tokenizer cannot be combined with fuzzy options"
   end
   it "phrase near and phrase prefix execute" do
     phrase_ids = BehaviorProduct.search(:description).phrase("running shoes").order(:id).pluck(:id)

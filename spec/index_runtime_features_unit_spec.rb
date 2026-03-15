@@ -24,6 +24,12 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
 
     error = assert_raises(ArgumentError) { ParadeDB.index_validation_mode = :invalid_mode }
     assert_includes error.message, "index_validation_mode must be one of"
+
+    error = assert_raises(ArgumentError) { ParadeDB.index_validation_mode = nil }
+    assert_includes error.message, "index_validation_mode must be one of"
+
+    error = assert_raises(ArgumentError) { ParadeDB.index_validation_mode = " " }
+    assert_includes error.message, "index_validation_mode must be one of"
   end
 
   it "paradedb_index macro overrides convention" do
