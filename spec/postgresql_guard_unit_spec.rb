@@ -18,9 +18,10 @@ class GuardProduct < ActiveRecord::Base
 end
 
 RSpec.describe "PostgreSQLGuardUnitTest" do
-  def teardown
+  after do
     GuardProduct._mock_adapter_name = nil
   end
+
   it "helper allows postgresql" do
     mock_connection = Struct.new(:adapter_name).new("PostgreSQL")
     ParadeDB.ensure_postgresql_adapter!(mock_connection, context: "test helper")

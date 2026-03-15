@@ -42,7 +42,6 @@ module ParadeDB
     end
 
     class TokenizerParser
-      TOKENIZER_EXPRESSION = /\A[a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\s*[a-zA-Z0-9_'".,=\s:-]*\s*\))?\z/.freeze
       TOKENIZER_SINGLE_KEYS = %i[tokenizer args named_args filters stemmer alias].freeze
 
       class << self
@@ -148,7 +147,7 @@ module ParadeDB
         end
 
         def validate_tokenizer_name!(source_name, tokenizer)
-          return if TOKENIZER_EXPRESSION.match?(tokenizer)
+          return if ParadeDB::TokenizerSQL::TOKENIZER_EXPRESSION.match?(tokenizer)
 
           raise InvalidIndexDefinition,
                 "invalid tokenizer name #{tokenizer.inspect} for #{source_name}. " \

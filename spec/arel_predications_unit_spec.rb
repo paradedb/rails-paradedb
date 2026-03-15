@@ -49,6 +49,12 @@ RSpec.describe "ArelPredicationsUnitTest" do
     node = @t[:description].pdb_match("running shoes", tokenizer: "whitespace('lowercase=false')")
     assert_equal %("products"."description" &&& 'running shoes'::pdb.whitespace('lowercase=false')), sql(node)
   end
+  it "pdb_match rejects tokenizer with fuzzy options" do
+    error = assert_raises(ArgumentError) do
+      @t[:description].pdb_match("running shoes", tokenizer: "whitespace", distance: 1)
+    end
+    assert_includes error.message, "tokenizer cannot be combined with fuzzy options"
+  end
 
   # ---- pdb_phrase ----
   it "pdb_phrase without slop" do
