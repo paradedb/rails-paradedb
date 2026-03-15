@@ -66,6 +66,12 @@ RSpec.describe "ArelBuilderUnitTest" do
     node = @builder.match(:description, "running shoes", tokenizer: "whitespace('lowercase=false')")
     assert_equal %("products"."description" &&& 'running shoes'::pdb.whitespace('lowercase=false')), sql(node)
   end
+  it "match rejects tokenizer with fuzzy options" do
+    error = assert_raises(ArgumentError) do
+      @builder.match(:description, "running shoes", tokenizer: "whitespace", distance: 1)
+    end
+    assert_includes error.message, "tokenizer cannot be combined with fuzzy options"
+  end
   it "match without boost" do
     node = @builder.match(:description, "shoes", boost: nil)
     assert_equal %("products"."description" &&& 'shoes'), sql(node)
@@ -79,6 +85,12 @@ RSpec.describe "ArelBuilderUnitTest" do
   it "match any multiple terms" do
     node = @builder.match_any(:description, "wireless", "bluetooth", "earbuds")
     assert_equal %("products"."description" ||| 'wireless bluetooth earbuds'), sql(node)
+  end
+  it "match any rejects tokenizer with fuzzy options" do
+    error = assert_raises(ArgumentError) do
+      @builder.match_any(:description, "wireless", tokenizer: "whitespace", prefix: true)
+    end
+    assert_includes error.message, "tokenizer cannot be combined with fuzzy options"
   end
 
   # ---- phrase ----

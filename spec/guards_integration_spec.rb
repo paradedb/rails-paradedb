@@ -109,6 +109,18 @@ RSpec.describe "GuardsUnitTest" do
     error = assert_raises(ArgumentError) { builder.match(:description, "shoes", tokenizer: "whitespace;drop") }
     assert_includes error.message, "invalid tokenizer expression"
   end
+  it "match tokenizer rejects fuzzy distance combination" do
+    error = assert_raises(ArgumentError) do
+      builder.match(:description, "shoes", tokenizer: "whitespace", distance: 1)
+    end
+    assert_includes error.message, "tokenizer cannot be combined with fuzzy options"
+  end
+  it "match any tokenizer rejects fuzzy prefix combination" do
+    error = assert_raises(ArgumentError) do
+      builder.match_any(:description, "shoes", tokenizer: "whitespace", prefix: true)
+    end
+    assert_includes error.message, "tokenizer cannot be combined with fuzzy options"
+  end
   it "phrase slop rejects non numeric" do
     error = assert_raises(ArgumentError) { builder.phrase(:description, "running shoes", slop: "lots") }
     assert_includes error.message, "slop must be numeric"
