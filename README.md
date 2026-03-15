@@ -34,7 +34,7 @@ Use Elastic-quality full-text search, scoring, snippets, facets, and aggregation
 
 ## Features
 
-- BM25 index management in Rails migrations (`create_paradedb_index`, `remove_bm25_index`, `reindex_bm25`)
+- BM25 index management in Rails migrations (`create_paradedb_index`, `replace_paradedb_index`, `add_bm25_index`, `remove_bm25_index`, `reindex_bm25`)
 - Chainable ActiveRecord search API (`matching_all`, `matching_any`, `term`, `phrase`, `regex`, `near`, `parse`, and more)
 - Relevance and highlighting (`with_score`, `with_snippet`, `with_snippets`, `with_snippet_positions`)
 - Facets and aggregations (`with_facets`, `facets`, `with_agg`, `facets_agg`, `aggregate_by`)
@@ -54,7 +54,7 @@ Use Elastic-quality full-text search, scoring, snippets, facets, and aggregation
 
 Notes:
 
-- CI runs Ruby `3.2` through `4.0` across Rails `7.2` and `8.1`.
+- CI runs Rails `7.2` on Ruby `3.2`/`3.3`/`3.4`, and Rails `8.1` on Ruby `3.2`/`3.3`/`3.4`/`4.0`.
 - Schema compatibility is checked against every ParadeDB release.
 
 ## Installation
@@ -142,6 +142,9 @@ MockItem.search(:description).matching_any("running shoes", tokenizer: "whitespa
 MockItem.search(:description).matching_any("runing shose", distance: 1)
 MockItem.search(:description).matching_all("runing", distance: 1, prefix: true)
 MockItem.search(:description).term("shose", distance: 1, transposition_cost_one: true)
+
+# Tokenizer overrides are not compatible with fuzzy options
+# MockItem.search(:description).matching_any("runing shose", tokenizer: "whitespace", distance: 1)
 
 # Other query types
 MockItem.search(:description).phrase("running shoes", slop: 2)
@@ -314,6 +317,15 @@ relation.facets
 MockItem.search(:title).matching_all("shoes")
 
 # ✅ Add :title to the index definition, then migrate
+class MockItemIndex < ParadeDB::Index
+  self.table_name = :mock_items
+  self.key_field = :id
+  self.fields = {
+    id: nil,
+    title: nil,
+    description: nil
+  }
+end
 ```
 
 ## Security
