@@ -59,7 +59,7 @@ Core search operations:
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/quickstart/quickstart.rb
 ```
 
-2. Faceted Search (`faceted_search/faceted_search.rb`)
+1. Faceted Search (`faceted_search/faceted_search.rb`)
 
 Top K rows plus facet buckets in one flow.
 
@@ -75,7 +75,7 @@ Structure:
 
 ### Smart Features
 
-3. Autocomplete (`autocomplete/`)
+1. Autocomplete (`autocomplete/`)
 
 Creates an ngram index and runs as-you-type queries.
 
@@ -90,7 +90,7 @@ Structure:
 - `examples/autocomplete/setup.rb`
 - `examples/autocomplete/autocomplete.rb`
 
-4. More Like This (`more_like_this/more_like_this.rb`)
+1. More Like This (`more_like_this/more_like_this.rb`)
 
 Recommendation-style search based on document similarity.
 
@@ -106,7 +106,7 @@ Structure:
 
 ### Advanced Recipes
 
-5. Hybrid Search with RRF (`hybrid_rrf/`)
+1. Hybrid Search with RRF (`hybrid_rrf/`)
 
 Demonstrates Reciprocal Rank Fusion (RRF) by composing a ParadeDB BM25 relation
 with a semantic relation (via `neighbor`) using CTEs.
@@ -122,7 +122,7 @@ Structure:
 - `examples/hybrid_rrf/setup.rb`
 - `examples/hybrid_rrf/hybrid_rrf.rb`
 
-6. RAG (`rag/rag.rb`)
+1. RAG (`rag/rag.rb`)
 
 Retrieves products with ParadeDB and can send context to OpenRouter. If
 `OPENROUTER_API_KEY` is set, this example makes live HTTPS requests to a
