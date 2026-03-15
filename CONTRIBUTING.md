@@ -34,7 +34,7 @@ git clone https://github.com/paradedb/rails-paradedb.git
 cd rails-paradedb
 
 bundle install
-pre-commit install -f
+prek install -f
 ```
 
 ### Running Tests
@@ -59,17 +59,15 @@ bash scripts/run_unit_tests.sh spec/user_api_unit_spec.rb
 
 ### Linting and Formatting
 
-This repository enforces markdown/style checks via `pre-commit` and
+This repository enforces markdown/style checks via `prek` and
 `.pre-commit-config.yaml`.
 Common commands:
 
 ```bash
-pre-commit run --all-files
-pre-commit install -f
+prek run --all-files
+prek install -f
 ```
 
-If you prefer `prek`, run the equivalent `prek` commands against the same
-`.pre-commit-config.yaml` hooks.
 If you change Ruby code, keep style consistent with existing files and tests.
 
 ### Pull Request Workflow
