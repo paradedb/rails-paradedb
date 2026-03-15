@@ -34,7 +34,7 @@ jobs:
         uses: actions/setup-node@v6
 
       - name: Install Prettier and markdownlint
-        run: npm install -g prettier markdownlint-cli
+        run: npm install -g prettier@3.5.3 markdownlint-cli@0.45.0
 
       - name: Run Markdown Lint
         run: markdownlint "**/*.md"

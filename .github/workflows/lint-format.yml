@@ -46,13 +46,25 @@ jobs:
             exit 1
           fi
 
-      - name: Print Modified Files
+      - name: Check for Missing Final Newlines
         run: |
-          FILES=$(git ls-files --modified)
-          if [[ ! -z "$FILES" ]]; then
-            echo "The following files have incorrect trailing newlines:"
-            echo "$FILES"
-            echo "Please fix them using:"
-            echo -e 'if [[ -f "$1" ]]; then\n  echo -n "$1"\n  if (diff /dev/null "$1" || true) | tail -1 | grep -q "^\\ No newline"; then\n    echo >> "$1"\n    echo "...fixed"\n  else\n    echo ""\n  fi\nfi'
-            false
-          fi
+          python3 - <<'PY'
+          import pathlib
+          import subprocess
+          import sys
+
+          missing = []
+          for name in subprocess.check_output(["git", "ls-files"], text=True).splitlines():
+              path = pathlib.Path(name)
+              if not path.is_file():
+                  continue
+              data = path.read_bytes()
+              if data and not data.endswith(b"\n"):
+                  missing.append(name)
+
+          if missing:
+              print("The following files are missing a trailing newline:")
+              for name in missing:
+                  print(name)
+              sys.exit(1)
+          PY
