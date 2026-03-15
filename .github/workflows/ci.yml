@@ -47,6 +47,12 @@ jobs:
             rails-paradedb.gemspec \
             Rakefile
 
+      - name: Check API coverage
+        run: ruby scripts/check_api_coverage.rb
+
+      - name: Gem install smoke test
+        run: bash scripts/smoke_gem_install.sh
+
   matrix-tests:
     name: Ruby ${{ matrix.ruby-version }} / Rails ${{ matrix.rails-version }}
     runs-on: ubuntu-latest

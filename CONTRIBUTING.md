@@ -70,6 +70,15 @@ prek install -f
 
 If you change Ruby code, keep style consistent with existing files and tests.
 
+### API and Packaging Consistency Checks
+
+Run these checks before opening a PR when you change API wrappers or packaging:
+
+```bash
+ruby scripts/check_api_coverage.rb
+bash scripts/smoke_gem_install.sh
+```
+
 ### Pull Request Workflow
 
 1. Ensure your change has an issue.
