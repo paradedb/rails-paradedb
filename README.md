@@ -1,24 +1,8 @@
-<!-- ParadeDB: Postgres for Search and Analytics -->
-<h1 align="center">
-  <a href="https://paradedb.com"><img src="https://github.com/paradedb/paradedb/raw/main/docs/logo/readme.svg" alt="ParadeDB"></a>
-<br>
-</h1>
-
-<p align="center">
-  <b>Simple, Elastic-quality search for Postgres</b><br/>
-</p>
-
-<h3 align="center">
-  <a href="https://paradedb.com">Website</a> &bull;
-  <a href="https://docs.paradedb.com">Docs</a> &bull;
-  <a href="https://paradedb.com/slack/">Community</a> &bull;
-  <a href="https://paradedb.com/blog/">Blog</a> &bull;
-  <a href="https://docs.paradedb.com/changelog/">Changelog</a>
-</h3>
-
----
-
 # rails-paradedb
+
+Simple, Elastic-quality search for Postgres.
+
+[Website](https://paradedb.com) | [Docs](https://docs.paradedb.com) | [Community](https://paradedb.com/slack/) | [Blog](https://paradedb.com/blog/) | [Changelog](https://docs.paradedb.com/changelog/)
 
 [![Gem Version](https://img.shields.io/gem/v/rails-paradedb)](https://rubygems.org/gems/rails-paradedb)
 [![Ruby Requirement](https://img.shields.io/gem/rd/rails-paradedb)](https://rubygems.org/gems/rails-paradedb)
@@ -45,12 +29,10 @@ Use Elastic-quality full-text search, scoring, snippets, facets, and aggregation
 
 ## Requirements & Compatibility
 
-| Component  | Supported                                    |
-| ---------- | -------------------------------------------- |
-| Ruby       | 3.2+                                         |
-| Rails      | 7.2+                                         |
-| PostgreSQL | PostgreSQL adapter only                      |
-| ParadeDB   | `pg_search` installed in your target database |
+- Ruby: 3.2+
+- Rails: 7.2+
+- PostgreSQL: PostgreSQL adapter only
+- ParadeDB: `pg_search` installed in your target database
 
 Notes:
 
@@ -350,6 +332,14 @@ For community support:
 - Ask in [ParadeDB Discussions](https://github.com/paradedb/paradedb/discussions)
 
 For commercial support, contact [sales@paradedb.com](mailto:sales@paradedb.com).
+
+## Acknowledgments
+
+We would like to thank the following community members for their feedback and support:
+
+- [@ebarendt](https://github.com/ebarendt)
+- [@matthuhiggins](https://github.com/matthuhiggins)
+- [bullfight](https://gist.github.com/bullfight)
 
 ## License
 
