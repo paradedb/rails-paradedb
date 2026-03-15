@@ -124,7 +124,7 @@ end
 def establish_test_connection
   dsn = ENV["PARADEDB_TEST_DSN"].to_s
   if dsn.empty?
-    raise "PARADEDB_TEST_DSN is required for all tests. Example: postgres://postgres:postgres@localhost:5432/postgres"
+    raise "PARADEDB_TEST_DSN is required for DB-backed unit and integration tests. Example: postgres://postgres:postgres@localhost:5432/postgres"
   end
 
   ActiveRecord::Base.establish_connection(dsn)

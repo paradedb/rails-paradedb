@@ -1125,8 +1125,12 @@ module ParadeDB
       end
 
       def extract_facets_from_results
-        # Execute query and extract facet columns
-        first_row = limit(1).first
+        first_row =
+          if loaded?
+            records.first
+          else
+            limit(1).first
+          end
         return {} unless first_row
 
         facets = {}

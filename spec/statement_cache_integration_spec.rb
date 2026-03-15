@@ -9,6 +9,7 @@ end
 
 RSpec.describe "StatementCacheIntegrationTest" do
   before do
+    skip "Statement cache integration tests require PostgreSQL" unless postgresql?
     ensure_paradedb_setup!
   end
   it "arel node identity in ast" do
@@ -35,6 +36,10 @@ RSpec.describe "StatementCacheIntegrationTest" do
   end
 
   private
+
+  def postgresql?
+    ActiveRecord::Base.connection.adapter_name.to_s.downcase.include?("postgres")
+  end
 
   def ensure_paradedb_setup!
     return if self.class.instance_variable_get(:@paradedb_setup_done)

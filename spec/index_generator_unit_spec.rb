@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
 require "spec_helper"
+require "fileutils"
 require "rails/generators"
+require "tmpdir"
 require "generators/parade_db/index/index_generator"
 
 RSpec.describe ParadeDB::Generators::IndexGenerator do
