@@ -129,7 +129,7 @@ module ParadeDB
       boost: nil,
       constant_score: nil
     )
-      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+      require_search_field!
 
       node = builder.match(
         _paradedb_current_field,
@@ -153,7 +153,7 @@ module ParadeDB
       boost: nil,
       constant_score: nil
     )
-      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+      require_search_field!
 
       node = builder.match_any(
         _paradedb_current_field,
@@ -169,14 +169,14 @@ module ParadeDB
     end
 
     def excluding(*terms)
-      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+      require_search_field!
 
       neg = builder.match(_paradedb_current_field, *terms)
       where(grouped(neg.not))
     end
 
     def phrase(text, slop: nil, tokenizer: nil, boost: nil, constant_score: nil)
-      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+      require_search_field!
 
       node = builder.phrase(
         _paradedb_current_field,
@@ -190,14 +190,14 @@ module ParadeDB
     end
 
     def regex(pattern, boost: nil, constant_score: nil)
-      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+      require_search_field!
 
       node = builder.regex(_paradedb_current_field, pattern, boost: boost, constant_score: constant_score)
       where(grouped(node))
     end
 
     def regex_phrase(*patterns, slop: nil, max_expansions: nil, boost: nil, constant_score: nil)
-      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+      require_search_field!
 
       node = builder.regex_phrase(
         _paradedb_current_field,
@@ -218,7 +218,7 @@ module ParadeDB
       boost: nil,
       constant_score: nil
     )
-      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+      require_search_field!
 
       node = builder.term(
         _paradedb_current_field,
@@ -233,14 +233,14 @@ module ParadeDB
     end
 
     def term_set(*values, boost: nil, constant_score: nil)
-      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+      require_search_field!
 
       node = builder.term_set(_paradedb_current_field, *values, boost: boost, constant_score: constant_score)
       where(grouped(node))
     end
 
     def near(*terms, anchor:, distance:, ordered: false, boost: nil, constant_score: nil)
-      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+      require_search_field!
 
       node = builder.near(
         _paradedb_current_field,
@@ -255,7 +255,7 @@ module ParadeDB
     end
 
     def phrase_prefix(*terms, max_expansion: nil, boost: nil, constant_score: nil)
-      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+      require_search_field!
 
       node = builder.phrase_prefix(
         _paradedb_current_field,
@@ -269,7 +269,7 @@ module ParadeDB
 
     # Parse query-string syntax into ParadeDB query AST (e.g. "running AND shoes").
     def parse(query, lenient: nil, conjunction_mode: nil, boost: nil, constant_score: nil)
-      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+      require_search_field!
       node = builder.parse(
         _paradedb_current_field,
         query,
@@ -284,7 +284,7 @@ module ParadeDB
     # Match-all wrapper for APIs that need an explicit ParadeDB predicate.
     # Use with `.search(:id)` (or any indexed field): `Product.search(:id).match_all`.
     def match_all(boost: nil, constant_score: nil)
-      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+      require_search_field!
 
       where(grouped(builder.match_all(_paradedb_current_field, boost: boost, constant_score: constant_score)))
     end
@@ -292,7 +292,7 @@ module ParadeDB
     # Exists wrapper to match rows where the indexed field has a value.
     # Use with `.search(:id)` (or another exists-compatible indexed field).
     def exists(boost: nil, constant_score: nil)
-      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+      require_search_field!
 
       where(grouped(builder.exists(_paradedb_current_field, boost: boost, constant_score: constant_score)))
     end
@@ -302,7 +302,7 @@ module ParadeDB
     #   Product.search(:rating).range(3..5)
     #   Product.search(:rating).range(gte: 3, lt: 5)
     def range(value = nil, gte: nil, gt: nil, lte: nil, lt: nil, type: nil, boost: nil, constant_score: nil)
-      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+      require_search_field!
 
       inferred_type = type || default_range_type_for_field(_paradedb_current_field)
       node = builder.range(_paradedb_current_field, value, gte: gte, gt: gt, lte: lte, lt: lt, type: inferred_type, boost: boost, constant_score: constant_score)
@@ -310,7 +310,7 @@ module ParadeDB
     end
 
     def range_term(value, relation: nil, range_type: nil, boost: nil, constant_score: nil)
-      raise "No search field set. Call .search(column) first." unless _paradedb_current_field
+      require_search_field!
 
       inferred_range_type = range_type || (relation && infer_range_type_for_field(_paradedb_current_field))
       node = builder.range_term(
@@ -568,6 +568,12 @@ module ParadeDB
 
     def grouped(node)
       ::Arel::Nodes::Grouping.new(node)
+    end
+
+    def require_search_field!
+      return if _paradedb_current_field
+
+      raise ArgumentError, "No search field set. Call .search(column) first."
     end
 
     def with_projection(projection)

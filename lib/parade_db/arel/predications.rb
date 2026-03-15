@@ -189,13 +189,6 @@ module ParadeDB
         Nodes::TokenizerCast.new(node, normalized)
       end
 
-      def pdb_apply_slop(node, slop)
-        return node if slop.nil?
-
-        pdb_validate_numeric!(slop, :slop)
-        Nodes::SlopCast.new(node, pdb_quoted(slop))
-      end
-
       def pdb_quoted(value)
         ::Arel::Nodes.build_quoted(value)
       end
