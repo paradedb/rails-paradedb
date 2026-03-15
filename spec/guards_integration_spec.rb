@@ -19,67 +19,67 @@ RSpec.describe "GuardsUnitTest" do
     GuardTestProduct.all.extending(ParadeDB::SearchMethods)
   end
   it "matching all without search raises" do
-    error = assert_raises(RuntimeError) { bare_relation.matching_all("shoes") }
+    error = assert_raises(ArgumentError) { bare_relation.matching_all("shoes") }
     assert_includes error.message, "No search field set"
   end
   it "matching any without search raises" do
-    error = assert_raises(RuntimeError) { bare_relation.matching_any("shoes") }
+    error = assert_raises(ArgumentError) { bare_relation.matching_any("shoes") }
     assert_includes error.message, "No search field set"
   end
   it "excluding without search raises" do
-    error = assert_raises(RuntimeError) { bare_relation.excluding("shoes") }
+    error = assert_raises(ArgumentError) { bare_relation.excluding("shoes") }
     assert_includes error.message, "No search field set"
   end
   it "phrase without search raises" do
-    error = assert_raises(RuntimeError) { bare_relation.phrase("running shoes") }
+    error = assert_raises(ArgumentError) { bare_relation.phrase("running shoes") }
     assert_includes error.message, "No search field set"
   end
   it "fuzzy-style matching_any without search raises" do
-    error = assert_raises(RuntimeError) { bare_relation.matching_any("shoes", distance: 1) }
+    error = assert_raises(ArgumentError) { bare_relation.matching_any("shoes", distance: 1) }
     assert_includes error.message, "No search field set"
   end
   it "regex without search raises" do
-    error = assert_raises(RuntimeError) { bare_relation.regex("run.*") }
+    error = assert_raises(ArgumentError) { bare_relation.regex("run.*") }
     assert_includes error.message, "No search field set"
   end
   it "regex phrase without search raises" do
-    error = assert_raises(RuntimeError) { bare_relation.regex_phrase("run.*", "sho.*") }
+    error = assert_raises(ArgumentError) { bare_relation.regex_phrase("run.*", "sho.*") }
     assert_includes error.message, "No search field set"
   end
   it "term without search raises" do
-    error = assert_raises(RuntimeError) { bare_relation.term("shoes") }
+    error = assert_raises(ArgumentError) { bare_relation.term("shoes") }
     assert_includes error.message, "No search field set"
   end
   it "term set without search raises" do
-    error = assert_raises(RuntimeError) { bare_relation.term_set("shoes") }
+    error = assert_raises(ArgumentError) { bare_relation.term_set("shoes") }
     assert_includes error.message, "No search field set"
   end
   it "near without search raises" do
-    error = assert_raises(RuntimeError) { bare_relation.near("running", anchor: "shoes", distance: 1) }
+    error = assert_raises(ArgumentError) { bare_relation.near("running", anchor: "shoes", distance: 1) }
     assert_includes error.message, "No search field set"
   end
   it "phrase prefix without search raises" do
-    error = assert_raises(RuntimeError) { bare_relation.phrase_prefix("run") }
+    error = assert_raises(ArgumentError) { bare_relation.phrase_prefix("run") }
     assert_includes error.message, "No search field set"
   end
   it "parse without search raises" do
-    error = assert_raises(RuntimeError) { bare_relation.parse("running AND shoes") }
+    error = assert_raises(ArgumentError) { bare_relation.parse("running AND shoes") }
     assert_includes error.message, "No search field set"
   end
   it "match all without search raises" do
-    error = assert_raises(RuntimeError) { bare_relation.match_all }
+    error = assert_raises(ArgumentError) { bare_relation.match_all }
     assert_includes error.message, "No search field set"
   end
   it "exists without search raises" do
-    error = assert_raises(RuntimeError) { bare_relation.exists }
+    error = assert_raises(ArgumentError) { bare_relation.exists }
     assert_includes error.message, "No search field set"
   end
   it "range without search raises" do
-    error = assert_raises(RuntimeError) { bare_relation.range(3..5) }
+    error = assert_raises(ArgumentError) { bare_relation.range(3..5) }
     assert_includes error.message, "No search field set"
   end
   it "range term without search raises" do
-    error = assert_raises(RuntimeError) { bare_relation.range_term(1) }
+    error = assert_raises(ArgumentError) { bare_relation.range_term(1) }
     assert_includes error.message, "No search field set"
   end
 
