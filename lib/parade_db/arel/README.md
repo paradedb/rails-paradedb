@@ -27,23 +27,23 @@ Render any node with `ParadeDB::Arel.to_sql(node)`. All nodes respond to
 
 | Method                                                                                               | ParadeDB SQL                                                                          |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `match(column, *terms, tokenizer: nil, distance:, prefix:, transposition_cost_one:, boost: nil)`     | `column &&& 'a b'::pdb.whitespace::pdb.fuzzy(...)::pdb.boost(N)`                      |
-| `match_any(column, *terms, tokenizer: nil, distance:, prefix:, transposition_cost_one:, boost: nil)` | `column \|\|\| 'a b'::pdb.whitespace::pdb.fuzzy(...)::pdb.boost(N)`                   |
-| `phrase(column, text_or_terms, slop: n, tokenizer: nil)`                                             | `column ### 'text'::pdb.slop(n)::pdb.whitespace` / `### ARRAY['a', 'b']::pdb.slop(n)` |
-| `term(column, term, distance:, prefix:, transposition_cost_one:, boost: nil)`                        | `column === 'term'::pdb.fuzzy(...)::pdb.boost(N)`                                     |
-| `term_set(column, *terms)`                                                                           | `column @@@ pdb.term_set(ARRAY[...])`                                                 |
-| `regex(column, pattern)`                                                                             | `column @@@ pdb.regex('pattern')`                                                     |
-| `regex_phrase(column, *patterns, slop: nil, max_expansions: nil)`                                    | `column @@@ pdb.regex_phrase(ARRAY['a', 'b'], slop => 2)`                             |
-| `near(column, *terms, anchor:, distance:, ordered: false)`                                           | `column @@@ ('a' ## d ## 'b')` / `(pdb.prox_array('a', 'b') ## d ## 'c')`             |
-| `near(column, ParadeDB.regex_term('a'), 'b', anchor:, distance:)`                                    | `column @@@ (pdb.prox_array(pdb.prox_regex('a'), 'b') ## d ## 'c')`                   |
-| `phrase_prefix(column, *terms, max_expansion: nil)`                                                  | `column @@@ pdb.phrase_prefix(ARRAY['a','b'][, 100])`                                 |
-| `parse(column, query, lenient: nil, conjunction_mode: nil)`                                          | `column @@@ pdb.parse('q', lenient => true, conjunction_mode => true)`                |
+| `match(column, *terms, tokenizer: nil, distance:, prefix:, transposition_cost_one:, boost: nil, constant_score: nil)`     | `column &&& 'a b'::pdb.whitespace::pdb.fuzzy(...)::pdb.boost(N)`                      |
+| `match_any(column, *terms, tokenizer: nil, distance:, prefix:, transposition_cost_one:, boost: nil, constant_score: nil)` | `column \|\|\| 'a b'::pdb.whitespace::pdb.fuzzy(...)::pdb.boost(N)`                   |
+| `phrase(column, text_or_terms, slop: n, tokenizer: nil, boost: nil, constant_score: nil)`                                             | `column ### 'text'::pdb.slop(n)::pdb.whitespace` / `### ARRAY['a', 'b']::pdb.slop(n)` |
+| `term(column, term, distance:, prefix:, transposition_cost_one:, boost: nil, constant_score: nil)`                        | `column === 'term'::pdb.fuzzy(...)::pdb.boost(N)`                                     |
+| `term_set(column, *terms, boost: nil, constant_score: nil)`                                                                           | `column @@@ pdb.term_set(ARRAY[...])`                                                 |
+| `regex(column, pattern, boost: nil, constant_score: nil)`                                                                             | `column @@@ pdb.regex('pattern')`                                                     |
+| `regex_phrase(column, *patterns, slop: nil, max_expansions: nil, boost: nil, constant_score: nil)`                                    | `column @@@ pdb.regex_phrase(ARRAY['a', 'b'], slop => 2)`                             |
+| `near(column, *terms, anchor:, distance:, ordered: false, boost: nil, constant_score: nil)`                                           | `column @@@ ('a' ## d ## 'b')` / `(pdb.prox_array('a', 'b') ## d ## 'c')`             |
+| `near(column, ParadeDB.regex_term('a'), 'b', anchor:, distance:, boost: nil, constant_score: nil)`                                    | `column @@@ (pdb.prox_array(pdb.prox_regex('a'), 'b') ## d ## 'c')`                   |
+| `phrase_prefix(column, *terms, max_expansion: nil, boost: nil, constant_score: nil)`                                                  | `column @@@ pdb.phrase_prefix(ARRAY['a','b'][, 100])`                                 |
+| `parse(column, query, lenient: nil, conjunction_mode: nil, boost: nil, constant_score: nil)`                                          | `column @@@ pdb.parse('q', lenient => true, conjunction_mode => true)`                |
 | `full_text(column, expr)`                                                                            | `column @@@ expr` (raw right-hand value)                                              |
-| `match_all(column)`                                                                                  | `column @@@ pdb.all()`                                                                |
-| `exists(column)`                                                                                     | `column @@@ pdb.exists()`                                                             |
-| `range(column, value = nil, gte:, gt:, lte:, lt:, type:)`                                            | `column @@@ pdb.range(int8range(3, 5, '[)'))`                                         |
-| `range_term(column, value, relation: nil, range_type: nil)`                                          | `column @@@ pdb.range_term(1)` / `pdb.range_term('(1,2]'::int4range, 'Intersects')`   |
-| `more_like_this(column, key, fields: [:f1, :f2])`                                                    | `column @@@ pdb.more_like_this(key, ARRAY['f1','f2'])`                                |
+| `match_all(column, boost: nil, constant_score: nil)`                                                                                  | `column @@@ pdb.all()`                                                                |
+| `exists(column, boost: nil, constant_score: nil)`                                                                                     | `column @@@ pdb.exists()`                                                             |
+| `range(column, value = nil, gte:, gt:, lte:, lt:, type:, boost: nil, constant_score: nil)`                                            | `column @@@ pdb.range(int8range(3, 5, '[)'))`                                         |
+| `range_term(column, value, relation: nil, range_type: nil, boost: nil, constant_score: nil)`                                          | `column @@@ pdb.range_term(1)` / `pdb.range_term('(1,2]'::int4range, 'Intersects')`   |
+| `more_like_this(column, key, fields: [:f1, :f2], options: {}, boost: nil, constant_score: nil)`                                                    | `column @@@ pdb.more_like_this(key, ARRAY['f1','f2'])`                                |
 | `score(key_field)`                                                                                   | `pdb.score(key_field)`                                                                |
 | `snippet(column, start, finish, max)`                                                                | `pdb.snippet(column, start, finish, max)`                                             |
 | `snippets(column, start_tag:, end_tag:, max_num_chars:, limit:, offset:, sort_by:)`                  | `pdb.snippets(column, ...)`                                                           |
@@ -55,6 +55,7 @@ Render any node with `ParadeDB::Arel.to_sql(node)`. All nodes respond to
 > **Note:** `Builder` has no access to ActiveRecord model metadata.
 > When calling `range_term` with a `relation:`, you must pass `range_type:` explicitly.
 > The `SearchMethods` layer (`.search(:col).range_term(...)`) auto-infers `range_type` from the column's SQL type.
+> Tokenizer overrides on `match`/`match_any` are mutually exclusive with fuzzy options.
 
 ## Composition
 
