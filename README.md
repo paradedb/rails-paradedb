@@ -45,12 +45,12 @@ Use Elastic-quality full-text search, scoring, snippets, facets, and aggregation
 
 ## Requirements & Compatibility
 
-| Component  | Supported                                      |
-| ---------- | ---------------------------------------------- |
-| Ruby       | 3.2+                                           |
-| Rails      | 7.2+                                           |
-| PostgreSQL | PostgreSQL adapter only                        |
-| ParadeDB   | `pg_search` installed in your target database  |
+| Component  | Supported                                     |
+| ---------- | --------------------------------------------- |
+| Ruby       | 3.2+                                          |
+| Rails      | 7.2+                                          |
+| PostgreSQL | PostgreSQL adapter only                       |
+| ParadeDB   | `pg_search` installed in your target database |
 
 Notes:
 
@@ -353,12 +353,11 @@ For commercial support, contact [sales@paradedb.com](mailto:sales@paradedb.com).
 
 ## Acknowledgments
 
-We would like to thank the following members of the community for their valuable
-feedback and reviews during the development of this package:
+We would like to thank the following members of the community for their valuable feedback and reviews during the development of this package:
 
-- [@ebarendt](https://github.com/ebarendt)
-- [@matthuhiggins](https://github.com/matthuhiggins)
-- [bullfight](https://gist.github.com/bullfight)
+- [Eric Barendt](https://github.com/ebarendt) - Engineering at Modern Treasury
+- [Matthew Higgins](https://github.com/matthuhiggins) - Engineering at Shopify
+- [Patrick Schmitz](https://gist.github.com/bullfight) - Engineering at Modern Treasury
 
 ## License
 
