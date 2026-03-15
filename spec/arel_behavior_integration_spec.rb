@@ -6,7 +6,6 @@ require "spec_helper"
 class ArelBehaviorProduct < ActiveRecord::Base
   include ParadeDB::Model
   self.table_name = :products
-  self.has_paradedb_index = true
 end
 
 class ArelBehaviorCategory < ActiveRecord::Base

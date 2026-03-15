@@ -8,7 +8,6 @@ class MockItem < ActiveRecord::Base
 
   self.table_name = "mock_items_faceted_search"
   self.primary_key = "id"
-  self.has_paradedb_index = true
 end
 
 class MockItemIndex < ParadeDB::Index

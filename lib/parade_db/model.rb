@@ -33,7 +33,23 @@ module ParadeDB
       end
 
       base.extend(ClassMethods)
-      base.class_attribute :has_paradedb_index, default: false
+      base.singleton_class.class_eval do
+        define_method(:has_paradedb_index) do
+          instance_variable_defined?(:@_paradedb_has_paradedb_index) ? @_paradedb_has_paradedb_index : false
+        end
+
+        define_method(:has_paradedb_index=) do |value|
+          unless instance_variable_defined?(:@_paradedb_has_paradedb_index_warned)
+            ActiveSupport::Deprecation.warn(
+              "#{name}.has_paradedb_index is deprecated and has no effect. " \
+              "Remove it and rely on `paradedb_index`, naming conventions, and `ParadeDB.index_validation_mode`."
+            )
+            @_paradedb_has_paradedb_index_warned = true
+          end
+
+          @_paradedb_has_paradedb_index = value
+        end
+      end
 
       # Provide `.search` as a convenience alias unless the model already defines it.
       # In collision scenarios (Searchkick, Ransack, etc.), users can call `.paradedb_search`.
