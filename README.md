@@ -92,6 +92,7 @@ MockItem.search(:description).matching_any("running shoes", tokenizer: "whitespa
 MockItem.search(:description).matching_any("running shoes", tokenizer: "whitespace('lowercase=false')")
 
 # Fuzzy options on match/term
+# Note: tokenizer overrides are mutually exclusive with fuzzy options.
 MockItem.search(:description).matching_any("runing shose", distance: 1)
 MockItem.search(:description).matching_all("runing", distance: 1, prefix: true)
 MockItem.search(:description).term("shose", distance: 1, transposition_cost_one: true)

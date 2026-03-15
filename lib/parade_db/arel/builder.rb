@@ -29,6 +29,12 @@ module ParadeDB
         boost: nil,
         constant_score: nil
       )
+        validate_tokenizer_fuzzy_compatibility!(
+          tokenizer: tokenizer,
+          distance: distance,
+          prefix: prefix,
+          transposition_cost_one: transposition_cost_one
+        )
         rhs = quoted_value(join_terms(terms))
         rhs = apply_fuzzy(
           rhs,
@@ -52,6 +58,12 @@ module ParadeDB
         boost: nil,
         constant_score: nil
       )
+        validate_tokenizer_fuzzy_compatibility!(
+          tokenizer: tokenizer,
+          distance: distance,
+          prefix: prefix,
+          transposition_cost_one: transposition_cost_one
+        )
         rhs = quoted_value(join_terms(terms))
         rhs = apply_fuzzy(
           rhs,
@@ -564,6 +576,14 @@ module ParadeDB
         end
 
         ParadeDB::TokenizerSQL.qualify(value)
+      end
+
+      def validate_tokenizer_fuzzy_compatibility!(tokenizer:, distance:, prefix:, transposition_cost_one:)
+        return if tokenizer.nil?
+        return if distance.nil? && !prefix && !transposition_cost_one
+
+        raise ArgumentError,
+              "tokenizer cannot be combined with fuzzy options (distance, prefix, transposition_cost_one)"
       end
 
       def arel_table

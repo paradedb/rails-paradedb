@@ -142,6 +142,18 @@ RSpec.describe "GuardsUnitTest" do
     error = assert_raises(ArgumentError) { builder.match_any(:description, "shoes", distance: 5) }
     assert_includes error.message, "distance must be between 0 and 2"
   end
+  it "matching_any rejects tokenizer combined with fuzzy options" do
+    error = assert_raises(ArgumentError) do
+      builder.match_any(:description, "shoes", tokenizer: "whitespace", distance: 1)
+    end
+    assert_includes error.message, "tokenizer cannot be combined with fuzzy options"
+  end
+  it "matching_all rejects tokenizer combined with fuzzy options" do
+    error = assert_raises(ArgumentError) do
+      builder.match(:description, "shoes", tokenizer: "whitespace", prefix: true)
+    end
+    assert_includes error.message, "tokenizer cannot be combined with fuzzy options"
+  end
   it "fuzzy boost on term rejects non numeric" do
     error = assert_raises(ArgumentError) { builder.term(:description, "shoes", distance: 1, boost: "high") }
     assert_includes error.message, "boost must be numeric"

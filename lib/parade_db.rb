@@ -45,8 +45,20 @@ module ParadeDB
   end
 
   def index_validation_mode=(mode)
-    normalized = mode.to_sym
     valid_modes = %i[warn raise off]
+    normalized =
+      case mode
+      when Symbol
+        mode
+      when String
+        stripped = mode.strip
+        raise ArgumentError, "index_validation_mode must be one of: #{valid_modes.join(', ')}" if stripped.empty?
+
+        stripped.to_sym
+      else
+        raise ArgumentError, "index_validation_mode must be one of: #{valid_modes.join(', ')}"
+      end
+
     if valid_modes.include?(normalized)
       @index_validation_mode = normalized
       return
@@ -57,7 +69,8 @@ module ParadeDB
 
   def ensure_postgresql_adapter!(connection, context:)
     adapter_name = connection.adapter_name.to_s
-    return if adapter_name.downcase.include?("postgres")
+    normalized = adapter_name.downcase
+    return if normalized.include?("postgres") || normalized.include?("postgis")
 
     raise Errors::UnsupportedAdapterError,
           "#{context} only supports PostgreSQL. Current adapter: #{adapter_name.inspect}"
