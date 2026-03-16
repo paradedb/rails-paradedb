@@ -91,7 +91,7 @@ RSpec.describe "EdgeCasesIntegrationTest" do
     assert_includes ids, @p_long.id
   end
   it "long text near finds needle terms" do
-    ids = search(:description).near("ultra", anchor: "needlephrase", distance: 5).order(:id).pluck(:id)
+    ids = search(:description).near("ultra", "needlephrase", distance: 5).order(:id).pluck(:id)
     assert_includes ids, @p_long.id
   end
   it "long text with score ranks unique term higher" do
