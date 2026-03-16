@@ -6,7 +6,6 @@ require "json"
 class MltFacetProduct < ActiveRecord::Base
   include ParadeDB::Model
   self.table_name = :products
-  self.has_paradedb_index = true
 end
 
 RSpec.describe "MltAndFacetsIntegrationTest" do

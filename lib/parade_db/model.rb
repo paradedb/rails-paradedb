@@ -33,7 +33,6 @@ module ParadeDB
       end
 
       base.extend(ClassMethods)
-      base.class_attribute :has_paradedb_index, default: false
 
       # Provide `.search` as a convenience alias unless the model already defines it.
       # In collision scenarios (Searchkick, Ransack, etc.), users can call `.paradedb_search`.

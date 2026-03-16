@@ -5,13 +5,11 @@ require "spec_helper"
 class Product < ActiveRecord::Base
   include ParadeDB::Model
   self.table_name = :products
-  self.has_paradedb_index = true
 end
 
 class Category < ActiveRecord::Base
   include ParadeDB::Model
   self.table_name = :categories
-  self.has_paradedb_index = true
 end
 
 RSpec.describe "UserApiIntegrationTest" do

@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Removed
+
+- **BREAKING**: Removed `has_paradedb_index` class attribute. It had no
+  effect on library behavior. Remove `self.has_paradedb_index = true`
+  from your models.
+
 ### Changed
 
 - **BREAKING**: `near` now uses a symmetric `left_terms`/`right_terms`

@@ -5,7 +5,6 @@ require "spec_helper"
 class BehaviorProduct < ActiveRecord::Base
   include ParadeDB::Model
   self.table_name = :products
-  self.has_paradedb_index = true
 end
 
 class BehaviorCategory < ActiveRecord::Base
@@ -16,13 +15,11 @@ class BehaviorOrder < ActiveRecord::Base
   include ParadeDB::Model
   self.table_name = :orders
   self.primary_key = :order_id
-  self.has_paradedb_index = true
 end
 
 class BehaviorRangeItem < ActiveRecord::Base
   include ParadeDB::Model
   self.table_name = :range_items
-  self.has_paradedb_index = true
 end
 
 RSpec.describe "UserApiBehaviorIntegrationTest" do

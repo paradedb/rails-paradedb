@@ -14,7 +14,6 @@ class MockItem < ActiveRecord::Base
 
   self.table_name = "mock_items_hybrid_rrf"
   self.primary_key = "id"
-  self.has_paradedb_index = true
 
   has_neighbors :embedding
 end

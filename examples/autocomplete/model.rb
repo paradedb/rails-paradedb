@@ -8,7 +8,6 @@ class MockItem < ActiveRecord::Base
 
   self.table_name = "mock_items"
   self.primary_key = "id"
-  self.has_paradedb_index = true
 end
 
 class MockItemIndex < ParadeDB::Index
@@ -30,7 +29,6 @@ class AutocompleteItem < ActiveRecord::Base
 
   self.table_name = "autocomplete_items"
   self.primary_key = "id"
-  self.has_paradedb_index = true
 end
 
 class AutocompleteItemIndex < ParadeDB::Index
