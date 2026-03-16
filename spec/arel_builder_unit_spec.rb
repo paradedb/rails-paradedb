@@ -223,6 +223,18 @@ RSpec.describe "ArelBuilderUnitTest" do
     node = @builder.near(:description, ParadeDB.regex_term("sl.*"), "white", anchor: "shoes", distance: 1)
     assert_equal %("products"."description" @@@ (pdb.prox_array(pdb.prox_regex('sl.*'), 'white') ## 1 ## 'shoes')), sql(node)
   end
+  it "near with array anchor" do
+    node = @builder.near(:description, "sleek", anchor: ["white", "shoes"], distance: 1)
+    assert_equal %("products"."description" @@@ ('sleek' ## 1 ## pdb.prox_array('white', 'shoes'))), sql(node)
+  end
+  it "near with regex anchor" do
+    node = @builder.near(:description, "sleek", anchor: ParadeDB.regex_term("sho.*"), distance: 1)
+    assert_equal %("products"."description" @@@ ('sleek' ## 1 ## pdb.prox_regex('sho.*'))), sql(node)
+  end
+  it "near with mixed array anchor" do
+    node = @builder.near(:description, "sleek", anchor: [ParadeDB.regex_term("sho.*"), "white"], distance: 1)
+    assert_equal %("products"."description" @@@ ('sleek' ## 1 ## pdb.prox_array(pdb.prox_regex('sho.*'), 'white'))), sql(node)
+  end
   it "near with regex wrapper max expansions" do
     node = @builder.near(:description, ParadeDB.regex_term("sl.*", max_expansions: 100), anchor: "shoes", distance: 1)
     assert_equal %("products"."description" @@@ (pdb.prox_regex('sl.*', 100) ## 1 ## 'shoes')), sql(node)

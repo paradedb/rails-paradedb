@@ -88,6 +88,18 @@ RSpec.describe "UserApiUnitTest" do
     sql = UnitProduct.search(:description).near(ParadeDB.regex_term("sl.*"), "white", anchor: "shoes", distance: 1).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ (pdb.prox_array(pdb.prox_regex('sl.*'), 'white') ## 1 ## 'shoes'))), sql
   end
+  it "near with array anchor" do
+    sql = UnitProduct.search(:description).near("sleek", anchor: ["white", "shoes"], distance: 1).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('sleek' ## 1 ## pdb.prox_array('white', 'shoes')))), sql
+  end
+  it "near with regex anchor" do
+    sql = UnitProduct.search(:description).near("sleek", anchor: ParadeDB.regex_term("sho.*"), distance: 1).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('sleek' ## 1 ## pdb.prox_regex('sho.*')))), sql
+  end
+  it "near with mixed array anchor" do
+    sql = UnitProduct.search(:description).near("sleek", anchor: [ParadeDB.regex_term("sho.*"), "white"], distance: 1).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('sleek' ## 1 ## pdb.prox_array(pdb.prox_regex('sho.*'), 'white')))), sql
+  end
   it "phrase prefix" do
     sql = UnitProduct.search(:description).phrase_prefix("run", "sh").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.phrase_prefix(ARRAY['run', 'sh']))), sql

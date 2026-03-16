@@ -35,6 +35,7 @@ Render any node with `ParadeDB::Arel.to_sql(node)`. All nodes respond to
 | `regex(column, pattern, boost: nil, constant_score: nil)`                                                                 | `column @@@ pdb.regex('pattern')`                                                     |
 | `regex_phrase(column, *patterns, slop: nil, max_expansions: nil, boost: nil, constant_score: nil)`                        | `column @@@ pdb.regex_phrase(ARRAY['a', 'b'], slop => 2)`                             |
 | `near(column, *terms, anchor:, distance:, ordered: false, boost: nil, constant_score: nil)`                               | `column @@@ ('a' ## d ## 'b')` / `(pdb.prox_array('a', 'b') ## d ## 'c')`             |
+| `near(column, 'a', anchor: ['b', 'c'], distance:, ordered: false, boost: nil, constant_score: nil)`                       | `column @@@ ('a' ## d ## pdb.prox_array('b', 'c'))`                                   |
 | `near(column, ParadeDB.regex_term('a'), 'b', anchor:, distance:, boost: nil, constant_score: nil)`                        | `column @@@ (pdb.prox_array(pdb.prox_regex('a'), 'b') ## d ## 'c')`                   |
 | `phrase_prefix(column, *terms, max_expansion: nil, boost: nil, constant_score: nil)`                                      | `column @@@ pdb.phrase_prefix(ARRAY['a','b'][, 100])`                                 |
 | `parse(column, query, lenient: nil, conjunction_mode: nil, boost: nil, constant_score: nil)`                              | `column @@@ pdb.parse('q', lenient => true, conjunction_mode => true)`                |

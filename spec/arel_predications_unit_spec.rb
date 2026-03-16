@@ -151,6 +151,14 @@ RSpec.describe "ArelPredicationsUnitTest" do
     node = @t[:description].pdb_near(ParadeDB.regex_term("sl.*"), "white", anchor: "shoes", distance: 1)
     assert_equal %("products"."description" @@@ (pdb.prox_array(pdb.prox_regex('sl.*'), 'white') ## 1 ## 'shoes')), sql(node)
   end
+  it "pdb_near with array anchor" do
+    node = @t[:description].pdb_near("running", anchor: ["trail", "shoes"], distance: 1)
+    assert_equal %("products"."description" @@@ ('running' ## 1 ## pdb.prox_array('trail', 'shoes'))), sql(node)
+  end
+  it "pdb_near with mixed array anchor" do
+    node = @t[:description].pdb_near("running", anchor: [ParadeDB.regex_term("sho.*"), "trail"], distance: 1)
+    assert_equal %("products"."description" @@@ ('running' ## 1 ## pdb.prox_array(pdb.prox_regex('sho.*'), 'trail'))), sql(node)
+  end
 
   # ---- pdb_phrase_prefix ----
   it "pdb_phrase_prefix single term" do
