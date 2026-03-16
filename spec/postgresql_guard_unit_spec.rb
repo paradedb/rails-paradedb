@@ -25,6 +25,10 @@ RSpec.describe "PostgreSQLGuardUnitTest" do
     mock_connection = Struct.new(:adapter_name).new("PostgreSQL")
     ParadeDB.ensure_postgresql_adapter!(mock_connection, context: "test helper")
   end
+  it "helper allows postgis" do
+    mock_connection = Struct.new(:adapter_name).new("PostGIS")
+    ParadeDB.ensure_postgresql_adapter!(mock_connection, context: "test helper")
+  end
   it "helper rejects non postgresql" do
     mock_connection = Struct.new(:adapter_name).new("SQLite")
     error = assert_raises(ParadeDB::UnsupportedAdapterError) do
