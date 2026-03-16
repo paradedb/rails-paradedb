@@ -150,20 +150,14 @@ module ParadeDB
         infix("@@@", column_node(column), rhs)
       end
 
-      def near(column, *terms, anchor:, distance:, ordered: false, boost: nil, constant_score: nil)
-        raise ArgumentError, "near requires at least one term" if terms.empty?
-
-        left_operand =
-          if terms.length == 1 && !terms.first.is_a?(::Array)
-            proximity_term_node(terms.first)
-          else
-            prox_array_node(terms.flatten)
-          end
+      def near(column, left_terms, right_terms, distance:, ordered: false, boost: nil, constant_score: nil)
+        left_operand = proximity_operand_node(left_terms, empty_message: "near requires at least one left-side term")
+        right_operand = proximity_operand_node(right_terms, empty_message: "near requires at least one right-side term")
 
         build_proximity_query(
           column,
           left_operand: left_operand,
-          right_operand: quoted_value(anchor),
+          right_operand: right_operand,
           distance: distance,
           ordered: ordered,
           boost: boost,
@@ -378,6 +372,17 @@ module ParadeDB
         raise ArgumentError, "near requires at least one left-side term" if values.empty?
 
         ::Arel::Nodes::NamedFunction.new("pdb.prox_array", values)
+      end
+
+      def proximity_operand_node(terms, empty_message:)
+        normalized_terms = normalize_proximity_terms(terms)
+        raise ArgumentError, empty_message if normalized_terms.empty?
+
+        if normalized_terms.length == 1
+          proximity_term_node(normalized_terms.first)
+        else
+          prox_array_node(normalized_terms)
+        end
       end
 
       def proximity_term_node(term)

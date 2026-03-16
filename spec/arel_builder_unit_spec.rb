@@ -200,38 +200,52 @@ RSpec.describe "ArelBuilderUnitTest" do
 
   # ---- near ----
   it "near distance 1" do
-    node = @builder.near(:description, "running", anchor: "shoes", distance: 1)
+    node = @builder.near(:description, "running", "shoes", distance: 1)
     assert_equal %("products"."description" @@@ ('running' ## 1 ## 'shoes')), sql(node)
   end
   it "near ordered" do
-    node = @builder.near(:description, "running", anchor: "shoes", distance: 1, ordered: true)
+    node = @builder.near(:description, "running", "shoes", distance: 1, ordered: true)
     assert_equal %("products"."description" @@@ ('running' ##> 1 ##> 'shoes')), sql(node)
   end
   it "near large distance" do
-    node = @builder.near(:description, "running", anchor: "shoes", distance: 5)
+    node = @builder.near(:description, "running", "shoes", distance: 5)
     assert_equal %("products"."description" @@@ ('running' ## 5 ## 'shoes')), sql(node)
   end
   it "near with array left operand" do
-    node = @builder.near(:description, "sleek", "white", anchor: "shoes", distance: 1)
+    node = @builder.near(:description, ["sleek", "white"], "shoes", distance: 1)
     assert_equal %("products"."description" @@@ (pdb.prox_array('sleek', 'white') ## 1 ## 'shoes')), sql(node)
   end
   it "near with regex wrapper" do
-    node = @builder.near(:description, ParadeDB.regex_term("sl.*"), anchor: "shoes", distance: 1)
+    node = @builder.near(:description, ParadeDB.regex_term("sl.*"), "shoes", distance: 1)
     assert_equal %("products"."description" @@@ (pdb.prox_regex('sl.*') ## 1 ## 'shoes')), sql(node)
   end
   it "near with mixed array left operand" do
-    node = @builder.near(:description, ParadeDB.regex_term("sl.*"), "white", anchor: "shoes", distance: 1)
+    node = @builder.near(:description, [ParadeDB.regex_term("sl.*"), "white"], "shoes", distance: 1)
     assert_equal %("products"."description" @@@ (pdb.prox_array(pdb.prox_regex('sl.*'), 'white') ## 1 ## 'shoes')), sql(node)
   end
+  it "near with array right operand" do
+    node = @builder.near(:description, "sleek", ["white", "shoes"], distance: 1)
+    assert_equal %("products"."description" @@@ ('sleek' ## 1 ## pdb.prox_array('white', 'shoes'))), sql(node)
+  end
+  it "near with mixed array right operand" do
+    node = @builder.near(:description, "sleek", ["white", ParadeDB.regex_term("sho.*")], distance: 1)
+    assert_equal %("products"."description" @@@ ('sleek' ## 1 ## pdb.prox_array('white', pdb.prox_regex('sho.*')))), sql(node)
+  end
   it "near with regex wrapper max expansions" do
-    node = @builder.near(:description, ParadeDB.regex_term("sl.*", max_expansions: 100), anchor: "shoes", distance: 1)
+    node = @builder.near(:description, ParadeDB.regex_term("sl.*", max_expansions: 100), "shoes", distance: 1)
     assert_equal %("products"."description" @@@ (pdb.prox_regex('sl.*', 100) ## 1 ## 'shoes')), sql(node)
   end
-  it "near rejects empty terms" do
+  it "near rejects empty left terms" do
     error = assert_raises(ArgumentError) do
-      @builder.near(:description, anchor: "shoes", distance: 1)
+      @builder.near(:description, [], "shoes", distance: 1)
     end
-    assert_includes error.message, "near requires at least one term"
+    assert_includes error.message, "near requires at least one left-side term"
+  end
+  it "near rejects empty right terms" do
+    error = assert_raises(ArgumentError) do
+      @builder.near(:description, "running", [], distance: 1)
+    end
+    assert_includes error.message, "near requires at least one right-side term"
   end
 
   # ---- phrase_prefix ----

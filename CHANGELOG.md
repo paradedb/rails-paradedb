@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING**: `near` now uses a symmetric `left_terms`/`right_terms`
+  API across the
+  relation and Arel DSLs, and both operands now accept a string,
+  `ParadeDB.regex_term`, or a mixed list of strings and regex terms
+
 ## [0.2.0] - 2026-03-13
 
 ### Added

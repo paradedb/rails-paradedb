@@ -77,7 +77,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
   end
   it "phrase near and phrase prefix execute" do
     phrase_ids = BehaviorProduct.search(:description).phrase("running shoes").order(:id).pluck(:id)
-    near_ids = BehaviorProduct.search(:description).near("running", anchor: "shoes", distance: 1).order(:id).pluck(:id)
+    near_ids = BehaviorProduct.search(:description).near("running", "shoes", distance: 1).order(:id).pluck(:id)
     prefix_ids = BehaviorProduct.search(:category).phrase_prefix("foot").order(:id).pluck(:id)
     prefix_max_ids = BehaviorProduct.search(:category).phrase_prefix("foot", max_expansion: 100).order(:id).pluck(:id)
 
@@ -505,7 +505,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       SQL
 
       relation = BehaviorProduct.search(:description)
-                                .near("sleek", anchor: "shoes", distance: 1, ordered: true)
+                                .near("sleek", "shoes", distance: 1, ordered: true)
                                 .order(:id)
 
       expected_ids = [1, 2]
@@ -522,7 +522,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       SQL
 
       relation = BehaviorProduct.search(:description)
-                                .near(ParadeDB.regex_term("sl.*"), anchor: "shoes", distance: 1)
+                                .near(ParadeDB.regex_term("sl.*"), "shoes", distance: 1)
                                 .order(:id)
 
       expected_ids = [1, 2]
@@ -539,7 +539,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       SQL
 
       relation = BehaviorProduct.search(:description)
-                                .near("sleek", "white", anchor: "shoes", distance: 1)
+                                .near(["sleek", "white"], "shoes", distance: 1)
                                 .order(:id)
 
       expected_ids = [1, 2, 4]
@@ -556,10 +556,27 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       SQL
 
       relation = BehaviorProduct.search(:description)
-                                .near(ParadeDB.regex_term("sl.*"), "white", anchor: "shoes", distance: 1)
+                                .near([ParadeDB.regex_term("sl.*"), "white"], "shoes", distance: 1)
                                 .order(:id)
 
       expected_ids = [1, 2, 4]
+      assert_equal expected_ids, ids_from_sql(raw_sql)
+      assert_equal expected_ids, relation.pluck(:id)
+    end
+
+    it "proximity array on right-hand side matches raw SQL" do
+      raw_sql = <<~SQL
+        SELECT id
+        FROM products
+        WHERE description @@@ ('sleek' ## 1 ## pdb.prox_array('white', 'shoes'))
+        ORDER BY id
+      SQL
+
+      relation = BehaviorProduct.search(:description)
+                                .near("sleek", ["white", "shoes"], distance: 1)
+                                .order(:id)
+
+      expected_ids = [1, 2]
       assert_equal expected_ids, ids_from_sql(raw_sql)
       assert_equal expected_ids, relation.pluck(:id)
     end
