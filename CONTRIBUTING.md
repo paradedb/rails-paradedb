@@ -66,9 +66,11 @@ Common commands:
 ```bash
 prek run --all-files
 prek install -f
+bundle exec rubocop --lint
 ```
 
 If you change Ruby code, keep style consistent with existing files and tests.
+The local `prek` hooks run syntax, typo, markdown, and RuboCop lint checks before commit.
 
 ### API and Packaging Consistency Checks
 

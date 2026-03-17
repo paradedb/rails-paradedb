@@ -1,7 +1,7 @@
 # workflows/release.yml
 #
 # Release
-# Build, tag, publish, and release rails-paradedb from a validated version.
+# Build, publish, and release rails-paradedb from a validated version.
 
 name: Release
 
@@ -88,25 +88,6 @@ jobs:
           gem build rails-paradedb.gemspec
           ls -l rails-paradedb-"${VERSION}".gem
 
-      - name: Create and push tag
-        run: |
-          set -euo pipefail
-          git config user.name "paradedb[bot]"
-          git config user.email "developers@paradedb.com"
-          git tag "v${VERSION}" "${GITHUB_SHA}"
-          git push origin "v${VERSION}"
-
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ env.VERSION }}
-          target_commitish: ${{ github.sha }}
-          prerelease: ${{ github.event.inputs.beta }}
-          generate_release_notes: true
-          files: rails-paradedb-${{ env.VERSION }}.gem
-        env:
-          GITHUB_TOKEN: ${{ secrets.PARADEDB_BOT_GITHUB_TOKEN }}
-
       - name: Publish to RubyGems
         env:
           RUBYGEMS_TOKEN: ${{ secrets.RUBYGEMS_TOKEN }}
@@ -127,12 +108,23 @@ jobs:
 
           gem push "rails-paradedb-${VERSION}.gem"
 
+      - name: Create GitHub tag and release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ github.event.inputs.beta }}
+          generate_release_notes: true
+          files: rails-paradedb-${{ env.VERSION }}.gem
+        env:
+          GITHUB_TOKEN: ${{ secrets.PARADEDB_BOT_GITHUB_TOKEN }}
+
       - name: Summary
         run: |
           {
             echo "## Released v${VERSION}"
             echo
-            echo "- GitHub tag: \`v${VERSION}\`"
-            echo "- GitHub release: created"
             echo "- RubyGems: \`rails-paradedb ${VERSION}\` published"
+            echo "- GitHub tag: \`v${VERSION}\` created from ${GITHUB_SHA}"
+            echo "- GitHub release: created and gem attached"
           } >> "${GITHUB_STEP_SUMMARY}"

@@ -45,17 +45,18 @@ Use Elastic-quality full-text search, scoring, snippets, facets, and aggregation
 
 ## Requirements & Compatibility
 
-| Component  | Supported                                     |
-| ---------- | --------------------------------------------- |
-| Ruby       | 3.2+                                          |
-| Rails      | 7.2+                                          |
-| PostgreSQL | PostgreSQL adapter only                       |
-| ParadeDB   | `pg_search` installed in your target database |
+| Component  | Supported                                        |
+| ---------- | ------------------------------------------------ |
+| Ruby       | 3.2+                                             |
+| Rails      | 7.2+                                             |
+| ParadeDB   | 0.22.0+                                          |
+| PostgreSQL | 15+ (PostgreSQL adapter with ParadeDB extension) |
 
 Notes:
 
-- CI runs Ruby `3.2` through `4.0` across Rails `7.2` and `8.1`.
+- CI runs Ruby `3.2` through `4.0` across Rails `7.2` and `8.1` on PostgreSQL `18`.
 - Schema compatibility is checked against every ParadeDB release.
+- The maintained minimum ParadeDB version is `0.22.0`; update `README.md`, `RELEASE.md`, and CI in the same PR whenever that floor changes.
 
 ## Installation
 
