@@ -268,6 +268,9 @@ module ParadeDB
       end
 
       def warn_has_paradedb_index_deprecation!
+        return if @has_paradedb_index_deprecation_warned
+
+        @has_paradedb_index_deprecation_warned = true
         ActiveSupport::Deprecation.send(:warn, DEPRECATED_HAS_PARADEDB_INDEX_MESSAGE)
       end
 
