@@ -7,9 +7,6 @@ module ParadeDB
   module Model
     extend ActiveSupport::Concern
 
-    DEPRECATED_HAS_PARADEDB_INDEX_MESSAGE =
-      "`has_paradedb_index` is deprecated, has no effect, and will be removed in a future release."
-
     INJECTED_CLASS_METHODS = [
       :paradedb_search,
       :more_like_this,
@@ -59,18 +56,6 @@ module ParadeDB
     end
 
     module ClassMethods
-      def has_paradedb_index
-        warn_has_paradedb_index_deprecation!
-        return @has_paradedb_index if instance_variable_defined?(:@has_paradedb_index)
-
-        false
-      end
-
-      def has_paradedb_index=(value)
-        warn_has_paradedb_index_deprecation!
-        @has_paradedb_index = value
-      end
-
       def paradedb_search(column)
         ensure_postgres!
         all.extending(SearchMethods).search(column)
@@ -265,13 +250,6 @@ module ParadeDB
         else
           Kernel.warn(message)
         end
-      end
-
-      def warn_has_paradedb_index_deprecation!
-        return if @has_paradedb_index_deprecation_warned
-
-        @has_paradedb_index_deprecation_warned = true
-        ActiveSupport::Deprecation.send(:warn, DEPRECATED_HAS_PARADEDB_INDEX_MESSAGE)
       end
 
       def paradedb_catalog_index_valid?(definition)

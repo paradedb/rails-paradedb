@@ -25,9 +25,7 @@
     "FN_AGG":              "pdb.agg",
 
     "FN_INDEXES":          "pdb.indexes",
-    "FN_INDEX_SEGMENTS":   "pdb.index_segments",
-    "FN_VERIFY_INDEX":     "pdb.verify_index",
-    "FN_VERIFY_ALL_INDEXES": "pdb.verify_all_indexes"
+    "FN_INDEX_SEGMENTS":   "pdb.index_segments"
   },
 
   "types": {
