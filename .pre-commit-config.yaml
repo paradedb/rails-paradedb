@@ -43,3 +43,9 @@ repos:
         language: system
         files: (^|/)(Rakefile|.*\.rb|.*\.rake|.*\.gemspec)$
         pass_filenames: true
+      - id: rubocop-lint
+        name: rubocop lint
+        entry: bundle exec rubocop --lint --force-exclusion
+        language: system
+        files: (^|/)(Rakefile|.*\.rb|.*\.rake|.*\.gemspec)$
+        pass_filenames: true
