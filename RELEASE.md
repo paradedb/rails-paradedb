@@ -46,7 +46,7 @@ The release workflow validates that the requested version matches this value.
 The canonical support matrix lives in `README.md` under
 **Requirements & Compatibility** and should be kept up to date.
 
-Today, the maintained minimum ParadeDB version is `0.21.10`. Update the README
+Today, the maintained minimum ParadeDB version is `0.22.0`. Update the README
 matrix, CI image tags, schema-compat expectations, and any version-gated
 examples in the same PR whenever that floor changes.
 
@@ -55,7 +55,7 @@ examples in the same PR whenever that floor changes.
 - Ruby: 3.2+
 - ActiveRecord: 7.2+
 - PostgreSQL: 15+ with the PostgreSQL adapter
-- ParadeDB: 0.21.10+
+- ParadeDB: 0.22.0+
 
 ## Pre-Release Checklist
 
