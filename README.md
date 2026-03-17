@@ -21,7 +21,7 @@
 # rails-paradedb
 
 [![Gem Version](https://img.shields.io/gem/v/rails-paradedb)](https://rubygems.org/gems/rails-paradedb)
-[![Ruby Requirement](https://img.shields.io/gem/rd/rails-paradedb)](https://rubygems.org/gems/rails-paradedb)
+[![Ruby Requirement](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Frubygems.org%2Fapi%2Fv1%2Fversions%2Frails-paradedb.json&query=%24%5B0%5D.ruby_version&label=ruby&logo=ruby)](https://rubygems.org/gems/rails-paradedb)
 [![Gem Downloads](https://img.shields.io/gem/dt/rails-paradedb)](https://rubygems.org/gems/rails-paradedb)
 [![Codecov](https://codecov.io/gh/paradedb/rails-paradedb/graph/badge.svg)](https://codecov.io/gh/paradedb/rails-paradedb)
 [![License](https://img.shields.io/github/license/paradedb/rails-paradedb?color=blue)](https://github.com/paradedb/rails-paradedb?tab=MIT-1-ov-file#readme)
