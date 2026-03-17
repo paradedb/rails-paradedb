@@ -45,11 +45,11 @@ Use Elastic-quality full-text search, scoring, snippets, facets, and aggregation
 
 ## Requirements & Compatibility
 
-| Component  | Supported                                     |
-| ---------- | --------------------------------------------- |
-| Ruby       | 3.2+                                          |
-| Rails      | 7.2+                                          |
-| ParadeDB   | 0.22.0+                                       |
+| Component  | Supported                                         |
+| ---------- | ------------------------------------------------- |
+| Ruby       | 3.2+                                              |
+| Rails      | 7.2+                                              |
+| ParadeDB   | 0.22.0+                                           |
 | PostgreSQL | 15+ (PostgreSQL adapter with ParadeDB extension) |
 
 Notes:
