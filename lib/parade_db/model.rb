@@ -268,7 +268,7 @@ module ParadeDB
       end
 
       def warn_has_paradedb_index_deprecation!
-        ActiveSupport::Deprecation.warn(DEPRECATED_HAS_PARADEDB_INDEX_MESSAGE)
+        ActiveSupport::Deprecation.send(:warn, DEPRECATED_HAS_PARADEDB_INDEX_MESSAGE)
       end
 
       def paradedb_catalog_index_valid?(definition)
