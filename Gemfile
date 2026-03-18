@@ -11,3 +11,7 @@ group :test do
   gem "simplecov", "~> 0.22", require: false
   gem "simplecov-cobertura", "~> 3.1", require: false
 end
+
+group :development do
+  gem "rubocop", require: false
+end
