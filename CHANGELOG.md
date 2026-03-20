@@ -12,11 +12,8 @@ All notable changes to this project will be documented in this file. The format 
 
 ### Changed
 
-- **BREAKING**: `near` now accepts a chainable
-  `ParadeDB.proximity(...).within(...)` clause instead of the previous
-  binary `left_terms`/`right_terms` API, and proximity clauses can now
-  chain across multiple hops; proximity scoring now uses `near(...,
-  boost:)` and `near(..., const:)`
+- **BREAKING**: `near` now accepts a chainable `ParadeDB.proximity(...).within(...)`
+  clause to support the full proximity API
 
 ## [0.2.0] - 2026-03-13
 
