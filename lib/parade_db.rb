@@ -79,4 +79,8 @@ module ParadeDB
   def regex_term(pattern, max_expansions: nil)
     Proximity::RegexTerm.new(pattern, max_expansions: max_expansions)
   end
+
+  def proximity(*terms)
+    Proximity::Clause.new(*terms)
+  end
 end

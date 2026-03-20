@@ -132,27 +132,27 @@ RSpec.describe "ArelPredicationsUnitTest" do
 
   # ---- pdb_near ----
   it "pdb_near distance 1" do
-    node = @t[:description].pdb_near("running", "shoes", distance: 1)
+    node = @t[:description].pdb_near(ParadeDB.proximity("running").within(1, "shoes"))
     assert_equal %("products"."description" @@@ ('running' ## 1 ## 'shoes')), sql(node)
   end
   it "pdb_near ordered" do
-    node = @t[:description].pdb_near("running", "shoes", distance: 1, ordered: true)
+    node = @t[:description].pdb_near(ParadeDB.proximity("running").within(1, "shoes", ordered: true))
     assert_equal %("products"."description" @@@ ('running' ##> 1 ##> 'shoes')), sql(node)
   end
   it "pdb_near large distance" do
-    node = @t[:description].pdb_near("running", "shoes", distance: 5)
+    node = @t[:description].pdb_near(ParadeDB.proximity("running").within(5, "shoes"))
     assert_equal %("products"."description" @@@ ('running' ## 5 ## 'shoes')), sql(node)
   end
   it "pdb_near with array left operand" do
-    node = @t[:description].pdb_near(["sleek", "white"], "shoes", distance: 1)
+    node = @t[:description].pdb_near(ParadeDB.proximity("sleek", "white").within(1, "shoes"))
     assert_equal %("products"."description" @@@ (pdb.prox_array('sleek', 'white') ## 1 ## 'shoes')), sql(node)
   end
   it "pdb_near with regex wrapper" do
-    node = @t[:description].pdb_near([ParadeDB.regex_term("sl.*"), "white"], "shoes", distance: 1)
+    node = @t[:description].pdb_near(ParadeDB.proximity(ParadeDB.regex_term("sl.*"), "white").within(1, "shoes"))
     assert_equal %("products"."description" @@@ (pdb.prox_array(pdb.prox_regex('sl.*'), 'white') ## 1 ## 'shoes')), sql(node)
   end
   it "pdb_near with array right operand" do
-    node = @t[:description].pdb_near("sleek", ["white", "shoes"], distance: 1)
+    node = @t[:description].pdb_near(ParadeDB.proximity("sleek").within(1, "white", "shoes"))
     assert_equal %("products"."description" @@@ ('sleek' ## 1 ## pdb.prox_array('white', 'shoes'))), sql(node)
   end
 

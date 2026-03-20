@@ -54,7 +54,7 @@ RSpec.describe "GuardsUnitTest" do
     assert_includes error.message, "No search field set"
   end
   it "near without search raises" do
-    error = assert_raises(ArgumentError) { bare_relation.near("running", "shoes", distance: 1) }
+    error = assert_raises(ArgumentError) { bare_relation.near(ParadeDB.proximity("running").within(1, "shoes")) }
     assert_includes error.message, "No search field set"
   end
   it "phrase prefix without search raises" do
@@ -170,26 +170,26 @@ RSpec.describe "GuardsUnitTest" do
     assert_includes error.message, "term_set requires at least one value"
   end
   it "near distance rejects non numeric" do
-    error = assert_raises(ArgumentError) { builder.near(:description, "a", "b", distance: "close") }
+    error = assert_raises(ArgumentError) { builder.near(:description, ParadeDB.proximity("a").within("close", "b")) }
     assert_includes error.message, "distance must be numeric"
   end
   it "near distance accepts integer" do
-    node = builder.near(:description, "a", "b", distance: 3)
+    node = builder.near(:description, ParadeDB.proximity("a").within(3, "b"))
     refute_nil node
   end
   it "near regex max expansions rejects non integer" do
     error = assert_raises(ArgumentError) do
-      builder.near(:description, ParadeDB.regex_term("sl.*", max_expansions: "100"), "shoes", distance: 1)
+      builder.near(:description, ParadeDB.regex_term("sl.*", max_expansions: "100").within(1, "shoes"))
     end
     assert_includes error.message, "max_expansions must be an integer"
   end
-  it "near rejects empty left operand" do
-    error = assert_raises(ArgumentError) { builder.near(:description, [], "shoes", distance: 1) }
-    assert_includes error.message, "near requires at least one left-side term"
+  it "near rejects a non proximity clause" do
+    error = assert_raises(ArgumentError) { builder.near(:description, "running") }
+    assert_includes error.message, "near requires a ParadeDB.proximity"
   end
-  it "near rejects empty right operand" do
-    error = assert_raises(ArgumentError) { builder.near(:description, "running", [], distance: 1) }
-    assert_includes error.message, "near requires at least one right-side term"
+  it "near rejects a clause without within" do
+    error = assert_raises(ArgumentError) { builder.near(:description, ParadeDB.proximity("running")) }
+    assert_includes error.message, "near requires at least one within clause"
   end
   it "range with no bounds raises" do
     error = assert_raises(ArgumentError) { builder.range(:rating) }

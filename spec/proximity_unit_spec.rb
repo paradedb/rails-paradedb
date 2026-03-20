@@ -21,4 +21,16 @@ RSpec.describe ParadeDB::Proximity::RegexTerm do
 
     assert_includes error.message, "max_expansions must be an integer"
   end
+
+  it "rejects empty base operands" do
+    error = assert_raises(ArgumentError) { ParadeDB.proximity([]) }
+
+    assert_includes error.message, "proximity requires at least one term"
+  end
+
+  it "rejects empty within operands" do
+    error = assert_raises(ArgumentError) { ParadeDB.proximity("running").within(1, []) }
+
+    assert_includes error.message, "within requires at least one term"
+  end
 end

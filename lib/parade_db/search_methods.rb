@@ -239,18 +239,10 @@ module ParadeDB
       where(grouped(node))
     end
 
-    def near(left_terms, right_terms, distance:, ordered: false, boost: nil, constant_score: nil)
+    def near(proximity)
       require_search_field!
 
-      node = builder.near(
-        _paradedb_current_field,
-        left_terms,
-        right_terms,
-        distance: distance,
-        ordered: ordered,
-        boost: boost,
-        constant_score: constant_score
-      )
+      node = builder.near(_paradedb_current_field, proximity)
       where(grouped(node))
     end
 

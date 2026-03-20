@@ -67,15 +67,15 @@ RSpec.describe "ArelVisitorTest" do
     assert_equal %("products"."description" @@@ pdb.regex('run.*shoes')), sql(node)
   end
   it "near" do
-    node = @builder.near(:description, "sleek", "shoes", distance: 1)
+    node = @builder.near(:description, ParadeDB.proximity("sleek").within(1, "shoes"))
     assert_equal %("products"."description" @@@ ('sleek' ## 1 ## 'shoes')), sql(node)
   end
   it "near ordered" do
-    node = @builder.near(:description, "sleek", "shoes", distance: 1, ordered: true)
+    node = @builder.near(:description, ParadeDB.proximity("sleek").within(1, "shoes", ordered: true))
     assert_equal %("products"."description" @@@ ('sleek' ##> 1 ##> 'shoes')), sql(node)
   end
   it "near with array left operand" do
-    node = @builder.near(:description, ["sleek", "white"], "shoes", distance: 1)
+    node = @builder.near(:description, ParadeDB.proximity("sleek", "white").within(1, "shoes"))
     assert_equal %("products"."description" @@@ (pdb.prox_array('sleek', 'white') ## 1 ## 'shoes')), sql(node)
   end
   it "regex phrase" do

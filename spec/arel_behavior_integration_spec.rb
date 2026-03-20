@@ -150,29 +150,33 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
 
   # ---- near ----
   it "near adjacent words" do
-    ids = search(:description).near("running", "shoes", distance: 1).order(:id).pluck(:id)
+    ids = search(:description).near(ParadeDB.proximity("running").within(1, "shoes")).order(:id).pluck(:id)
     assert_equal [1, 2], ids
   end
   it "near larger distance" do
-    ids = search(:description).near("running", "shoes", distance: 5).order(:id).pluck(:id)
+    ids = search(:description).near(ParadeDB.proximity("running").within(5, "shoes")).order(:id).pluck(:id)
     # Same set — "running shoes" are always adjacent
     assert_equal [1, 2], ids
   end
   it "near no match" do
-    ids = search(:description).near("running", "earbuds", distance: 1).order(:id).pluck(:id)
+    ids = search(:description).near(ParadeDB.proximity("running").within(1, "earbuds")).order(:id).pluck(:id)
     assert_empty ids
   end
   it "near lhs list" do
-    ids = search(:description).near(["hiking", "running"], "shoes", distance: 1).order(:id).pluck(:id)
+    ids = search(:description).near(ParadeDB.proximity("hiking", "running").within(1, "shoes")).order(:id).pluck(:id)
     assert_equal [1, 2], ids
   end
   it "near rhs list" do
-    ids = search(:description).near("running", ["shoes", "sneakers"], distance: 1).order(:id).pluck(:id)
+    ids = search(:description).near(ParadeDB.proximity("running").within(1, "shoes", "sneakers")).order(:id).pluck(:id)
     assert_equal [1, 2], ids
   end
   it "near with rhs list and regex" do
-    ids = search(:description).near("running", [ParadeDB.regex_term("sho.*"), "sneakers"], distance: 1).order(:id).pluck(:id)
+    ids = search(:description).near(ParadeDB.proximity("running").within(1, ParadeDB.regex_term("sho.*"), "sneakers")).order(:id).pluck(:id)
     assert_equal [1, 2], ids
+  end
+  it "near chained clauses" do
+    ids = search(:description).near(ParadeDB.proximity("trail").within(1, "running").within(1, "shoes")).order(:id).pluck(:id)
+    assert_equal [2], ids
   end
 
   # ---- phrase_prefix ----

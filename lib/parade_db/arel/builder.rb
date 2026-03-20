@@ -150,19 +150,9 @@ module ParadeDB
         infix("@@@", column_node(column), rhs)
       end
 
-      def near(column, left_terms, right_terms, distance:, ordered: false, boost: nil, constant_score: nil)
-        left_operand = proximity_operand_node(left_terms, empty_message: "near requires at least one left-side term")
-        right_operand = proximity_operand_node(right_terms, empty_message: "near requires at least one right-side term")
-
-        build_proximity_query(
-          column,
-          left_operand: left_operand,
-          right_operand: right_operand,
-          distance: distance,
-          ordered: ordered,
-          boost: boost,
-          constant_score: constant_score
-        )
+      def near(column, proximity)
+        rhs = proximity_query_node(proximity)
+        infix("@@@", column_node(column), rhs)
       end
 
       def phrase_prefix(column, *terms, max_expansion: nil, boost: nil, constant_score: nil)
@@ -349,12 +339,31 @@ module ParadeDB
         ::Arel::Nodes.build_quoted(value)
       end
 
-      def build_proximity_query(column, left_operand:, right_operand:, distance:, ordered:, boost:, constant_score:)
-        validate_numeric!(distance, :distance)
-        operator = ordered ? "##>" : "##"
-        near_chain = infix(operator, infix(operator, left_operand, quoted_value(distance)), right_operand)
-        rhs = apply_score_modifier(::Arel::Nodes::Grouping.new(near_chain), boost: boost, constant_score: constant_score)
-        infix("@@@", column_node(column), rhs)
+      def proximity_query_node(proximity)
+        unless proximity.is_a?(ParadeDB::Proximity::Clause)
+          raise ArgumentError, "near requires a ParadeDB.proximity(...) clause"
+        end
+
+        if proximity.clauses.empty?
+          raise ArgumentError, "near requires at least one within clause"
+        end
+
+        compile_proximity_clause(proximity)
+      end
+
+      def compile_proximity_clause(clause)
+        current = proximity_operand_node(clause.operand, empty_message: "proximity requires at least one term")
+
+        clause.clauses.each do |within_clause|
+          validate_numeric!(within_clause.distance, :distance)
+          operator = within_clause.ordered ? "##>" : "##"
+          right_operand = proximity_operand_node(within_clause.operand, empty_message: "within requires at least one term")
+          current = ::Arel::Nodes::Grouping.new(
+            infix(operator, infix(operator, current, quoted_value(within_clause.distance)), right_operand)
+          )
+        end
+
+        current
       end
 
       def prox_regex_node(pattern, max_expansions)
@@ -366,27 +375,30 @@ module ParadeDB
         ::Arel::Nodes::NamedFunction.new("pdb.prox_regex", args)
       end
 
-      def prox_array_node(left_terms)
-        terms = normalize_proximity_terms(left_terms)
+      def prox_array_node(terms, empty_message:)
         values = terms.map { |term| proximity_term_node(term) }
-        raise ArgumentError, "near requires at least one left-side term" if values.empty?
+        raise ArgumentError, empty_message if values.empty?
 
         ::Arel::Nodes::NamedFunction.new("pdb.prox_array", values)
       end
 
       def proximity_operand_node(terms, empty_message:)
+        return compile_proximity_clause(terms) if terms.is_a?(ParadeDB::Proximity::Clause)
+
         normalized_terms = normalize_proximity_terms(terms)
         raise ArgumentError, empty_message if normalized_terms.empty?
 
         if normalized_terms.length == 1
           proximity_term_node(normalized_terms.first)
         else
-          prox_array_node(normalized_terms)
+          prox_array_node(normalized_terms, empty_message: empty_message)
         end
       end
 
       def proximity_term_node(term)
-        if term.is_a?(ParadeDB::Proximity::RegexTerm)
+        if term.is_a?(ParadeDB::Proximity::Clause)
+          raise ArgumentError, "nested proximity clauses must be passed directly, not inside an array"
+        elsif term.is_a?(ParadeDB::Proximity::RegexTerm)
           prox_regex_node(term.pattern, term.max_expansions)
         else
           quoted_value(term)

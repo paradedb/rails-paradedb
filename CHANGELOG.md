@@ -12,10 +12,10 @@ All notable changes to this project will be documented in this file. The format 
 
 ### Changed
 
-- **BREAKING**: `near` now uses a symmetric `left_terms`/`right_terms`
-  API across the
-  relation and Arel DSLs, and both operands now accept a string,
-  `ParadeDB.regex_term`, or a mixed list of strings and regex terms
+- **BREAKING**: `near` now accepts a chainable
+  `ParadeDB.proximity(...).within(...)` clause instead of the previous
+  binary `left_terms`/`right_terms` API, and proximity clauses can now
+  chain across multiple hops
 
 ## [0.2.0] - 2026-03-13
 

@@ -144,28 +144,36 @@ RSpec.describe "UserApiUnitTest" do
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."category" @@@ pdb.term_set(ARRAY['audio', 'footwear']))), sql
   end
   it "near proximity" do
-    sql = Product.search(:description).near("sleek", "shoes", distance: 1).to_sql
+    sql = Product.search(:description).near(ParadeDB.proximity("sleek").within(1, "shoes")).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('sleek' ## 1 ## 'shoes'))), sql
   end
   it "near ordered proximity" do
-    sql = Product.search(:description).near("sleek", "shoes", distance: 1, ordered: true).to_sql
+    sql = Product.search(:description).near(ParadeDB.proximity("sleek").within(1, "shoes", ordered: true)).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('sleek' ##> 1 ##> 'shoes'))), sql
   end
   it "near array proximity" do
-    sql = Product.search(:description).near(["sleek", "white"], "shoes", distance: 1).to_sql
+    sql = Product.search(:description).near(ParadeDB.proximity("sleek", "white").within(1, "shoes")).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ (pdb.prox_array('sleek', 'white') ## 1 ## 'shoes'))), sql
   end
   it "near with regex wrapper" do
-    sql = Product.search(:description).near(ParadeDB.regex_term("sl.*"), "shoes", distance: 1).to_sql
+    sql = Product.search(:description).near(ParadeDB.regex_term("sl.*").within(1, "shoes")).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ (pdb.prox_regex('sl.*') ## 1 ## 'shoes'))), sql
   end
   it "near with mixed array left operand" do
-    sql = Product.search(:description).near([ParadeDB.regex_term("sl.*"), "white"], "shoes", distance: 1).to_sql
+    sql = Product.search(:description).near(ParadeDB.proximity(ParadeDB.regex_term("sl.*"), "white").within(1, "shoes")).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ (pdb.prox_array(pdb.prox_regex('sl.*'), 'white') ## 1 ## 'shoes'))), sql
   end
   it "near with array right operand" do
-    sql = Product.search(:description).near("sleek", ["white", "shoes"], distance: 1).to_sql
+    sql = Product.search(:description).near(ParadeDB.proximity("sleek").within(1, "white", "shoes")).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('sleek' ## 1 ## pdb.prox_array('white', 'shoes')))), sql
+  end
+  it "near chained proximity" do
+    sql = Product.search(:description).near(ParadeDB.proximity("trail").within(1, "running").within(1, "shoes")).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ (('trail' ## 1 ## 'running') ## 1 ## 'shoes'))), sql
+  end
+  it "near chained proximity" do
+    sql = Product.search(:description).near(ParadeDB.proximity("trail").within(1, ParadeDB.proximity("running").within(1, "shoes"))).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('trail' ## 1 ## ('running' ## 1 ## 'shoes')))), sql
   end
   it "phrase prefix" do
     sql = Product.search(:description).phrase_prefix("run", "sh").to_sql

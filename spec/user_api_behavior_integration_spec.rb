@@ -74,7 +74,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
   end
   it "phrase near and phrase prefix execute" do
     phrase_ids = BehaviorProduct.search(:description).phrase("running shoes").order(:id).pluck(:id)
-    near_ids = BehaviorProduct.search(:description).near("running", "shoes", distance: 1).order(:id).pluck(:id)
+    near_ids = BehaviorProduct.search(:description).near(ParadeDB.proximity("running").within(1, "shoes")).order(:id).pluck(:id)
     prefix_ids = BehaviorProduct.search(:category).phrase_prefix("foot").order(:id).pluck(:id)
     prefix_max_ids = BehaviorProduct.search(:category).phrase_prefix("foot", max_expansion: 100).order(:id).pluck(:id)
 
@@ -502,7 +502,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       SQL
 
       relation = BehaviorProduct.search(:description)
-                                .near("sleek", "shoes", distance: 1, ordered: true)
+                                .near(ParadeDB.proximity("sleek").within(1, "shoes", ordered: true))
                                 .order(:id)
 
       expected_ids = [1, 2]
@@ -519,7 +519,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       SQL
 
       relation = BehaviorProduct.search(:description)
-                                .near(ParadeDB.regex_term("sl.*"), "shoes", distance: 1)
+                                .near(ParadeDB.regex_term("sl.*").within(1, "shoes"))
                                 .order(:id)
 
       expected_ids = [1, 2]
@@ -536,7 +536,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       SQL
 
       relation = BehaviorProduct.search(:description)
-                                .near(["sleek", "white"], "shoes", distance: 1)
+                                .near(ParadeDB.proximity("sleek", "white").within(1, "shoes"))
                                 .order(:id)
 
       expected_ids = [1, 2, 4]
@@ -553,7 +553,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       SQL
 
       relation = BehaviorProduct.search(:description)
-                                .near([ParadeDB.regex_term("sl.*"), "white"], "shoes", distance: 1)
+                                .near(ParadeDB.proximity(ParadeDB.regex_term("sl.*"), "white").within(1, "shoes"))
                                 .order(:id)
 
       expected_ids = [1, 2, 4]
@@ -570,10 +570,27 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       SQL
 
       relation = BehaviorProduct.search(:description)
-                                .near("sleek", ["white", "shoes"], distance: 1)
+                                .near(ParadeDB.proximity("sleek").within(1, "white", "shoes"))
                                 .order(:id)
 
       expected_ids = [1, 2]
+      assert_equal expected_ids, ids_from_sql(raw_sql)
+      assert_equal expected_ids, relation.pluck(:id)
+    end
+
+    it "chained proximity matches raw SQL" do
+      raw_sql = <<~SQL
+        SELECT id
+        FROM products
+        WHERE description @@@ (('trail' ## 1 ## 'running') ## 1 ## 'shoes')
+        ORDER BY id
+      SQL
+
+      relation = BehaviorProduct.search(:description)
+                                .near(ParadeDB.proximity("trail").within(1, "running").within(1, "shoes"))
+                                .order(:id)
+
+      expected_ids = [5]
       assert_equal expected_ids, ids_from_sql(raw_sql)
       assert_equal expected_ids, relation.pluck(:id)
     end
