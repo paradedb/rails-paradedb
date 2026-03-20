@@ -177,6 +177,18 @@ RSpec.describe "GuardsUnitTest" do
     node = builder.near(:description, ParadeDB.proximity("a").within(3, "b"))
     refute_nil node
   end
+  it "near boost rejects non numeric" do
+    error = assert_raises(ArgumentError) { builder.near(:description, ParadeDB.proximity("a").within(1, "b"), boost: "high") }
+    assert_includes error.message, "boost must be numeric"
+  end
+  it "near const rejects non numeric" do
+    error = assert_raises(ArgumentError) { builder.near(:description, ParadeDB.proximity("a").within(1, "b"), const: "fixed") }
+    assert_includes error.message, "const must be numeric"
+  end
+  it "near rejects boost and const together" do
+    error = assert_raises(ArgumentError) { builder.near(:description, ParadeDB.proximity("a").within(1, "b"), boost: 2.0, const: 1.0) }
+    assert_includes error.message, "boost and const are mutually exclusive"
+  end
   it "near regex max expansions rejects non integer" do
     error = assert_raises(ArgumentError) do
       builder.near(:description, ParadeDB.regex_term("sl.*", max_expansions: "100").within(1, "shoes"))

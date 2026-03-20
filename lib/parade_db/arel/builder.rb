@@ -150,8 +150,8 @@ module ParadeDB
         infix("@@@", column_node(column), rhs)
       end
 
-      def near(column, proximity)
-        rhs = proximity_query_node(proximity)
+      def near(column, proximity, boost: nil, const: nil)
+        rhs = proximity_query_node(proximity, boost: boost, const: const)
         infix("@@@", column_node(column), rhs)
       end
 
@@ -339,7 +339,7 @@ module ParadeDB
         ::Arel::Nodes.build_quoted(value)
       end
 
-      def proximity_query_node(proximity)
+      def proximity_query_node(proximity, boost: nil, const: nil)
         unless proximity.is_a?(ParadeDB::Proximity::Clause)
           raise ArgumentError, "near requires a ParadeDB.proximity(...) clause"
         end
@@ -348,7 +348,14 @@ module ParadeDB
           raise ArgumentError, "near requires at least one within clause"
         end
 
-        compile_proximity_clause(proximity)
+        if boost && !const.nil?
+          raise ArgumentError, "boost and const are mutually exclusive"
+        end
+
+        validate_numeric!(boost, :boost) if boost
+        validate_numeric!(const, :const) unless const.nil?
+
+        apply_score_modifier(compile_proximity_clause(proximity), boost: boost, constant_score: const)
       end
 
       def compile_proximity_clause(clause)

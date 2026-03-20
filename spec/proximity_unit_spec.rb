@@ -22,6 +22,45 @@ RSpec.describe ParadeDB::Proximity::RegexTerm do
     assert_includes error.message, "max_expansions must be an integer"
   end
 
+  it "chains into a proximity clause" do
+    clause = ParadeDB.regex_term("sl.*").within(1, "shoes")
+
+    assert_instance_of ParadeDB::Proximity::Clause, clause
+    assert_instance_of ParadeDB::Proximity::RegexTerm, clause.operand
+    assert_equal 1, clause.clauses.first.distance
+    assert_equal "shoes", clause.clauses.first.operand
+  end
+end
+
+RSpec.describe ParadeDB::Proximity::Clause do
+  it "builds from a single term" do
+    clause = ParadeDB.proximity("running")
+
+    assert_equal "running", clause.operand
+    assert_empty clause.clauses
+  end
+
+  it "builds from multiple terms" do
+    clause = ParadeDB.proximity("sleek", "white")
+
+    assert_equal ["sleek", "white"], clause.operand
+  end
+
+  it "returns a new clause when chaining" do
+    base = ParadeDB.proximity("running")
+    chained = base.within(1, "shoes")
+
+    assert_empty base.clauses
+    assert_equal 1, chained.clauses.length
+  end
+
+  it "supports nested clauses" do
+    nested = ParadeDB.proximity("right").within(3, "associative")
+    clause = ParadeDB.proximity(ParadeDB.regex_term("sl.*"), "running").within(3, nested)
+
+    assert_equal nested, clause.clauses.first.operand
+  end
+
   it "rejects empty base operands" do
     error = assert_raises(ArgumentError) { ParadeDB.proximity([]) }
 

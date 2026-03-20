@@ -149,6 +149,25 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
 
     assert_equal baseline_ids, const_ids
   end
+  it "proximity with boost and const execute" do
+    baseline_ids = BehaviorProduct.search(:description)
+                                  .near(ParadeDB.proximity("running").within(1, "shoes"))
+                                  .order(:id)
+                                  .pluck(:id)
+
+    boost_ids = BehaviorProduct.search(:description)
+                               .near(ParadeDB.proximity("running").within(1, "shoes"), boost: 2.0)
+                               .order(:id)
+                               .pluck(:id)
+
+    const_ids = BehaviorProduct.search(:description)
+                               .near(ParadeDB.proximity("running").within(1, "shoes"), const: 1.0)
+                               .order(:id)
+                               .pluck(:id)
+
+    assert_equal baseline_ids, boost_ids
+    assert_equal baseline_ids, const_ids
+  end
   it "more like this with id executes and returns similar rows" do
     ids = BehaviorProduct.more_like_this(3, fields: [:description]).limit(5).pluck(:id)
 

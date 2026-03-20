@@ -175,6 +175,14 @@ RSpec.describe "UserApiUnitTest" do
     sql = Product.search(:description).near(ParadeDB.proximity("trail").within(1, ParadeDB.proximity("running").within(1, "shoes"))).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('trail' ## 1 ## ('running' ## 1 ## 'shoes')))), sql
   end
+  it "near boosted proximity" do
+    sql = Product.search(:description).near(ParadeDB.proximity("sleek").within(1, "shoes"), boost: 2.0).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('sleek' ## 1 ## 'shoes')::pdb.boost(2.0))), sql
+  end
+  it "near constant score proximity" do
+    sql = Product.search(:description).near(ParadeDB.proximity("sleek").within(1, "shoes"), const: 1.0).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('sleek' ## 1 ## 'shoes')::pdb.const(1.0))), sql
+  end
   it "phrase prefix" do
     sql = Product.search(:description).phrase_prefix("run", "sh").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ pdb.phrase_prefix(ARRAY['run', 'sh']))), sql

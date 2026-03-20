@@ -235,6 +235,14 @@ RSpec.describe "ArelBuilderUnitTest" do
     node = @builder.near(:description, ParadeDB.regex_term("sl.*", max_expansions: 100).within(1, "shoes"))
     assert_equal %("products"."description" @@@ (pdb.prox_regex('sl.*', 100) ## 1 ## 'shoes')), sql(node)
   end
+  it "near with boost" do
+    node = @builder.near(:description, ParadeDB.proximity("running").within(1, "shoes"), boost: 2.0)
+    assert_equal %("products"."description" @@@ ('running' ## 1 ## 'shoes')::pdb.boost(2.0)), sql(node)
+  end
+  it "near with const" do
+    node = @builder.near(:description, ParadeDB.proximity("running").within(1, "shoes"), const: 1.0)
+    assert_equal %("products"."description" @@@ ('running' ## 1 ## 'shoes')::pdb.const(1.0)), sql(node)
+  end
   it "near nested clauses" do
     node = @builder.near(
       :description,
@@ -256,6 +264,13 @@ RSpec.describe "ArelBuilderUnitTest" do
       @builder.near(:description, ParadeDB.proximity("running"))
     end
     assert_includes error.message, "near requires at least one within clause"
+  end
+  it "near rejects boost and const together" do
+    error = assert_raises(ArgumentError) do
+      @builder.near(:description, ParadeDB.proximity("running").within(1, "shoes"), boost: 2.0, const: 1.0)
+    end
+
+    assert_includes error.message, "boost and const are mutually exclusive"
   end
 
   # ---- phrase_prefix ----

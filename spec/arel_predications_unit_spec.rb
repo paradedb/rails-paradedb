@@ -155,6 +155,10 @@ RSpec.describe "ArelPredicationsUnitTest" do
     node = @t[:description].pdb_near(ParadeDB.proximity("sleek").within(1, "white", "shoes"))
     assert_equal %("products"."description" @@@ ('sleek' ## 1 ## pdb.prox_array('white', 'shoes'))), sql(node)
   end
+  it "pdb_near with boost" do
+    node = @t[:description].pdb_near(ParadeDB.proximity("running").within(1, "shoes"), boost: 2.0)
+    assert_equal %("products"."description" @@@ ('running' ## 1 ## 'shoes')::pdb.boost(2.0)), sql(node)
+  end
 
   # ---- pdb_phrase_prefix ----
   it "pdb_phrase_prefix single term" do

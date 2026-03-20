@@ -154,6 +154,8 @@ MockItem.search(:description).near(ParadeDB.proximity("hiking", "running").withi
 MockItem.search(:description).near(ParadeDB.proximity("running").within(2, "shoes", "sneakers", ordered: true))
 MockItem.search(:description).near(ParadeDB.regex_term("run.*").within(3, "shoes"))
 MockItem.search(:description).near(ParadeDB.proximity("trail").within(1, "running").within(1, "shoes"))
+MockItem.search(:description).near(ParadeDB.proximity("running").within(3, "shoes"), boost: 2.0)
+MockItem.search(:description).near(ParadeDB.proximity("running").within(3, "shoes"), const: 1.0)
 MockItem.search(:description).regex_phrase("run.*", "shoes")
 MockItem.search(:description).phrase_prefix("run", "sh", max_expansion: 100)
 MockItem.search(:description).parse("running AND shoes", lenient: true)

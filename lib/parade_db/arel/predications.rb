@@ -52,8 +52,8 @@ module ParadeDB
         BUILDER.regex_phrase(self, *patterns, slop: slop, max_expansions: max_expansions)
       end
 
-      def pdb_near(proximity)
-        BUILDER.near(self, proximity)
+      def pdb_near(proximity, boost: nil, const: nil)
+        BUILDER.near(self, proximity, boost: boost, const: const)
       end
 
       def pdb_phrase_prefix(*terms, max_expansion: nil)

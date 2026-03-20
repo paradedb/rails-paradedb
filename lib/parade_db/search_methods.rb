@@ -239,10 +239,10 @@ module ParadeDB
       where(grouped(node))
     end
 
-    def near(proximity)
+    def near(proximity, boost: nil, const: nil)
       require_search_field!
 
-      node = builder.near(_paradedb_current_field, proximity)
+      node = builder.near(_paradedb_current_field, proximity, boost: boost, const: const)
       where(grouped(node))
     end
 
