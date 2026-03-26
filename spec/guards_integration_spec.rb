@@ -430,14 +430,6 @@ RSpec.describe "GuardsUnitTest" do
     end
     assert_includes error.message, "facets(exact: false)"
   end
-  it "facets_agg exact false raises on non-windowed API" do
-    error = assert_raises(ArgumentError) do
-      GuardTestProduct.search(:description)
-                      .matching_all("shoes")
-                      .facets_agg(exact: false, docs: ParadeDB::Aggregations.value_count(:id))
-    end
-    assert_includes error.message, "facets_agg(exact: false)"
-  end
 
   # ──────────────────────────────────────────────
   # 5. Facet order validation (SearchMethods)

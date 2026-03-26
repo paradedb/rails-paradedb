@@ -397,10 +397,6 @@ module ParadeDB
 
     def facets_agg(exact: nil, **named_aggregations)
       validate_exact_option!(exact)
-      if exact == false
-        raise ArgumentError, "facets_agg(exact: false) requires with_agg so aggregation runs as a window function"
-      end
-
       agg_specs = normalize_named_aggregation_specs(named_aggregations)
       build_aggregation_query(agg_specs, exact: exact).execute
     end

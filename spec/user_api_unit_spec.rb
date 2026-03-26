@@ -660,15 +660,6 @@ RSpec.describe "UserApiUnitTest" do
 
     assert_includes facet_sql, %(pdb.agg('{"value_count":{"field":"id"}}') FILTER (WHERE "paradedb_agg_source"."category" === 'electronics') AS electronics_count_facet)
   end
-  it "facets_agg exact false raises" do
-    error = assert_raises(ArgumentError) do
-      Product.search(:description).matching_all("shoes").facets_agg(
-        exact: false,
-        docs: ParadeDB::Aggregations.value_count(:id)
-      )
-    end
-    assert_includes error.message, "facets_agg(exact: false)"
-  end
   it "model with_agg class helper delegates to relation api" do
     sql = Product.with_agg(docs: ParadeDB::Aggregations.value_count(:id)).to_sql
 
