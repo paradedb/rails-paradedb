@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Changed
+
+- Removed unnecessary validation from non-exact aggregate queries without `over()`
+
 ## [0.3.0] - 2026-03-23
 
 ### Removed
