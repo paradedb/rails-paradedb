@@ -126,7 +126,7 @@ jobs:
         run: bundle exec rake test:integration
 
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: ./coverage/coverage.xml
           flags: rails-paradedb,rb${{ matrix.ruby-version }},rl${{ matrix.rails-version }}
