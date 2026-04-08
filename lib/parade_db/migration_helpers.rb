@@ -787,6 +787,41 @@ if defined?(ActiveRecord::ConnectionAdapters::AbstractAdapter)
   ActiveRecord::ConnectionAdapters::AbstractAdapter.include(ParadeDB::MigrationHelpers)
 end
 
+if defined?(ActiveRecord::Migration)
+  module ParadeDB
+    module MigrationDSL
+      def create_paradedb_index(index_klass, if_not_exists: false)
+        connection.create_paradedb_index(index_klass, if_not_exists: if_not_exists)
+      end
+
+      def replace_paradedb_index(index_klass)
+        connection.replace_paradedb_index(index_klass)
+      end
+
+      def add_bm25_index(table, fields:, key_field:, name: nil, index_options: nil, if_not_exists: false)
+        connection.add_bm25_index(
+          table,
+          fields: fields,
+          key_field: key_field,
+          name: name,
+          index_options: index_options,
+          if_not_exists: if_not_exists
+        )
+      end
+
+      def remove_bm25_index(table, name: nil, if_exists: false)
+        connection.remove_bm25_index(table, name: name, if_exists: if_exists)
+      end
+
+      def reindex_bm25(table, name: nil, concurrently: false)
+        connection.reindex_bm25(table, name: name, concurrently: concurrently)
+      end
+    end
+  end
+
+  ActiveRecord::Migration.include(ParadeDB::MigrationDSL)
+end
+
 if defined?(ActiveRecord::SchemaDumper)
   module ParadeDB
     module SchemaDumperPatch
@@ -828,4 +863,80 @@ if defined?(ActiveRecord::SchemaDumper)
   end
 
   ActiveRecord::SchemaDumper.prepend(ParadeDB::SchemaDumperPatch)
+end
+
+if defined?(ActiveRecord::Migration::CommandRecorder)
+  module ParadeDB
+    module CommandRecorderPatch
+      %i[
+        create_paradedb_index
+        add_bm25_index
+        remove_bm25_index
+        replace_paradedb_index
+        reindex_bm25
+      ].each do |method_name|
+        define_method(method_name) do |*args, &block|
+          record(method_name, args, &block)
+        end
+        ruby2_keywords(method_name)
+      end
+
+      private
+
+      def invert_create_paradedb_index(args)
+        index_klass, = args
+        compiled = resolve_paradedb_index_klass(index_klass).compiled_definition
+        remove_options = Hash.ruby2_keywords_hash(name: compiled.index_name, if_exists: true)
+
+        [:remove_bm25_index, [compiled.table_name, remove_options]]
+      end
+
+      def invert_add_bm25_index(args)
+        table, options = args
+        options = symbolize_options_hash(options)
+
+        remove_options = { if_exists: true }
+        remove_options[:name] = options[:name] if options[:name]
+        remove_options = Hash.ruby2_keywords_hash(remove_options)
+
+        [:remove_bm25_index, [table, remove_options]]
+      end
+
+      def invert_remove_bm25_index(_args)
+        raise ActiveRecord::IrreversibleMigration,
+              "remove_bm25_index is not automatically reversible. Use #up/#down or #reversible."
+      end
+
+      def invert_replace_paradedb_index(_args)
+        raise ActiveRecord::IrreversibleMigration,
+              "replace_paradedb_index is not automatically reversible. Use #up/#down or #reversible."
+      end
+
+      def invert_reindex_bm25(_args)
+        raise ActiveRecord::IrreversibleMigration,
+              "reindex_bm25 is not automatically reversible. Use #up/#down or #reversible."
+      end
+
+      def resolve_paradedb_index_klass(index_klass)
+        case index_klass
+        when String
+          index_klass.to_s.split("::").inject(Object) { |ctx, const_name| ctx.const_get(const_name) }
+        else
+          index_klass
+        end
+      rescue NameError
+        raise ParadeDB::InvalidIndexDefinition, "Unknown index class #{index_klass.inspect}"
+      end
+
+      def symbolize_options_hash(options)
+        return {} unless options.is_a?(Hash)
+
+        options.each_with_object({}) do |(key, value), memo|
+          memo[key.to_sym] = value
+        end
+      end
+    end
+  end
+
+  ActiveRecord::Migration::CommandRecorder.prepend(ParadeDB::CommandRecorderPatch)
 end

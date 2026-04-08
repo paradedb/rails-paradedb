@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file. The format 
 ### Changed
 
 - Removed unnecessary validation from non-exact aggregate queries without `over()`
+- `change` migrations now auto-reverse `create_paradedb_index` and `add_bm25_index`, while irreversible ParadeDB migration helpers raise explicit rollback errors
 
 ## [0.3.0] - 2026-03-23
 

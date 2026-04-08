@@ -138,6 +138,63 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     assert_not index_exists?("books_custom_bm25_idx")
   end
 
+  it "rolls back create_paradedb_index in change migrations" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_bm25_index(:books, if_exists: true)
+    conn.remove_bm25_index(:books, name: :books_by_name_bm25_idx, if_exists: true)
+
+    migration = build_change_migration do
+      create_paradedb_index(IndexMigrationBookByNameIndex, if_not_exists: true)
+    end
+
+    run_migration(migration, :up, connection: conn)
+    assert index_exists?("books_by_name_bm25_idx")
+
+    run_migration(migration, :down, connection: conn)
+    assert_not index_exists?("books_by_name_bm25_idx")
+  end
+
+  it "rolls back add_bm25_index in change migrations" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_bm25_index(:books, if_exists: true)
+    conn.remove_bm25_index(:books, name: :books_custom_bm25_idx, if_exists: true)
+
+    migration = build_change_migration do
+      add_bm25_index(
+        :books,
+        fields: {
+          id: {},
+          title: { tokenizer: :simple }
+        },
+        key_field: :id,
+        name: :books_custom_bm25_idx,
+        if_not_exists: true
+      )
+    end
+
+    run_migration(migration, :up, connection: conn)
+    assert index_exists?("books_custom_bm25_idx")
+
+    run_migration(migration, :down, connection: conn)
+    assert_not index_exists?("books_custom_bm25_idx")
+  end
+
+  it "raises for remove_bm25_index in change migrations" do
+    conn = ActiveRecord::Base.connection
+
+    migration = build_change_migration do
+      remove_bm25_index(:books, if_exists: true)
+    end
+
+    run_migration(migration, :up, connection: conn)
+    assert_not index_exists?("books_bm25_idx")
+
+    error = assert_raises(ActiveRecord::IrreversibleMigration) do
+      run_migration(migration, :down, connection: conn)
+    end
+    assert_includes error.message, "remove_bm25_index"
+  end
+
   it "supports replace_paradedb_index helper" do
     conn = ActiveRecord::Base.connection
     conn.remove_bm25_index(:books, if_exists: true)
@@ -345,5 +402,18 @@ RSpec.describe "IndexMigrationIntegrationTest" do
       LIMIT 1
     SQL
     ActiveRecord::Base.connection.select_value(sql).to_s
+  end
+
+  def build_change_migration(&block)
+    Class.new(ActiveRecord::Migration[ActiveRecord::Migration.current_version]) do
+      define_method(:change, &block)
+    end
+  end
+
+  def run_migration(migration_class, direction, connection:)
+    migration = migration_class.new
+    migration.suppress_messages do
+      migration.exec_migration(connection, direction)
+    end
   end
 end
