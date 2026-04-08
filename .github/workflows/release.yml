@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   release:
-    name: release
+    name: Build and Publish to RubyGems
     runs-on: ubuntu-latest
     permissions:
       contents: write
