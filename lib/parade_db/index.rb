@@ -3,7 +3,7 @@
 module ParadeDB
   class Index
     class << self
-      attr_writer :table_name, :key_field, :index_name, :fields, :index_options
+      attr_writer :table_name, :key_field, :index_name, :fields, :index_options, :where
 
       def table_name
         @table_name
@@ -23,6 +23,10 @@ module ParadeDB
 
       def index_options
         @index_options || {}
+      end
+
+      def where
+        @where
       end
 
       def default_index_name
@@ -166,15 +170,16 @@ module ParadeDB
       FIELD_OPTION_KEYS = %i[fast record normalizer expand_dots].freeze
 
       class Compiled
-        attr_reader :table_name, :key_field, :index_name, :entries, :index_options, :field_options
+        attr_reader :table_name, :key_field, :index_name, :entries, :index_options, :field_options, :where
 
-        def initialize(table_name:, key_field:, index_name:, entries:, index_options:, field_options:)
+        def initialize(table_name:, key_field:, index_name:, entries:, index_options:, field_options:, where:)
           @table_name = table_name
           @key_field = key_field
           @index_name = index_name
           @entries = entries
           @index_options = index_options
           @field_options = field_options
+          @where = where
         end
       end
       Entry = Struct.new(:source, :expression, :tokenizer, :options, :query_key, keyword_init: true)
@@ -203,7 +208,8 @@ module ParadeDB
             index_name: index_name,
             entries: entries,
             index_options: index_options,
-            field_options: field_options
+            field_options: field_options,
+            where: klass.where
           )
         end
 

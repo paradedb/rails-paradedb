@@ -118,6 +118,33 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     assert index_exists?("books_by_name_bm25_idx")
   end
 
+  it "create_paradedb_index supports where" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_bm25_index(:books, if_exists: true)
+    conn.remove_bm25_index(:books, name: :books_filtered_bm25_idx, if_exists: true)
+
+    index_klass = Class.new(ParadeDB::Index) do
+      self.table_name = :books
+      self.key_field = :id
+      self.index_name = :books_filtered_bm25_idx
+      self.where = "author IS NOT NULL"
+      self.fields = {
+        id: {},
+        title: { tokenizer: :simple },
+        author: {}
+      }
+    end
+
+    conn.create_paradedb_index(index_klass)
+
+    assert_sql_equal <<~SQL, indexdef_for("books_filtered_bm25_idx")
+      CREATE INDEX books_filtered_bm25_idx ON public.books
+      USING bm25 (id, ((title)::pdb.simple), author)
+      WITH (key_field=id)
+      WHERE (author IS NOT NULL)
+    SQL
+  end
+
   it "supports add and remove bm25 index helpers" do
     conn = ActiveRecord::Base.connection
     conn.remove_bm25_index(:books, if_exists: true)
@@ -136,6 +163,33 @@ RSpec.describe "IndexMigrationIntegrationTest" do
 
     conn.remove_bm25_index(:books, name: :books_custom_bm25_idx, if_exists: true)
     assert_not index_exists?("books_custom_bm25_idx")
+  end
+
+  it "supports partial bm25 indexes with where clauses" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_bm25_index(:books, if_exists: true)
+
+    conn.add_bm25_index(
+      :books,
+      fields: {
+        id: {},
+        title: { tokenizer: :simple }
+      },
+      key_field: :id,
+      name: :books_partial_bm25_idx,
+      where: "author IS NOT NULL",
+      if_not_exists: true
+    )
+
+    assert index_exists?("books_partial_bm25_idx")
+    assert_sql_equal <<~SQL, indexdef_for("books_partial_bm25_idx")
+      CREATE INDEX books_partial_bm25_idx ON public.books
+      USING bm25 (id, ((title)::pdb.simple))
+      WITH (key_field=id)
+      WHERE (author IS NOT NULL)
+    SQL
+
+    conn.remove_bm25_index(:books, name: :books_partial_bm25_idx, if_exists: true)
   end
 
   it "rolls back create_paradedb_index in change migrations" do
@@ -416,6 +470,44 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     conn.remove_bm25_index(:books, if_exists: true)
     expect { conn.instance_eval(add_stmt.strip) }.not_to raise_error
     assert index_exists?("books_bm25_idx")
+  end
+
+  it "round-trips schema dump/load for partial bm25 indexes" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_bm25_index(:books, if_exists: true)
+
+    conn.add_bm25_index(
+      :books,
+      fields: {
+        id: {},
+        title: { tokenizer: :simple, alias: "title_simple" }
+      },
+      key_field: :id,
+      where: "author IS NOT NULL",
+      if_not_exists: true
+    )
+
+    stream = StringIO.new
+    ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection_pool, stream)
+    schema = stream.string
+    add_stmt = schema.each_line.find do |line|
+      line.include?("add_bm25_index :books") &&
+        line.include?("title_simple") &&
+        line.include?("where:")
+    end
+
+    assert_equal <<~RUBY.strip, add_stmt.to_s.strip
+      add_bm25_index :books, fields: { id: {}, title: { tokenizer: :simple, alias: "title_simple" } }, key_field: :id, name: "books_bm25_idx", where: "author IS NOT NULL"
+    RUBY
+
+    conn.remove_bm25_index(:books, if_exists: true)
+    expect { conn.instance_eval(add_stmt.strip) }.not_to raise_error
+    assert_sql_equal <<~SQL, indexdef_for("books_bm25_idx")
+      CREATE INDEX books_bm25_idx ON public.books
+      USING bm25 (id, ((title)::pdb.simple('alias=title_simple')))
+      WITH (key_field=id)
+      WHERE (author IS NOT NULL)
+    SQL
   end
 
   private
