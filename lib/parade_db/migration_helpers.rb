@@ -177,6 +177,11 @@ module ParadeDB
 
     def bm25_entry_sql(entry)
       source_sql = bm25_source_sql(entry)
+
+      if entry.tokenizer.nil? && entry.query_key != entry.source
+        return "(#{source_sql}::pdb.alias(#{quote(entry.query_key)}))"
+      end
+
       return source_sql if entry.tokenizer.nil?
 
       "(#{source_sql}::#{tokenizer_sql(entry.tokenizer, entry.options)})"

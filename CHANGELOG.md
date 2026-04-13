@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Fixed
+
+- Allow aliased indexed expressions like `"(rating + 1)" => { alias: "rating" }`
+
 ## [0.4.0] - 2026-04-09
 
 ### Changed

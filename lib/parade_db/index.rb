@@ -223,10 +223,6 @@ module ParadeDB
             raise InvalidIndexDefinition, "fields must be a Hash"
           end
 
-          build_entries_from_structured_fields(raw_fields)
-        end
-
-        def build_entries_from_structured_fields(raw_fields)
           entries = []
           field_options = {}
 
@@ -246,7 +242,16 @@ module ParadeDB
             tokenizers = normalized[:tokenizers]
             single_tokenizer_keys_present = TokenizerParser::TOKENIZER_SINGLE_KEYS.any? { |key| normalized.key?(key) }
 
-            if tokenizers
+            is_alias = normalized[:alias] && normalized.length == 1
+            if is_alias
+              entries << Entry.new(
+                source: source_name,
+                expression: expression?(source_name),
+                tokenizer: nil,
+                options: {},
+                query_key: normalized[:alias]
+              )
+            elsif tokenizers
               if single_tokenizer_keys_present
                 raise InvalidIndexDefinition,
                       "field #{source_name.inspect} cannot mix :tokenizers with :tokenizer/:args/:named_args/:filters/:stemmer/:alias"
