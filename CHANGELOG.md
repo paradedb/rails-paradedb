@@ -4,8 +4,6 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
-## [0.5.0] - 2026-04-13
-
 ### Fixed
 
 - Allow aliased indexed expressions like `"(rating + 1)" => { alias: "rating" }`
@@ -116,8 +114,7 @@ All notable changes to this project will be documented in this file. The format 
 - Schema dump/load round-trip for tokenizer configuration and index options
   (including `target_segment_count`)
 
-[Unreleased]: https://github.com/paradedb/rails-paradedb/compare/v0.5.0...HEAD
-[0.5.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.5.0
+[Unreleased]: https://github.com/paradedb/rails-paradedb/compare/v0.4.0...HEAD
 [0.4.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.4.0
 [0.3.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.3.0
 [0.2.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.2.0
