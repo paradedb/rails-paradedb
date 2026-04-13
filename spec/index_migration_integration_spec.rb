@@ -224,7 +224,11 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     after_indexdef = indexdef_for("books_bm25_idx")
 
     refute_equal before_indexdef, after_indexdef
-    assert_includes after_indexdef, "author"
+    assert_sql_equal <<~SQL, after_indexdef
+      CREATE INDEX books_bm25_idx ON public.books
+      USING bm25 (id, ((title)::pdb.simple), ((author)::pdb.literal))
+      WITH (key_field=id)
+    SQL
   end
 
   it "supports reindex_bm25 and guards concurrent reindex in a transaction" do
@@ -269,10 +273,15 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection_pool, stream)
     schema = stream.string
 
-    assert_includes schema, "add_bm25_index"
-    assert_includes schema, ":books"
-    assert_includes schema, "title_simple"
-    assert_includes schema, "target_segment_count"
+    add_stmt = schema.each_line.find do |line|
+      line.include?("add_bm25_index :books") &&
+        line.include?("title_simple") &&
+        line.include?("target_segment_count")
+    end
+
+    assert_equal <<~RUBY.strip, add_stmt.to_s.strip
+      add_bm25_index :books, fields: { id: {}, title: { tokenizer: :simple, alias: "title_simple" } }, key_field: :id, name: "books_bm25_idx", index_options: { :target_segment_count => 17 }
+    RUBY
     expect(schema).not_to match(/add_index.*books_bm25_idx/)
     expect(schema).not_to match(/t\.index.*books_bm25_idx/)
   end
@@ -296,8 +305,11 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     conn.create_paradedb_index(expression_index)
     indexdef = indexdef_for("books_bm25_idx")
 
-    assert_includes indexdef, "metadata"
-    assert_includes indexdef, "pdb.simple"
+    assert_sql_equal <<~SQL, indexdef
+      CREATE INDEX books_bm25_idx ON public.books
+      USING bm25 (id, (((metadata ->> 'title'::text))::pdb.simple('alias=metadata_title')))
+      WITH (key_field=id)
+    SQL
   end
 
   it "allows aliased computed numeric expressions without requiring a tokenizer" do
@@ -323,7 +335,11 @@ RSpec.describe "IndexMigrationIntegrationTest" do
       )
     end.not_to raise_error
 
-    assert_includes indexdef_for("search_idx"), "::pdb.alias('rating')"
+    assert_sql_equal <<~SQL, indexdef_for("search_idx")
+      CREATE INDEX search_idx ON public.mock_items
+      USING bm25 (id, description, (((rating + 1))::pdb.alias('rating')))
+      WITH (key_field=id)
+    SQL
     assert index_exists?("search_idx")
   ensure
     conn.execute("DROP INDEX IF EXISTS search_idx;") rescue nil
@@ -359,7 +375,9 @@ RSpec.describe "IndexMigrationIntegrationTest" do
         line.include?("target_segment_count")
     end
 
-    refute_nil add_stmt
+    assert_equal <<~RUBY.strip, add_stmt.to_s.strip
+      add_bm25_index :books, fields: { id: {}, title: { tokenizers: [{ tokenizer: :literal }, { tokenizer: :simple, alias: "title_simple" }] } }, key_field: :id, name: "books_bm25_idx", index_options: { :target_segment_count => 17 }
+    RUBY
 
     conn.remove_bm25_index(:books, if_exists: true)
     expect { conn.instance_eval(add_stmt.strip) }.not_to raise_error
@@ -391,10 +409,9 @@ RSpec.describe "IndexMigrationIntegrationTest" do
       line.include?("add_bm25_index :books") && line.include?("metadata_title_text")
     end
 
-    refute_nil add_stmt
-    assert_includes add_stmt, "metadata"
-    assert_includes add_stmt, "title"
-    assert_includes add_stmt, "::text"
+    assert_equal <<~RUBY.strip, add_stmt.to_s.strip
+      add_bm25_index :books, fields: { id: {}, "metadata ->> 'title'::text" => { tokenizer: :simple, alias: "metadata_title_text", named_args: { :lowercase => true } } }, key_field: :id, name: "books_bm25_idx"
+    RUBY
 
     conn.remove_bm25_index(:books, if_exists: true)
     expect { conn.instance_eval(add_stmt.strip) }.not_to raise_error
