@@ -300,6 +300,36 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     assert_includes indexdef, "pdb.simple"
   end
 
+  it "allows aliased computed numeric expressions without requiring a tokenizer" do
+    conn = ActiveRecord::Base.connection
+
+    conn.execute("DROP INDEX IF EXISTS search_idx;")
+    conn.drop_table(:mock_items, if_exists: true)
+    conn.create_table(:mock_items) do |t|
+      t.text :description
+      t.integer :rating
+    end
+
+    expect do
+      conn.add_bm25_index(
+        :mock_items,
+        fields: {
+          id: {},
+          description: {},
+          "(rating + 1)" => { alias: "rating" }
+        },
+        key_field: :id,
+        name: :search_idx
+      )
+    end.not_to raise_error
+
+    assert_includes indexdef_for("search_idx"), "::pdb.alias('rating')"
+    assert index_exists?("search_idx")
+  ensure
+    conn.execute("DROP INDEX IF EXISTS search_idx;") rescue nil
+    conn.drop_table(:mock_items, if_exists: true) rescue nil
+  end
+
   it "round-trips schema dump/load for structured multi-tokenizer fields" do
     conn = ActiveRecord::Base.connection
     conn.remove_bm25_index(:books, if_exists: true)
