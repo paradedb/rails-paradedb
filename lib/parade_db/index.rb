@@ -223,10 +223,6 @@ module ParadeDB
             raise InvalidIndexDefinition, "fields must be a Hash"
           end
 
-          build_entries_from_structured_fields(raw_fields)
-        end
-
-        def build_entries_from_structured_fields(raw_fields)
           entries = []
           field_options = {}
 
