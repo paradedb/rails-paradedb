@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-04-14
+
 ### Added
 
 - Support concurrent BM25 index creation via `concurrently:` in `create_paradedb_index` and `add_bm25_index`
@@ -124,7 +126,8 @@ All notable changes to this project will be documented in this file. The format 
 - Schema dump/load round-trip for tokenizer configuration and index options
   (including `target_segment_count`)
 
-[Unreleased]: https://github.com/paradedb/rails-paradedb/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/paradedb/rails-paradedb/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.6.0
 [0.5.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.5.0
 [0.4.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.4.0
 [0.3.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.3.0
