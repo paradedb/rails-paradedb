@@ -6,7 +6,7 @@ class <%= migration_class_name %> < ActiveRecord::Migration[<%= ActiveRecord::Mi
 
 <% end -%>
   def up
-    create_paradedb_index(<%= class_name %>Index, if_not_exists: true)
+    create_paradedb_index(<%= class_name %>Index, if_not_exists: true<% if options[:concurrent] %>, concurrently: true<% end %>)
   end
 
   def down

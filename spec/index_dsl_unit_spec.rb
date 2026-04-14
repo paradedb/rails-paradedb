@@ -43,6 +43,20 @@ RSpec.describe "IndexDslUnitTest" do
     assert_includes sql, "WHERE archived_at IS NULL"
   end
 
+  it "renders concurrent create index SQL" do
+    klass = Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.fields = {
+        id: {},
+        description: { tokenizer: :simple }
+      }
+    end
+
+    sql = ActiveRecord::Base.connection.send(:build_create_sql, klass.compiled_definition, if_not_exists: true, concurrently: true)
+    assert_includes sql, "CREATE INDEX CONCURRENTLY IF NOT EXISTS"
+  end
+
   it "rejects mixing tokenizers with single tokenizer keys" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :products

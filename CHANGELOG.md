@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Added
+
+- Support concurrent BM25 index creation via `concurrently:` in `create_paradedb_index` and `add_bm25_index`
+
 ## [0.5.0] - 2026-04-14
 
 ### Added
