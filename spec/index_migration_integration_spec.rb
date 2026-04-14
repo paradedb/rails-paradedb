@@ -118,6 +118,20 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     assert index_exists?("books_by_name_bm25_idx")
   end
 
+  it "supports create_paradedb_index concurrently" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_bm25_index(:books, if_exists: true)
+
+    conn.create_paradedb_index(IndexMigrationBookIndex, concurrently: true)
+
+    assert index_exists?("books_bm25_idx")
+
+    IndexMigrationBook.create!(title: "Concurrent indexing", author: "ParadeDB")
+    ids = IndexMigrationBook.search(:title_simple).matching_all("concurrent").pluck(:id)
+
+    assert_equal 1, ids.length
+  end
+
   it "create_paradedb_index supports where" do
     conn = ActiveRecord::Base.connection
     conn.remove_bm25_index(:books, if_exists: true)
@@ -190,6 +204,26 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     SQL
 
     conn.remove_bm25_index(:books, name: :books_partial_bm25_idx, if_exists: true)
+  end
+
+  it "supports add_bm25_index concurrently" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_bm25_index(:books, name: :books_concurrent_bm25_idx, if_exists: true)
+
+    conn.add_bm25_index(
+      :books,
+      fields: {
+        id: {},
+        title: { tokenizer: :simple }
+      },
+      key_field: :id,
+      name: :books_concurrent_bm25_idx,
+      concurrently: true
+    )
+
+    assert index_exists?("books_concurrent_bm25_idx")
+
+    conn.remove_bm25_index(:books, name: :books_concurrent_bm25_idx, if_exists: true)
   end
 
   it "rolls back create_paradedb_index in change migrations" do
@@ -296,6 +330,33 @@ RSpec.describe "IndexMigrationIntegrationTest" do
       end
     end
     assert_includes error.message, "cannot run inside a transaction"
+  end
+
+  it "guards concurrent create helpers in a transaction" do
+    conn = ActiveRecord::Base.connection
+
+    create_error = assert_raises(ArgumentError) do
+      conn.transaction do
+        conn.create_paradedb_index(IndexMigrationBookIndex, concurrently: true)
+      end
+    end
+    assert_includes create_error.message, "cannot run inside a transaction"
+
+    add_error = assert_raises(ArgumentError) do
+      conn.transaction do
+        conn.add_bm25_index(
+          :books,
+          fields: {
+            id: {},
+            title: { tokenizer: :simple }
+          },
+          key_field: :id,
+          name: :books_concurrent_bm25_idx,
+          concurrently: true
+        )
+      end
+    end
+    assert_includes add_error.message, "cannot run inside a transaction"
   end
 
   it "makes create_paradedb_index idempotent with if_not_exists" do

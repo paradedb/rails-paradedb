@@ -4,11 +4,15 @@ require_relative "tokenizer_sql"
 
 module ParadeDB
   module MigrationHelpers
-    def create_paradedb_index(index_klass, if_not_exists: false)
+    def create_paradedb_index(index_klass, if_not_exists: false, concurrently: false)
       ensure_postgresql_adapter!
+      if concurrently && transaction_open_for_paradedb?
+        raise ArgumentError, "create_paradedb_index concurrently: true cannot run inside a transaction"
+      end
+
       resolved = resolve_index_klass(index_klass)
       compiled = resolved.compiled_definition
-      execute(build_create_sql(compiled, if_not_exists: if_not_exists))
+      execute(build_create_sql(compiled, if_not_exists: if_not_exists, concurrently: concurrently))
       remember_schema_index_reference(resolved)
     end
 
@@ -21,7 +25,7 @@ module ParadeDB
       remember_schema_index_reference(resolved)
     end
 
-    def add_bm25_index(table, fields:, key_field:, name: nil, index_options: nil, where: nil, if_not_exists: false)
+    def add_bm25_index(table, fields:, key_field:, name: nil, index_options: nil, where: nil, if_not_exists: false, concurrently: false)
       ensure_postgresql_adapter!
       anonymous = Class.new(ParadeDB::Index)
       anonymous.table_name = table
@@ -31,7 +35,7 @@ module ParadeDB
       anonymous.index_options = index_options unless index_options.nil?
       anonymous.where = where unless where.nil?
 
-      create_paradedb_index(anonymous, if_not_exists: if_not_exists)
+      create_paradedb_index(anonymous, if_not_exists: if_not_exists, concurrently: concurrently)
     end
 
     def remove_bm25_index(table, name: nil, if_exists: false)
@@ -77,14 +81,15 @@ module ParadeDB
       ParadeDB.ensure_postgresql_adapter!(self, context: "ParadeDB migration helper")
     end
 
-    def build_create_sql(compiled, if_not_exists:)
+    def build_create_sql(compiled, if_not_exists:, concurrently: false)
+      modifier = concurrently ? " CONCURRENTLY" : ""
       prefix = if_not_exists ? "IF NOT EXISTS " : ""
       fields_sql = compiled.entries.map { |entry| bm25_entry_sql(entry) }.join(", ")
       with_options_sql = bm25_with_options_sql(compiled)
       where_sql = compiled.where ? "\nWHERE #{compiled.where}" : ""
 
       <<~SQL.strip.gsub(/\s+/, " ")
-        CREATE INDEX #{prefix}#{quote_table_name(compiled.index_name)} ON #{quote_table_name(compiled.table_name)}
+        CREATE INDEX#{modifier} #{prefix}#{quote_table_name(compiled.index_name)} ON #{quote_table_name(compiled.table_name)}
         USING bm25 (#{fields_sql})
         WITH (#{with_options_sql})#{where_sql}
       SQL
@@ -846,15 +851,15 @@ end
 if defined?(ActiveRecord::Migration)
   module ParadeDB
     module MigrationDSL
-      def create_paradedb_index(index_klass, if_not_exists: false)
-        connection.create_paradedb_index(index_klass, if_not_exists: if_not_exists)
+      def create_paradedb_index(index_klass, if_not_exists: false, concurrently: false)
+        connection.create_paradedb_index(index_klass, if_not_exists: if_not_exists, concurrently: concurrently)
       end
 
       def replace_paradedb_index(index_klass)
         connection.replace_paradedb_index(index_klass)
       end
 
-      def add_bm25_index(table, fields:, key_field:, name: nil, index_options: nil, where: nil, if_not_exists: false)
+      def add_bm25_index(table, fields:, key_field:, name: nil, index_options: nil, where: nil, if_not_exists: false, concurrently: false)
         connection.add_bm25_index(
           table,
           fields: fields,
@@ -862,7 +867,8 @@ if defined?(ActiveRecord::Migration)
           name: name,
           index_options: index_options,
           where: where,
-          if_not_exists: if_not_exists
+          if_not_exists: if_not_exists,
+          concurrently: concurrently
         )
       end
 

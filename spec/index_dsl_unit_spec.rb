@@ -40,7 +40,30 @@ RSpec.describe "IndexDslUnitTest" do
 
     assert_equal "archived_at IS NULL", compiled.where
     sql = ActiveRecord::Base.connection.send(:build_create_sql, compiled, if_not_exists: false)
-    assert_includes sql, "WHERE archived_at IS NULL"
+    assert_sql_equal <<~SQL, sql
+      CREATE INDEX products_bm25_idx ON products
+      USING bm25 (id, (description::pdb.simple))
+      WITH (key_field='id')
+      WHERE archived_at IS NULL
+    SQL
+  end
+
+  it "renders concurrent create index SQL" do
+    klass = Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.fields = {
+        id: {},
+        description: { tokenizer: :simple }
+      }
+    end
+
+    sql = ActiveRecord::Base.connection.send(:build_create_sql, klass.compiled_definition, if_not_exists: true, concurrently: true)
+    assert_sql_equal <<~SQL, sql
+      CREATE INDEX CONCURRENTLY IF NOT EXISTS products_bm25_idx ON products
+      USING bm25 (id, (description::pdb.simple))
+      WITH (key_field='id')
+    SQL
   end
 
   it "rejects mixing tokenizers with single tokenizer keys" do
@@ -156,7 +179,11 @@ RSpec.describe "IndexDslUnitTest" do
     end
 
     sql = ActiveRecord::Base.connection.send(:build_create_sql, klass.compiled_definition, if_not_exists: false)
-    assert_includes sql, "pdb.ngram(2, 5)"
+    assert_sql_equal <<~SQL, sql
+      CREATE INDEX products_bm25_idx ON products
+      USING bm25 (id, (description::pdb.ngram(2, 5)))
+      WITH (key_field='id')
+    SQL
   end
 
   it "rejects partial ngram bounds in named_args" do
@@ -203,8 +230,11 @@ RSpec.describe "IndexDslUnitTest" do
     end
 
     sql = ActiveRecord::Base.connection.send(:build_create_sql, klass.compiled_definition, if_not_exists: false)
-    assert_includes sql, "::pdb::xyz"
-    assert_includes sql, "::pdb::abc(12, \"fafda\")"
+    assert_sql_equal <<~SQL, sql
+      CREATE INDEX products_bm25_idx ON products
+      USING bm25 (id, (description::pdb::xyz), ((metadata->>'title')::pdb::abc(12, "fafda")))
+      WITH (key_field='id')
+    SQL
   end
 
   it "prefixes unqualified inline tokenizers with pdb namespace" do
@@ -218,7 +248,11 @@ RSpec.describe "IndexDslUnitTest" do
     end
 
     sql = ActiveRecord::Base.connection.send(:build_create_sql, klass.compiled_definition, if_not_exists: false)
-    assert_includes sql, "::pdb.ngram(2, 5)"
+    assert_sql_equal <<~SQL, sql
+      CREATE INDEX products_bm25_idx ON products
+      USING bm25 (id, (description::pdb.ngram(2, 5)))
+      WITH (key_field='id')
+    SQL
   end
 
   it "round-trips tokenizer args through schema ruby" do

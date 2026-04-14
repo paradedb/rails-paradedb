@@ -109,6 +109,12 @@ RSpec.describe ParadeDB::Generators::IndexGenerator do
         expect(content).to include("disable_ddl_transaction!")
       end
 
+      it "creates the index concurrently" do
+        run_generator(["Product"], "concurrent" => true)
+        content = File.read(generated_migration_path("Product"))
+        expect(content).to include("create_paradedb_index(ProductIndex, if_not_exists: true, concurrently: true)")
+      end
+
       it "places disable_ddl_transaction! before the up method" do
         run_generator(["Product"], "concurrent" => true)
         content = File.read(generated_migration_path("Product"))
