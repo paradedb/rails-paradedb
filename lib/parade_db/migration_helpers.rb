@@ -892,7 +892,7 @@ if defined?(ActiveRecord::SchemaDumper)
       def indexes_in_create(table, stream)
         conn = paradedb_connection
         if conn
-          bm25_names = conn.paraded_bm25_index_names
+          bm25_names = conn.paradedb_bm25_index_names
           original_indexes = conn.method(:indexes)
 
           conn.define_singleton_method(:indexes) do |tbl|
