@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Added
+
+- Support partial indexes via `where:` in `add_bm25_index` and `ParadeDB::Index`
+
 ### Fixed
 
 - Allow aliased indexed expressions like `"(rating + 1)" => { alias: "rating" }`

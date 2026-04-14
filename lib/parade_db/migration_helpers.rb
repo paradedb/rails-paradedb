@@ -21,7 +21,7 @@ module ParadeDB
       remember_schema_index_reference(resolved)
     end
 
-    def add_bm25_index(table, fields:, key_field:, name: nil, index_options: nil, if_not_exists: false)
+    def add_bm25_index(table, fields:, key_field:, name: nil, index_options: nil, where: nil, if_not_exists: false)
       ensure_postgresql_adapter!
       anonymous = Class.new(ParadeDB::Index)
       anonymous.table_name = table
@@ -29,6 +29,7 @@ module ParadeDB
       anonymous.index_name = name unless name.nil?
       anonymous.fields = fields
       anonymous.index_options = index_options unless index_options.nil?
+      anonymous.where = where unless where.nil?
 
       create_paradedb_index(anonymous, if_not_exists: if_not_exists)
     end
@@ -80,11 +81,12 @@ module ParadeDB
       prefix = if_not_exists ? "IF NOT EXISTS " : ""
       fields_sql = compiled.entries.map { |entry| bm25_entry_sql(entry) }.join(", ")
       with_options_sql = bm25_with_options_sql(compiled)
+      where_sql = compiled.where ? "\nWHERE #{compiled.where}" : ""
 
       <<~SQL.strip.gsub(/\s+/, " ")
         CREATE INDEX #{prefix}#{quote_table_name(compiled.index_name)} ON #{quote_table_name(compiled.table_name)}
         USING bm25 (#{fields_sql})
-        WITH (#{with_options_sql})
+        WITH (#{with_options_sql})#{where_sql}
       SQL
     end
 
@@ -287,7 +289,8 @@ module ParadeDB
         SELECT
           c.relname  AS index_name,
           t.relname  AS table_name,
-          pg_get_indexdef(c.oid) AS indexdef
+          pg_get_indexdef(c.oid) AS indexdef,
+          pg_get_expr(i.indpred, i.indrelid) AS where_clause
         FROM pg_class c
         JOIN pg_namespace n ON n.oid = c.relnamespace
         JOIN pg_index i ON i.indexrelid = c.oid
@@ -311,6 +314,7 @@ module ParadeDB
       key_field = extract_bm25_key_field(indexdef)
       index_options = extract_bm25_index_options(indexdef)
       fields_sql = extract_bm25_fields_sql(indexdef)
+      where = normalize_bm25_where_clause(row["where_clause"])
 
       if key_field && fields_sql
         field_sqls = split_bm25_top_level(fields_sql).map(&:strip)
@@ -339,6 +343,7 @@ module ParadeDB
         unless index_options.empty?
           statement += ", index_options: #{ruby_hash_literal(index_options)}"
         end
+        statement += ", where: #{where.inspect}" if where
         statement
       else
         "execute #{indexdef.inspect}"
@@ -356,10 +361,7 @@ module ParadeDB
     end
 
     def extract_bm25_index_options(indexdef)
-      with_match = indexdef.match(/WITH\s*\((.*)\)\s*\z/im)
-      return {} unless with_match
-
-      with_sql = with_match[1]
+      with_sql, = extract_bm25_with_components(indexdef)
       options = {}
       split_sql_arguments(with_sql).each do |argument|
         key, value_sql = split_assignment(argument)
@@ -383,7 +385,6 @@ module ParadeDB
 
     def extract_bm25_fields_sql(indexdef)
       match = indexdef.match(/USING\s+bm25\s*\(/im)
-      return nil unless match
 
       start = match.end(0)
       depth = 1
@@ -395,9 +396,59 @@ module ParadeDB
         end
         pos += 1
       end
-      return nil if depth != 0
+      raise "Found invalid index definition `#{indexdef}`" if depth != 0
 
       indexdef[start..pos - 2]
+    end
+
+    def extract_bm25_with_components(indexdef)
+      match = indexdef.match(/WITH\s*\(/im)
+      start = match.end(0)
+      depth = 1
+      pos = start
+      while pos < indexdef.length && depth > 0
+        case indexdef[pos]
+        when "(" then depth += 1
+        when ")" then depth -= 1
+        end
+        pos += 1
+      end
+      raise "Found invalid index definition `#{indexdef}`" if depth != 0
+
+      with_sql = indexdef[start..pos - 2]
+      trailing_sql = indexdef[pos..]&.strip
+      trailing_sql = nil if trailing_sql&.empty?
+
+      [with_sql, trailing_sql]
+    end
+
+    def normalize_bm25_where_clause(where)
+      return nil if where.nil?
+
+      normalized = where.to_s.strip
+      return nil if normalized.empty?
+
+      while bm25_wrapped_in_parentheses?(normalized)
+        normalized = normalized[1...-1].strip
+      end
+
+      normalized.empty? ? nil : normalized
+    end
+
+    def bm25_wrapped_in_parentheses?(sql)
+      return false unless sql.start_with?("(") && sql.end_with?(")")
+
+      depth = 0
+      sql.each_char.with_index do |char, idx|
+        case char
+        when "(" then depth += 1
+        when ")"
+          depth -= 1
+          return false if depth.zero? && idx < sql.length - 1
+        end
+      end
+
+      depth.zero?
     end
 
     def split_bm25_top_level(str)
@@ -803,13 +854,14 @@ if defined?(ActiveRecord::Migration)
         connection.replace_paradedb_index(index_klass)
       end
 
-      def add_bm25_index(table, fields:, key_field:, name: nil, index_options: nil, if_not_exists: false)
+      def add_bm25_index(table, fields:, key_field:, name: nil, index_options: nil, where: nil, if_not_exists: false)
         connection.add_bm25_index(
           table,
           fields: fields,
           key_field: key_field,
           name: name,
           index_options: index_options,
+          where: where,
           if_not_exists: if_not_exists
         )
       end

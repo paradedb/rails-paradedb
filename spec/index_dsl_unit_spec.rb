@@ -25,6 +25,24 @@ RSpec.describe "IndexDslUnitTest" do
     assert_includes compiled.entries.map(&:query_key), "description_simple"
   end
 
+  it "compiles partial index predicates" do
+    klass = Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.where = "archived_at IS NULL"
+      self.fields = {
+        id: {},
+        description: { tokenizer: :simple }
+      }
+    end
+
+    compiled = klass.compiled_definition
+
+    assert_equal "archived_at IS NULL", compiled.where
+    sql = ActiveRecord::Base.connection.send(:build_create_sql, compiled, if_not_exists: false)
+    assert_includes sql, "WHERE archived_at IS NULL"
+  end
+
   it "rejects mixing tokenizers with single tokenizer keys" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :products
@@ -259,5 +277,20 @@ RSpec.describe "IndexDslUnitTest" do
     reloaded_entries = reloaded.compiled_definition.entries.map { |entry| [entry.source, entry.tokenizer, entry.options, entry.query_key] }
 
     assert_equal original_entries, reloaded_entries
+  end
+
+  it "parses nested parentheses in WITH clauses before trailing SQL" do
+    conn = ActiveRecord::Base.connection
+    indexdef = <<~SQL.squish
+      CREATE INDEX products_bm25_idx ON public.products
+      USING bm25 (id, description)
+      WITH (key_field=id, target_segment_count=((17)))
+      WHERE ((archived_at IS NULL))
+    SQL
+
+    with_sql, trailing_sql = conn.send(:extract_bm25_with_components, indexdef)
+
+    assert_equal "key_field=id, target_segment_count=((17))", with_sql
+    assert_equal "WHERE ((archived_at IS NULL))", trailing_sql
   end
 end
