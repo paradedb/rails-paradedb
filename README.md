@@ -30,7 +30,7 @@
 
 ## ParadeDB for Rails
 
-The official ActiveRecord integration for [ParadeDB](https://paradedb.com) including first class support for for managing BM25 indexes and running queries using the full ParadeDB API. Follow the [getting started guide](https://docs.paradedb.com/documentation/getting-started/environment#rails) to begin.
+The official ActiveRecord integration for [ParadeDB](https://paradedb.com), including first-class support for managing BM25 indexes and running queries using the full ParadeDB API. Follow the [getting started guide](https://docs.paradedb.com/documentation/getting-started/environment#rails) to begin.
 
 ## Requirements & Compatibility
 
