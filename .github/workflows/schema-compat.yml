@@ -17,6 +17,9 @@ on:
       version:
         description: "ParadeDB version to check against"
         required: true
+  pull_request:
+    branches: [main]
+
 
 concurrency:
   group: schema-compat-${{ github.head_ref || github.ref }}
