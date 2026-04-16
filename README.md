@@ -43,13 +43,13 @@ The official ActiveRecord integration for [ParadeDB](https://paradedb.com), incl
 
 ## Examples
 
-- [Quick Start](examples/quickstart/quickstart.rb)
+- [README](examples/README.md)
+- [Quickstart](examples/quickstart/quickstart.rb)
 - [Faceted Search](examples/faceted_search/faceted_search.rb)
 - [Autocomplete](examples/autocomplete/autocomplete.rb)
 - [More Like This](examples/more_like_this/more_like_this.rb)
 - [Hybrid RRF](examples/hybrid_rrf/hybrid_rrf.rb)
 - [RAG](examples/rag/rag.rb)
-- [Examples README](examples/README.md)
 
 ## Contributing
 
@@ -57,7 +57,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, test commands, lin
 
 ## Support
 
-If you're missing a feature or found a bug, open a
+If you're missing a feature or have found a bug, open a
 [GitHub Issue](https://github.com/paradedb/rails-paradedb/issues/new/choose).
 
 For community support:
@@ -77,4 +77,4 @@ We would like to thank the following members of the community for their valuable
 
 ## License
 
-rails-paradedb is licensed under the [MIT License](LICENSE).
+ParadeDB for Rails is licensed under the [MIT License](LICENSE).
