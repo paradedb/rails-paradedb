@@ -43,12 +43,11 @@ The official ActiveRecord integration for [ParadeDB](https://paradedb.com), incl
 
 ## Examples
 
-- [README](examples/README.md)
 - [Quickstart](examples/quickstart/quickstart.rb)
 - [Faceted Search](examples/faceted_search/faceted_search.rb)
 - [Autocomplete](examples/autocomplete/autocomplete.rb)
 - [More Like This](examples/more_like_this/more_like_this.rb)
-- [Hybrid RRF](examples/hybrid_rrf/hybrid_rrf.rb)
+- [Hybrid Search (RRF)](examples/hybrid_rrf/hybrid_rrf.rb)
 - [RAG](examples/rag/rag.rb)
 
 ## Contributing
