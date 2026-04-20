@@ -6,8 +6,7 @@ All notable changes to this project will be documented in this file. The format 
 
 ### Changed
 
-- BM25 index definitions and schema dumps now specify field tokenizers with
-  `Tokenizer.*(...)`, matching query APIs like `matching_all`
+- **BREAKING**: Use function based approach for specifying tokenizers: `Tokenizer.simple(options: {alias: "description_simple"})`
 
 ## [0.6.0] - 2026-04-14
 
