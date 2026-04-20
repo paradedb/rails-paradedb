@@ -26,8 +26,8 @@ class MockItemIndex < ParadeDB::Index
     id: nil,
     description: nil,
     rating: nil,
-    category: { tokenizer: :literal },
-    "metadata->>'color'" => { tokenizer: :literal, alias: "metadata_color" },
-    "metadata->>'location'" => { tokenizer: :literal, alias: "metadata_location" }
+    category: { tokenizer: Tokenizer.literal() },
+    "metadata->>'color'" => { tokenizer: Tokenizer.literal(options: {alias: "metadata_color"}) },
+    "metadata->>'location'" => { tokenizer: Tokenizer.literal(options: {alias: "metadata_location"}) }
   }
 end

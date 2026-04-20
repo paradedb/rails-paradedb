@@ -99,7 +99,7 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
       self.fields = {
         id: {},
         category: {},
-        description: { tokenizer: :simple, alias: "description_simple" }
+        description: { tokenizer: Tokenizer.simple(options: {alias: "description_simple"}) }
       }
     end)
 
@@ -121,7 +121,7 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
       self.fields = {
         id: {},
         category: {},
-        description: { tokenizer: :simple, alias: "description_simple" }
+        description: { tokenizer: Tokenizer.simple(options: {alias: "description_simple"}) }
       }
     end)
 
@@ -167,7 +167,7 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
       self.key_field = :id
       self.fields = {
         id: {},
-        description: { tokenizer: :simple, alias: "description_simple" }
+        description: { tokenizer: Tokenizer.simple(options: {alias: "description_simple"}) }
       }
     end)
 
@@ -192,7 +192,7 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
       self.key_field = :id
       self.fields = {
         id: {},
-        description: { tokenizer: :literal, alias: "description_exact" }
+        description: { tokenizer: Tokenizer.literal(options: {alias: "description_exact"}) }
       }
     end)
 
@@ -214,7 +214,7 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
       self.key_field = :id
       self.fields = {
         id: {},
-        description: { tokenizer: :simple, alias: "description_simple" }
+        description: { tokenizer: Tokenizer.simple(options: {alias: "description_simple"}) }
       }
     end)
 
@@ -243,7 +243,7 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
       self.key_field = :id
       self.fields = {
         id: {},
-        description: { tokenizer: :simple, alias: "description_simple" }
+        description: { tokenizer: Tokenizer.simple(options: {alias: "description_simple"}) }
       }
     end)
 

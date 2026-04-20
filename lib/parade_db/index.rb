@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "tokenizer"
+
 module ParadeDB
   class Index
     class << self
@@ -47,117 +49,29 @@ module ParadeDB
 
     class TokenizerParser
       TOKENIZER_EXPRESSION = /\A[a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\s*[a-zA-Z0-9_'".,=\s:-]*\s*\))?\z/.freeze
-      TOKENIZER_SINGLE_KEYS = %i[tokenizer args named_args filters stemmer alias].freeze
+      TOKENIZER_SINGLE_KEYS = %i[tokenizer alias].freeze
 
       class << self
-        def parse(source_name, tokenizer_spec)
-          case tokenizer_spec
-          when Symbol, String
-            [build_tokenized_entry(source_name, tokenizer_spec.to_s, {})]
-          when Hash
-            tokenizer_spec.map do |tokenizer, opts|
-              case opts
-              when Hash
-                build_tokenized_entry(source_name, tokenizer.to_s, normalize_options(opts))
-              when Symbol, String
-                build_tokenized_entry(source_name, tokenizer.to_s, normalize_positional_option(opts))
-              else
-                raise InvalidIndexDefinition,
-                      "tokenizer options for #{source_name}.#{tokenizer} must be a Hash, Symbol, or String"
-              end
-            end
-          else
-            raise InvalidIndexDefinition,
-                  "invalid tokenizer definition for #{source_name}: #{tokenizer_spec.inspect}"
+        def parse(source_name, tokenizer, context:)
+          unless tokenizer.is_a?(Tokenizer)
+            raise InvalidIndexDefinition, "#{context} for #{source_name.inspect} must be a Tokenizer"
           end
-        end
-
-        private
-
-        def parse_structured_tokenizer_config(source_name, config, context:)
-          unless config.is_a?(Hash)
-            raise InvalidIndexDefinition, "#{context} for #{source_name.inspect} must be a Hash"
-          end
-
-          tokenizer = config[:tokenizer] || config["tokenizer"]
-          if tokenizer.nil?
-            raise InvalidIndexDefinition, "#{context} for #{source_name.inspect} requires :tokenizer"
-          end
-
-          tokenizer_name = tokenizer.to_s
-          validate_tokenizer_name!(source_name, tokenizer_name)
-
-          args = config[:args] || config["args"]
-          named_args = config[:named_args] || config["named_args"]
-          filters = config[:filters] || config["filters"]
-          stemmer = config[:stemmer] || config["stemmer"]
-          alias_name = config[:alias] || config["alias"]
 
           options = {}
-          if args
-            unless args.respond_to?(:to_ary)
-              raise InvalidIndexDefinition, "args for #{source_name.inspect} must be an Array"
-            end
-            options[:__positional] = args.to_ary
-          end
+          options[:__positional] = tokenizer.positional_args.dup unless tokenizer.positional_args.nil?
+          tokenizer.options&.each { |key, value| options[key.to_sym] = value }
 
-          if named_args
-            unless named_args.is_a?(Hash)
-              raise InvalidIndexDefinition, "named_args for #{source_name.inspect} must be a Hash"
-            end
-            named_args.each { |key, value| options[key.to_sym] = value }
-          end
-
-          if filters
-            unless filters.respond_to?(:to_ary)
-              raise InvalidIndexDefinition, "filters for #{source_name.inspect} must be an Array"
-            end
-            filters.to_ary.each do |name|
-              filter_key = name.to_s
-              if filter_key == "stemmer" && stemmer
-                options[:stemmer] = stemmer
-              else
-                key = filter_key.to_sym
-                options[key] = true unless options.key?(key)
-              end
-            end
-          end
-
-          options[:stemmer] = stemmer if stemmer && !options.key?(:stemmer)
-          options[:alias] = alias_name.to_s if alias_name
-
-          build_tokenized_entry(source_name, tokenizer_name, options)
-        end
-
-        def normalize_options(opts)
-          opts.each_with_object({}) do |(key, value), memo|
-            memo[key.to_sym] = value
-          end
-        end
-
-        def normalize_positional_option(option)
-          { __positional: [option.to_s] }
-        end
-
-        def build_tokenized_entry(source_name, tokenizer, options)
-          validate_tokenizer_name!(source_name, tokenizer) unless tokenizer.nil?
           key = options[:alias]&.to_s || source_name
           DefinitionCompiler::Entry.new(
             source: source_name,
             expression: expression?(source_name),
-            tokenizer: tokenizer,
+            tokenizer: tokenizer.name,
             options: options,
             query_key: key
           )
         end
 
-        def validate_tokenizer_name!(source_name, tokenizer)
-          return if TOKENIZER_EXPRESSION.match?(tokenizer)
-
-          raise InvalidIndexDefinition,
-                "invalid tokenizer name #{tokenizer.inspect} for #{source_name}. " \
-                "Expected identifier form like simple, pdb::simple, or pdb::ngram(2, 5, alias=field_alias)."
-        end
+        private
 
         def expression?(value)
           value.match?(/[^a-zA-Z0-9_]/)
@@ -260,33 +174,22 @@ module ParadeDB
             elsif tokenizers
               if single_tokenizer_keys_present
                 raise InvalidIndexDefinition,
-                      "field #{source_name.inspect} cannot mix :tokenizers with :tokenizer/:args/:named_args/:filters/:stemmer/:alias"
+                      "field #{source_name.inspect} cannot mix :tokenizers with :tokenizer/:alias"
               end
               unless tokenizers.respond_to?(:to_ary) && !tokenizers.to_ary.empty?
                 raise InvalidIndexDefinition, "field #{source_name.inspect} :tokenizers must be a non-empty Array"
               end
 
               tokenizers.to_ary.each_with_index do |tokenizer_config, idx|
-                entry = TokenizerParser.send(
-                  :parse_structured_tokenizer_config,
-                  source_name,
-                  tokenizer_config,
-                  context: "tokenizers[#{idx}]"
-                )
+                entry = TokenizerParser.parse(source_name, tokenizer_config, context: "tokenizers[#{idx}]")
                 entries << entry
               end
-            elsif single_tokenizer_keys_present
-              unless normalized[:tokenizer]
-                raise InvalidIndexDefinition,
-                      "field #{source_name.inspect} specifies tokenizer configuration but no :tokenizer"
-              end
-              entry = TokenizerParser.send(
-                :parse_structured_tokenizer_config,
-                source_name,
-                select_keys(normalized, TokenizerParser::TOKENIZER_SINGLE_KEYS),
-                context: "tokenizer config"
-              )
+            elsif normalized.key?(:tokenizer)
+              entry = TokenizerParser.parse(source_name, normalized[:tokenizer], context: "tokenizer")
               entries << entry
+            elsif single_tokenizer_keys_present
+              raise InvalidIndexDefinition,
+                    "field #{source_name.inspect} specifies tokenizer configuration but no :tokenizer"
             else
               entries << Entry.new(
                 source: source_name,

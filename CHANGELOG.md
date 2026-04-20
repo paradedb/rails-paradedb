@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Changed
+
+- BM25 index definitions and schema dumps now specify field tokenizers with
+  `Tokenizer.*(...)`, matching query APIs like `matching_all`
+
 ## [0.6.0] - 2026-04-14
 
 ### Added

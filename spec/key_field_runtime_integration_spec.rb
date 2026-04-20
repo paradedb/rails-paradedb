@@ -12,7 +12,7 @@ class RuntimeKeyDocIndex < ParadeDB::Index
   self.key_field = :external_id
   self.fields = {
     external_id: {},
-    body: { tokenizer: :simple },
+    body: { tokenizer: Tokenizer.simple() },
     tag: {}
   }
 end

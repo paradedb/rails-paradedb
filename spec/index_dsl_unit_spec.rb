@@ -12,8 +12,8 @@ RSpec.describe "IndexDslUnitTest" do
         id: {},
         description: {
           tokenizers: [
-            { tokenizer: :literal },
-            { tokenizer: :simple, alias: "description_simple", filters: [:lowercase] }
+            Tokenizer.literal(),
+            Tokenizer.simple(options: {alias: "description_simple", lowercase: true})
           ]
         }
       }
@@ -32,7 +32,7 @@ RSpec.describe "IndexDslUnitTest" do
       self.where = "archived_at IS NULL"
       self.fields = {
         id: {},
-        description: { tokenizer: :simple }
+        description: { tokenizer: Tokenizer.simple() }
       }
     end
 
@@ -54,7 +54,7 @@ RSpec.describe "IndexDslUnitTest" do
       self.key_field = :id
       self.fields = {
         id: {},
-        description: { tokenizer: :simple }
+        description: { tokenizer: Tokenizer.simple() }
       }
     end
 
@@ -73,8 +73,8 @@ RSpec.describe "IndexDslUnitTest" do
       self.fields = {
         id: {},
         description: {
-          tokenizers: [{ tokenizer: :literal }],
-          tokenizer: :simple
+          tokenizers: [Tokenizer.literal()],
+          tokenizer: Tokenizer.simple()
         }
       }
     end
@@ -83,18 +83,18 @@ RSpec.describe "IndexDslUnitTest" do
     assert_includes error.message, "cannot mix"
   end
 
-  it "rejects tokenizer config without tokenizer key" do
+  it "rejects non-Tokenizer tokenizer config" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :products
       self.key_field = :id
       self.fields = {
         id: {},
-        description: { filters: [:lowercase] }
+        description: { tokenizer: :simple }
       }
     end
 
     error = assert_raises(ParadeDB::InvalidIndexDefinition) { klass.compiled_definition }
-    assert_includes error.message, "no :tokenizer"
+    assert_includes error.message, "must be a Tokenizer"
   end
 
   it "compiles a valid index definition" do
@@ -103,9 +103,9 @@ RSpec.describe "IndexDslUnitTest" do
       self.key_field = :id
       self.fields = {
         id: {},
-        description: { tokenizer: :simple },
-        category: { tokenizer: :literal },
-        "metadata->>'title'" => { tokenizer: :simple, alias: "metadata_title" }
+        description: { tokenizer: Tokenizer.simple() },
+        category: { tokenizer: Tokenizer.literal() },
+        "metadata->>'title'" => { tokenizer: Tokenizer.simple(options: {alias: "metadata_title"}) }
       }
     end
 
@@ -134,8 +134,8 @@ RSpec.describe "IndexDslUnitTest" do
         id: {},
         description: {
           tokenizers: [
-            { tokenizer: :simple },
-            { tokenizer: :literal }
+            Tokenizer.simple(),
+            Tokenizer.literal()
           ]
         }
       }
@@ -154,8 +154,8 @@ RSpec.describe "IndexDslUnitTest" do
         id: {},
         description: {
           tokenizers: [
-            { tokenizer: :simple, alias: "description_simple" },
-            { tokenizer: :literal, alias: "description_exact" }
+            Tokenizer.simple(options: {alias: "description_simple"}),
+            Tokenizer.literal(options: {alias: "description_exact"})
           ]
         }
       }
@@ -174,7 +174,7 @@ RSpec.describe "IndexDslUnitTest" do
       self.key_field = :id
       self.fields = {
         id: {},
-        description: { tokenizer: :ngram, named_args: { min: 2, max: 5 } }
+        description: { tokenizer: Tokenizer.ngram(2, 5) }
       }
     end
 
@@ -186,71 +186,35 @@ RSpec.describe "IndexDslUnitTest" do
     SQL
   end
 
-  it "rejects partial ngram bounds in named_args" do
+  it "rejects non-Tokenizer values in tokenizers arrays" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :products
       self.key_field = :id
       self.fields = {
         id: {},
-        description: { tokenizer: :ngram, named_args: { min: 2 } }
+        description: { tokenizers: [Tokenizer.literal(), :simple] }
       }
     end
 
-    error = assert_raises(ArgumentError) do
-      ActiveRecord::Base.connection.send(:build_create_sql, klass.compiled_definition, if_not_exists: false)
-    end
-    assert_includes error.message, ":min and :max must be provided together"
+    error = assert_raises(ParadeDB::InvalidIndexDefinition) { klass.compiled_definition }
+    assert_includes error.message, "must be a Tokenizer"
   end
 
-  it "rejects max-only ngram bounds in named_args" do
+  it "renders custom tokenizer objects" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :products
       self.key_field = :id
       self.fields = {
         id: {},
-        description: { tokenizer: :ngram, named_args: { max: 5 } }
-      }
-    end
-
-    error = assert_raises(ArgumentError) do
-      ActiveRecord::Base.connection.send(:build_create_sql, klass.compiled_definition, if_not_exists: false)
-    end
-    assert_includes error.message, ":min and :max must be provided together"
-  end
-
-  it "renders qualified and inline tokenizer forms" do
-    klass = Class.new(ParadeDB::Index) do
-      self.table_name = :products
-      self.key_field = :id
-      self.fields = {
-        id: {},
-        description: { tokenizer: "pdb::xyz" },
-        "metadata->>'title'" => { tokenizer: "pdb::abc(12, \"fafda\")" }
+        description: { tokenizer: Tokenizer.new("pdb::xyz", nil, nil) },
+        "metadata->>'title'" => { tokenizer: Tokenizer.new("pdb::abc", [12, "fafda"], nil) }
       }
     end
 
     sql = ActiveRecord::Base.connection.send(:build_create_sql, klass.compiled_definition, if_not_exists: false)
     assert_sql_equal <<~SQL, sql
       CREATE INDEX products_bm25_idx ON products
-      USING bm25 (id, (description::pdb::xyz), ((metadata->>'title')::pdb::abc(12, "fafda")))
-      WITH (key_field='id')
-    SQL
-  end
-
-  it "prefixes unqualified inline tokenizers with pdb namespace" do
-    klass = Class.new(ParadeDB::Index) do
-      self.table_name = :products
-      self.key_field = :id
-      self.fields = {
-        id: {},
-        description: { tokenizer: "ngram(2, 5)" }
-      }
-    end
-
-    sql = ActiveRecord::Base.connection.send(:build_create_sql, klass.compiled_definition, if_not_exists: false)
-    assert_sql_equal <<~SQL, sql
-      CREATE INDEX products_bm25_idx ON products
-      USING bm25 (id, (description::pdb.ngram(2, 5)))
+      USING bm25 (id, (description::pdb::xyz), ((metadata->>'title')::pdb::abc(12, 'fafda')))
       WITH (key_field='id')
     SQL
   end
@@ -262,10 +226,7 @@ RSpec.describe "IndexDslUnitTest" do
       self.fields = {
         id: {},
         description: {
-          tokenizer: :ngram,
-          args: [2, 5],
-          named_args: { prefix_only: true },
-          alias: "description_ngram"
+          tokenizer: Tokenizer.ngram(2, 5, options: {prefix_only: true, alias: "description_ngram"})
         }
       }
     end
