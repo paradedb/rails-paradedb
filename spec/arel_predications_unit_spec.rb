@@ -64,7 +64,7 @@ RSpec.describe "ArelPredicationsUnitTest" do
     assert_equal %("products"."description" ### 'running shoes'::pdb.slop(10)), sql(node)
   end
   it "pdb_phrase with tokenizer" do
-    node = @t[:description].pdb_phrase("running shoes", tokenizer: "whitespace")
+    node = @t[:description].pdb_phrase("running shoes", tokenizer: Tokenizer.whitespace())
     assert_equal %("products"."description" ### 'running shoes'::pdb.whitespace), sql(node)
   end
   it "pdb_phrase with pretokenized array" do

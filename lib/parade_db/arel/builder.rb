@@ -302,12 +302,11 @@ module ParadeDB
       def apply_tokenizer(node, tokenizer)
         return node if tokenizer.nil?
 
-        unless tokenizer.is_a?(String)
-          raise ArgumentError, "tokenizer must be a string"
+        unless tokenizer.is_a?(Tokenizer)
+          raise ArgumentError, "tokenizer must be a Tokenizer"
         end
 
-        normalized = normalize_tokenizer(tokenizer)
-        Nodes::TokenizerCast.new(node, normalized)
+        return Nodes::TokenizerCast.new(node, tokenizer.render())
       end
 
       def apply_slop(node, slop)

@@ -48,7 +48,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
   end
   it "matching with tokenizer override executes" do
     ids = BehaviorProduct.search(:description)
-                         .matching_any("running shoes", tokenizer: "whitespace")
+                         .matching_any("running shoes", tokenizer: Tokenizer.whitespace())
                          .order(:id)
                          .pluck(:id)
 
@@ -56,21 +56,21 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
   end
   it "matching all with supported tokenizers matches raw SQL" do
     [
-      ["pdb.whitespace", "whitespace"],
-      ["pdb.whitespace('alias=my_column')", "whitespace('alias=my_column')"],
-      ["pdb.unicode_words", "unicode_words"],
-      ["pdb.literal", "literal"],
-      ["pdb.literal_normalized", "literal_normalized"],
-      ["pdb.ngram(3,3)", "ngram(3,3)"],
-      ["pdb.ngram(3,3,'positions=true')", "ngram(3,3,'positions=true')"],
-      ["pdb.edge_ngram(2,5)", "edge_ngram(2,5)"],
-      ["pdb.simple", "simple"],
-      # ["pdb.regex_pattern('.*')", "regex_pattern('.*')"], # rejected by the current tokenizer validator
-      ["pdb.chinese_compatible", "chinese_compatible"],
-      ["pdb.lindera('chinese')", "lindera('chinese')"],
-      ["pdb.icu", "icu"],
-      ["pdb.jieba", "jieba"],
-      ["pdb.source_code", "source_code"]
+      ["pdb.whitespace", Tokenizer.whitespace()],
+      ["pdb.whitespace('alias=my_column')", Tokenizer.whitespace(options: {alias: "my_column"})],
+      ["pdb.unicode_words", Tokenizer.unicode_words()],
+      ["pdb.literal", Tokenizer.literal()],
+      ["pdb.literal_normalized", Tokenizer.literal_normalized()],
+      ["pdb.ngram(3,3)", Tokenizer.ngram(3, 3)],
+      ["pdb.ngram(3,3,'positions=true')", Tokenizer.ngram(3, 3, options: {positions: true})],
+      ["pdb.edge_ngram(2,5)", Tokenizer.edge_ngram(2, 5)],
+      ["pdb.simple", Tokenizer.simple()],
+      ["pdb.regex_pattern('.*')", Tokenizer.regex_pattern('.*')],
+      ["pdb.chinese_compatible", Tokenizer.chinese_compatible()],
+      ["pdb.lindera('chinese')", Tokenizer.lindera('chinese')],
+      ["pdb.icu", Tokenizer.icu()],
+      ["pdb.jieba", Tokenizer.jieba()],
+      ["pdb.source_code", Tokenizer.source_code()]
     ].each do |expected, tokenizer|
       relation = BehaviorProduct.search(:description)
                                 .matching_all("running shoes", tokenizer: tokenizer)
@@ -88,7 +88,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
   it "matching with tokenizer + fuzzy distance raises argument error" do
     error = assert_raises(ArgumentError) do
       BehaviorProduct.search(:description)
-                     .matching_any("runing shose", tokenizer: "whitespace", distance: 1)
+                     .matching_any("runing shose", tokenizer: Tokenizer.whitespace(), distance: 1)
                      .order(:id)
                      .pluck(:id)
     end
@@ -97,7 +97,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
   it "matching with tokenizer + fuzzy constant score raises argument error" do
     error = assert_raises(ArgumentError) do
       BehaviorProduct.search(:description)
-                     .matching_any("runing shose", tokenizer: "whitespace", distance: 1, constant_score: 1.0)
+                     .matching_any("runing shose", tokenizer: Tokenizer.whitespace(), distance: 1, constant_score: 1.0)
                      .order(:id)
                      .pluck(:id)
     end
@@ -475,7 +475,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       SQL
 
       relation = BehaviorProduct.search(:description)
-                                .phrase("running shoes", tokenizer: "whitespace")
+                                .phrase("running shoes", tokenizer: Tokenizer.whitespace())
                                 .order(:id)
 
       expected_ids = [1, 5]

@@ -101,29 +101,13 @@ RSpec.describe "GuardsUnitTest" do
     node = builder.match(:description, "shoes", boost: nil)
     refute_nil node
   end
-  it "match tokenizer rejects non-string" do
-    error = assert_raises(ArgumentError) { builder.match(:description, "shoes", tokenizer: 123) }
-    assert_includes error.message, "tokenizer must be a string"
-  end
-  it "match tokenizer rejects invalid expression" do
+  it "match tokenizer rejects strings" do
     error = assert_raises(ArgumentError) { builder.match(:description, "shoes", tokenizer: "whitespace;drop") }
-    assert_includes error.message, "invalid tokenizer expression"
+    assert_includes error.message, "tokenizer must be a Tokenizer"
   end
   it "phrase slop rejects non numeric" do
     error = assert_raises(ArgumentError) { builder.phrase(:description, "running shoes", slop: "lots") }
     assert_includes error.message, "slop must be numeric"
-  end
-  it "phrase tokenizer rejects non-string" do
-    error = assert_raises(ArgumentError) { builder.phrase(:description, "running shoes", tokenizer: 123) }
-    assert_includes error.message, "tokenizer must be a string"
-  end
-  it "phrase tokenizer rejects invalid expression" do
-    error = assert_raises(ArgumentError) { builder.phrase(:description, "running shoes", tokenizer: "whitespace;drop") }
-    assert_includes error.message, "invalid tokenizer expression"
-  end
-  it "phrase array rejects tokenizer" do
-    error = assert_raises(ArgumentError) { builder.phrase(:description, %w[running shoes], tokenizer: "whitespace") }
-    assert_includes error.message, "tokenizer is not supported for pretokenized phrase arrays"
   end
   it "phrase slop accepts integer" do
     node = builder.phrase(:description, "running shoes", slop: 2)
@@ -143,13 +127,13 @@ RSpec.describe "GuardsUnitTest" do
   end
   it "matching_any rejects tokenizer combined with fuzzy options" do
     error = assert_raises(ArgumentError) do
-      builder.match_any(:description, "shoes", tokenizer: "whitespace", distance: 1)
+      builder.match_any(:description, "shoes", tokenizer: Tokenizer.whitespace(), distance: 1)
     end
     assert_includes error.message, "tokenizer cannot be combined with fuzzy options"
   end
   it "matching_all rejects tokenizer combined with fuzzy options" do
     error = assert_raises(ArgumentError) do
-      builder.match(:description, "shoes", tokenizer: "whitespace", prefix: true)
+      builder.match(:description, "shoes", tokenizer: Tokenizer.whitespace(), prefix: true)
     end
     assert_includes error.message, "tokenizer cannot be combined with fuzzy options"
   end
