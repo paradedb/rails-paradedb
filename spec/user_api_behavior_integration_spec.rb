@@ -54,6 +54,37 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
 
     assert_equal [1, 2, 6], ids
   end
+  it "matching all with supported tokenizers matches raw SQL" do
+    [
+      ["pdb.whitespace", "whitespace"],
+      ["pdb.whitespace('alias=my_column')", "whitespace('alias=my_column')"],
+      ["pdb.unicode_words", "unicode_words"],
+      ["pdb.literal", "literal"],
+      ["pdb.literal_normalized", "literal_normalized"],
+      ["pdb.ngram(3,3)", "ngram(3,3)"],
+      ["pdb.ngram(3,3,'positions=true')", "ngram(3,3,'positions=true')"],
+      ["pdb.edge_ngram(2,5)", "edge_ngram(2,5)"],
+      ["pdb.simple", "simple"],
+      # ["pdb.regex_pattern('.*')", "regex_pattern('.*')"], # rejected by the current tokenizer validator
+      ["pdb.chinese_compatible", "chinese_compatible"],
+      ["pdb.lindera('chinese')", "lindera('chinese')"],
+      ["pdb.icu", "icu"],
+      ["pdb.jieba", "jieba"],
+      ["pdb.source_code", "source_code"]
+    ].each do |expected, tokenizer|
+      relation = BehaviorProduct.search(:description)
+                                .matching_all("running shoes", tokenizer: tokenizer)
+                                .order(:id)
+
+      relation.load
+
+      assert_sql_equal <<~SQL, relation.to_sql
+        SELECT products.* FROM products
+        WHERE ("products"."description" &&& 'running shoes'::#{expected})
+        ORDER BY "products"."id" ASC
+      SQL
+    end
+  end
   it "matching with tokenizer + fuzzy distance raises argument error" do
     error = assert_raises(ArgumentError) do
       BehaviorProduct.search(:description)
