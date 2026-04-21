@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-04-21
+
 ### Changed
 
 - **BREAKING**: Use function based approach for specifying tokenizers: `Tokenizer.simple(options: {alias: "description_simple"})`
@@ -130,7 +132,8 @@ All notable changes to this project will be documented in this file. The format 
 - Schema dump/load round-trip for tokenizer configuration and index options
   (including `target_segment_count`)
 
-[Unreleased]: https://github.com/paradedb/rails-paradedb/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/paradedb/rails-paradedb/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.7.0
 [0.6.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.6.0
 [0.5.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.5.0
 [0.4.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.4.0
