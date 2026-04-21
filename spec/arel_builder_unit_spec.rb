@@ -59,11 +59,11 @@ RSpec.describe "ArelBuilderUnitTest" do
     assert_equal %("products"."description" &&& 'shoes'::pdb.boost(2.5)), sql(node)
   end
   it "match with tokenizer override" do
-    node = @builder.match(:description, "running shoes", tokenizer: "whitespace")
+    node = @builder.match(:description, "running shoes", tokenizer: Tokenizer.whitespace())
     assert_equal %("products"."description" &&& 'running shoes'::pdb.whitespace), sql(node)
   end
   it "match with tokenizer override and args" do
-    node = @builder.match(:description, "running shoes", tokenizer: "whitespace('lowercase=false')")
+    node = @builder.match(:description, "running shoes", tokenizer: Tokenizer.whitespace(options: {lowercase: false}))
     assert_equal %("products"."description" &&& 'running shoes'::pdb.whitespace('lowercase=false')), sql(node)
   end
   it "match without boost" do
@@ -95,7 +95,7 @@ RSpec.describe "ArelBuilderUnitTest" do
     assert_equal %("products"."description" ### 'running shoes'::pdb.slop(10)), sql(node)
   end
   it "phrase with tokenizer override" do
-    node = @builder.phrase(:description, "running shoes", tokenizer: "whitespace")
+    node = @builder.phrase(:description, "running shoes", tokenizer: Tokenizer.whitespace())
     assert_equal %("products"."description" ### 'running shoes'::pdb.whitespace), sql(node)
   end
   it "phrase with slop and constant score bridges through query" do

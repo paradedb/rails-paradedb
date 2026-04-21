@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING**: Use function based approach for specifying tokenizers: `Tokenizer.simple(options: {alias: "description_simple"})`
+
 ## [0.6.0] - 2026-04-14
 
 ### Added

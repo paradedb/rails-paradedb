@@ -12,6 +12,7 @@ require_relative "parade_db/migration_helpers"
 require_relative "parade_db/model"
 require_relative "parade_db/search_methods"
 require_relative "parade_db/railtie"
+require_relative "parade_db/tokenizer"
 
 module ParadeDB
   FacetQueryError = Errors::FacetQueryError

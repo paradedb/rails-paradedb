@@ -16,11 +16,11 @@ class IndexMigrationBookIndex < ParadeDB::Index
     id: {},
     title: {
       tokenizers: [
-        { tokenizer: :literal },
-        { tokenizer: :simple, alias: "title_simple", filters: [:lowercase] }
+        Tokenizer.literal(),
+        Tokenizer.simple(options: {alias: "title_simple", lowercase: true})
       ]
     },
-    author: { tokenizer: :literal },
+    author: { tokenizer: Tokenizer.literal() },
     metadata: { fast: true, expand_dots: false }
   }
 end
@@ -31,7 +31,7 @@ class IndexMigrationBookByNameIndex < ParadeDB::Index
   self.index_name = :books_by_name_bm25_idx
   self.fields = {
     id: {},
-    title: { tokenizer: :simple }
+    title: { tokenizer: Tokenizer.simple() }
   }
 end
 
@@ -95,8 +95,8 @@ RSpec.describe "IndexMigrationIntegrationTest" do
         id: {},
         title: {
           tokenizers: [
-            { tokenizer: :literal },
-            { tokenizer: :simple }
+            Tokenizer.literal(),
+            Tokenizer.simple()
           ]
         }
       }
@@ -144,7 +144,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
       self.where = "author IS NOT NULL"
       self.fields = {
         id: {},
-        title: { tokenizer: :simple },
+        title: { tokenizer: Tokenizer.simple() },
         author: {}
       }
     end
@@ -167,7 +167,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
       :books,
       fields: {
         id: {},
-        title: { tokenizer: :simple }
+        title: { tokenizer: Tokenizer.simple() }
       },
       key_field: :id,
       name: :books_custom_bm25_idx,
@@ -187,7 +187,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
       :books,
       fields: {
         id: {},
-        title: { tokenizer: :simple }
+        title: { tokenizer: Tokenizer.simple() }
       },
       key_field: :id,
       name: :books_partial_bm25_idx,
@@ -214,7 +214,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
       :books,
       fields: {
         id: {},
-        title: { tokenizer: :simple }
+        title: { tokenizer: Tokenizer.simple() }
       },
       key_field: :id,
       name: :books_concurrent_bm25_idx,
@@ -252,7 +252,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
         :books,
         fields: {
           id: {},
-          title: { tokenizer: :simple }
+          title: { tokenizer: Tokenizer.simple() }
         },
         key_field: :id,
         name: :books_custom_bm25_idx,
@@ -292,7 +292,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
       self.key_field = :id
       self.fields = {
         id: {},
-        title: { tokenizer: :simple }
+        title: { tokenizer: Tokenizer.simple() }
       }
     end
     v2 = Class.new(ParadeDB::Index) do
@@ -300,8 +300,8 @@ RSpec.describe "IndexMigrationIntegrationTest" do
       self.key_field = :id
       self.fields = {
         id: {},
-        title: { tokenizer: :simple },
-        author: { tokenizer: :literal }
+        title: { tokenizer: Tokenizer.simple() },
+        author: { tokenizer: Tokenizer.literal() }
       }
     end
 
@@ -348,7 +348,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
           :books,
           fields: {
             id: {},
-            title: { tokenizer: :simple }
+            title: { tokenizer: Tokenizer.simple() }
           },
           key_field: :id,
           name: :books_concurrent_bm25_idx,
@@ -376,7 +376,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
       :books,
       fields: {
         id: {},
-        title: { tokenizer: :simple, alias: "title_simple" }
+        title: { tokenizer: Tokenizer.simple(options: {alias: "title_simple"}) }
       },
       key_field: :id,
       index_options: { target_segment_count: 17 },
@@ -395,7 +395,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     end
 
     assert_equal <<~RUBY.strip, add_stmt.to_s.strip
-      add_bm25_index :books, fields: { id: {}, title: { tokenizer: :simple, alias: "title_simple" } }, key_field: :id, name: "books_bm25_idx", index_options: { :target_segment_count => 17 }
+      add_bm25_index :books, fields: { id: {}, title: { tokenizer: Tokenizer.simple(options: { :alias => "title_simple" }) } }, key_field: :id, name: "books_bm25_idx", index_options: { :target_segment_count => 17 }
     RUBY
     expect(schema).not_to match(/add_index.*books_bm25_idx/)
     expect(schema).not_to match(/t\.index.*books_bm25_idx/)
@@ -411,8 +411,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
       self.fields = {
         id: {},
         "(metadata->>'title')::text": {
-          tokenizer: :simple,
-          alias: "metadata_title"
+          tokenizer: Tokenizer.simple(options: {alias: "metadata_title"})
         }
       }
     end
@@ -471,8 +470,8 @@ RSpec.describe "IndexMigrationIntegrationTest" do
         id: {},
         title: {
           tokenizers: [
-            { tokenizer: :literal },
-            { tokenizer: :simple, alias: "title_simple" }
+            Tokenizer.literal(),
+            Tokenizer.simple(options: {alias: "title_simple"})
           ]
         }
       },
@@ -491,7 +490,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     end
 
     assert_equal <<~RUBY.strip, add_stmt.to_s.strip
-      add_bm25_index :books, fields: { id: {}, title: { tokenizers: [{ tokenizer: :literal }, { tokenizer: :simple, alias: "title_simple" }] } }, key_field: :id, name: "books_bm25_idx", index_options: { :target_segment_count => 17 }
+      add_bm25_index :books, fields: { id: {}, title: { tokenizers: [Tokenizer.literal(), Tokenizer.simple(options: { :alias => "title_simple" })] } }, key_field: :id, name: "books_bm25_idx", index_options: { :target_segment_count => 17 }
     RUBY
 
     conn.remove_bm25_index(:books, if_exists: true)
@@ -508,9 +507,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
       fields: {
         id: {},
         "(metadata->>'title')::text": {
-          tokenizer: :simple,
-          alias: "metadata_title_text",
-          filters: [:lowercase]
+          tokenizer: Tokenizer.simple(options: {alias: "metadata_title_text", lowercase: true})
         }
       },
       key_field: :id,
@@ -525,7 +522,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     end
 
     assert_equal <<~RUBY.strip, add_stmt.to_s.strip
-      add_bm25_index :books, fields: { id: {}, "metadata ->> 'title'::text" => { tokenizer: :simple, alias: "metadata_title_text", named_args: { :lowercase => true } } }, key_field: :id, name: "books_bm25_idx"
+      add_bm25_index :books, fields: { id: {}, "metadata ->> 'title'::text" => { tokenizer: Tokenizer.simple(options: { :lowercase => true, :alias => "metadata_title_text" }) } }, key_field: :id, name: "books_bm25_idx"
     RUBY
 
     conn.remove_bm25_index(:books, if_exists: true)
@@ -541,7 +538,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
       :books,
       fields: {
         id: {},
-        title: { tokenizer: :simple, alias: "title_simple" }
+        title: { tokenizer: Tokenizer.simple(options: {alias: "title_simple"}) }
       },
       key_field: :id,
       where: "author IS NOT NULL",
@@ -558,7 +555,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     end
 
     assert_equal <<~RUBY.strip, add_stmt.to_s.strip
-      add_bm25_index :books, fields: { id: {}, title: { tokenizer: :simple, alias: "title_simple" } }, key_field: :id, name: "books_bm25_idx", where: "author IS NOT NULL"
+      add_bm25_index :books, fields: { id: {}, title: { tokenizer: Tokenizer.simple(options: { :alias => "title_simple" }) } }, key_field: :id, name: "books_bm25_idx", where: "author IS NOT NULL"
     RUBY
 
     conn.remove_bm25_index(:books, if_exists: true)

@@ -76,11 +76,11 @@ RSpec.describe "UserApiUnitTest" do
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ||| 'wireless bluetooth')), sql
   end
   it "matching all with tokenizer override" do
-    sql = Product.search(:description).matching_all("running shoes", tokenizer: "whitespace").to_sql
+    sql = Product.search(:description).matching_all("running shoes", tokenizer: Tokenizer.whitespace()).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" &&& 'running shoes'::pdb.whitespace)), sql
   end
   it "matching all with tokenizer args" do
-    sql = Product.search(:description).matching_all("running shoes", tokenizer: "whitespace('lowercase=false')").to_sql
+    sql = Product.search(:description).matching_all("running shoes", tokenizer: Tokenizer.whitespace(options: {lowercase: false})).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" &&& 'running shoes'::pdb.whitespace('lowercase=false'))), sql
   end
   it "excluding terms" do
@@ -112,7 +112,7 @@ RSpec.describe "UserApiUnitTest" do
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ### 'running shoes'::pdb.slop(2))), sql
   end
   it "phrase with tokenizer" do
-    sql = Product.search(:description).phrase("running shoes", tokenizer: "whitespace").to_sql
+    sql = Product.search(:description).phrase("running shoes", tokenizer: Tokenizer.whitespace()).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ### 'running shoes'::pdb.whitespace)), sql
   end
   it "phrase with pretokenized array" do

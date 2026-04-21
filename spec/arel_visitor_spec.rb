@@ -19,7 +19,7 @@ RSpec.describe "ArelVisitorTest" do
     assert_equal %("products"."description" ||| 'wireless bluetooth'), sql(node)
   end
   it "match any with tokenizer override" do
-    node = @builder.match_any(:description, "running shoes", tokenizer: "whitespace")
+    node = @builder.match_any(:description, "running shoes", tokenizer: Tokenizer.whitespace())
     assert_equal %("products"."description" ||| 'running shoes'::pdb.whitespace), sql(node)
   end
   it "phrase with slop" do
@@ -27,7 +27,7 @@ RSpec.describe "ArelVisitorTest" do
     assert_equal %("products"."description" ### 'running shoes'::pdb.slop(2)), sql(node)
   end
   it "phrase with tokenizer" do
-    node = @builder.phrase(:description, "running shoes", tokenizer: "whitespace")
+    node = @builder.phrase(:description, "running shoes", tokenizer: Tokenizer.whitespace())
     assert_equal %("products"."description" ### 'running shoes'::pdb.whitespace), sql(node)
   end
   it "phrase with array" do

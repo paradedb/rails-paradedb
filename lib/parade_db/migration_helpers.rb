@@ -336,7 +336,7 @@ module ParadeDB
           elsif entries.length == 1
             "#{source_ruby} #{bm25_tokenizer_config_ruby(entries.first)}"
           else
-            configs = entries.map { |e| bm25_tokenizer_config_ruby(e) }
+            configs = entries.map { |e| bm25_tokenizer_ruby_from_entry(e) }
             "#{source_ruby} { tokenizers: [#{configs.join(', ')}] }"
           end
         end
@@ -678,6 +678,10 @@ module ParadeDB
     end
 
     def bm25_tokenizer_config_ruby(entry)
+      "{ tokenizer: #{bm25_tokenizer_ruby_from_entry(entry)} }"
+    end
+
+    def bm25_tokenizer_ruby_from_entry(entry)
       opts = entry[:options].dup
       positional_args = Array(opts.delete(:__positional))
       alias_val = opts.delete(:alias)
@@ -685,16 +689,19 @@ module ParadeDB
       max_val = opts.delete(:max)
       positional_args = [min_val, max_val] + positional_args if min_val && max_val
 
-      parts = ["tokenizer: #{entry[:tokenizer].to_sym.inspect}"]
-      parts << "args: #{positional_args.inspect}" unless positional_args.empty?
-      parts << "alias: #{alias_val.inspect}" if alias_val
+      opts[:alias] = alias_val if alias_val
 
-      unless opts.empty?
-        named_pairs = opts.map { |k, v| "#{k.inspect} => #{v.inspect}" }.join(", ")
-        parts << "named_args: { #{named_pairs} }"
+      bm25_tokenizer_ruby(entry[:tokenizer], positional_args, opts)
+    end
+
+    def bm25_tokenizer_ruby(name, positional_args, options)
+      if name.match?(/\A[a-z_][a-z0-9_]*\z/) && Tokenizer.respond_to?(name)
+        args = positional_args.map { |arg| ruby_literal(arg) }
+        args << "options: #{ruby_hash_literal(options)}" unless options.empty?
+        return "Tokenizer.#{name}(#{args.join(', ')})"
       end
 
-      "{ #{parts.join(', ')} }"
+      "Tokenizer.new(#{name.inspect}, #{ruby_literal(positional_args.empty? ? nil : positional_args)}, #{ruby_literal(options.empty? ? nil : options)})"
     end
 
     def split_sql_arguments(args_sql)

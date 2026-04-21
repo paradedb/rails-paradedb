@@ -38,6 +38,16 @@ jobs:
       - name: Install RuboCop
         run: gem install rubocop --no-document
 
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
       - name: Run RuboCop lint cops
         run: |
           rubocop --version
@@ -48,7 +58,7 @@ jobs:
             Rakefile
 
       - name: Check API coverage
-        run: ruby scripts/check_api_coverage.rb
+        run: uv run --with json5 scripts/check_api_coverage.py
 
       - name: Gem install smoke test
         run: bash scripts/smoke_gem_install.sh
@@ -86,7 +96,7 @@ jobs:
 
     services:
       paradedb:
-        image: paradedb/paradedb:0.22.0-pg18
+        image: paradedb/paradedb:0.23.0-pg18
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
