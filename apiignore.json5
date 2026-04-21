@@ -21,6 +21,9 @@
     "pdb.alias_out_safe",
     "pdb.alias_recv",
     "pdb.alias_send",
+
+    // These functions are implementation details of tokenizers that the ORM
+    // doesn't need to interact with
     "pdb.chinese_compatible_in",
     "pdb.chinese_compatible_out",
     "pdb.chinese_compatible_recv",
