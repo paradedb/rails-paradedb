@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING**: The `Tokenizer` class is now namespaced as `ParadeDB::Tokenizer`. Update references from `Tokenizer.simple(...)` to `ParadeDB::Tokenizer.simple(...)`. Schema dumps (`schema.rb`) now emit the fully-qualified constant.
+
 ## [0.7.0] - 2026-04-21
 
 ### Changed

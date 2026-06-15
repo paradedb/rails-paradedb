@@ -12,8 +12,8 @@ RSpec.describe "IndexDslUnitTest" do
         id: {},
         description: {
           tokenizers: [
-            Tokenizer.literal(),
-            Tokenizer.simple(options: {alias: "description_simple", lowercase: true})
+            ParadeDB::Tokenizer.literal(),
+            ParadeDB::Tokenizer.simple(options: {alias: "description_simple", lowercase: true})
           ]
         }
       }
@@ -32,7 +32,7 @@ RSpec.describe "IndexDslUnitTest" do
       self.where = "archived_at IS NULL"
       self.fields = {
         id: {},
-        description: { tokenizer: Tokenizer.simple() }
+        description: { tokenizer: ParadeDB::Tokenizer.simple() }
       }
     end
 
@@ -54,7 +54,7 @@ RSpec.describe "IndexDslUnitTest" do
       self.key_field = :id
       self.fields = {
         id: {},
-        description: { tokenizer: Tokenizer.simple() }
+        description: { tokenizer: ParadeDB::Tokenizer.simple() }
       }
     end
 
@@ -73,8 +73,8 @@ RSpec.describe "IndexDslUnitTest" do
       self.fields = {
         id: {},
         description: {
-          tokenizers: [Tokenizer.literal()],
-          tokenizer: Tokenizer.simple()
+          tokenizers: [ParadeDB::Tokenizer.literal()],
+          tokenizer: ParadeDB::Tokenizer.simple()
         }
       }
     end
@@ -103,9 +103,9 @@ RSpec.describe "IndexDslUnitTest" do
       self.key_field = :id
       self.fields = {
         id: {},
-        description: { tokenizer: Tokenizer.simple() },
-        category: { tokenizer: Tokenizer.literal() },
-        "metadata->>'title'" => { tokenizer: Tokenizer.simple(options: {alias: "metadata_title"}) }
+        description: { tokenizer: ParadeDB::Tokenizer.simple() },
+        category: { tokenizer: ParadeDB::Tokenizer.literal() },
+        "metadata->>'title'" => { tokenizer: ParadeDB::Tokenizer.simple(options: {alias: "metadata_title"}) }
       }
     end
 
@@ -134,8 +134,8 @@ RSpec.describe "IndexDslUnitTest" do
         id: {},
         description: {
           tokenizers: [
-            Tokenizer.simple(),
-            Tokenizer.literal()
+            ParadeDB::Tokenizer.simple(),
+            ParadeDB::Tokenizer.literal()
           ]
         }
       }
@@ -154,8 +154,8 @@ RSpec.describe "IndexDslUnitTest" do
         id: {},
         description: {
           tokenizers: [
-            Tokenizer.simple(options: {alias: "description_simple"}),
-            Tokenizer.literal(options: {alias: "description_exact"})
+            ParadeDB::Tokenizer.simple(options: {alias: "description_simple"}),
+            ParadeDB::Tokenizer.literal(options: {alias: "description_exact"})
           ]
         }
       }
@@ -174,7 +174,7 @@ RSpec.describe "IndexDslUnitTest" do
       self.key_field = :id
       self.fields = {
         id: {},
-        description: { tokenizer: Tokenizer.ngram(2, 5) }
+        description: { tokenizer: ParadeDB::Tokenizer.ngram(2, 5) }
       }
     end
 
@@ -192,7 +192,7 @@ RSpec.describe "IndexDslUnitTest" do
       self.key_field = :id
       self.fields = {
         id: {},
-        description: { tokenizers: [Tokenizer.literal(), :simple] }
+        description: { tokenizers: [ParadeDB::Tokenizer.literal(), :simple] }
       }
     end
 
@@ -206,8 +206,8 @@ RSpec.describe "IndexDslUnitTest" do
       self.key_field = :id
       self.fields = {
         id: {},
-        description: { tokenizer: Tokenizer.new("pdb::xyz", nil, nil) },
-        "metadata->>'title'" => { tokenizer: Tokenizer.new("pdb::abc", [12, "fafda"], nil) }
+        description: { tokenizer: ParadeDB::Tokenizer.new("pdb::xyz", nil, nil) },
+        "metadata->>'title'" => { tokenizer: ParadeDB::Tokenizer.new("pdb::abc", [12, "fafda"], nil) }
       }
     end
 
@@ -226,7 +226,7 @@ RSpec.describe "IndexDslUnitTest" do
       self.fields = {
         id: {},
         description: {
-          tokenizer: Tokenizer.ngram(2, 5, options: {prefix_only: true, alias: "description_ngram"})
+          tokenizer: ParadeDB::Tokenizer.ngram(2, 5, options: {prefix_only: true, alias: "description_ngram"})
         }
       }
     end

@@ -53,7 +53,7 @@ module ParadeDB
 
       class << self
         def parse(source_name, tokenizer, context:)
-          unless tokenizer.is_a?(Tokenizer)
+          unless tokenizer.is_a?(ParadeDB::Tokenizer)
             raise InvalidIndexDefinition, "#{context} for #{source_name.inspect} must be a Tokenizer"
           end
 

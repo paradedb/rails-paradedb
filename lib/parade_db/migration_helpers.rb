@@ -695,13 +695,13 @@ module ParadeDB
     end
 
     def bm25_tokenizer_ruby(name, positional_args, options)
-      if name.match?(/\A[a-z_][a-z0-9_]*\z/) && Tokenizer.respond_to?(name)
+      if name.match?(/\A[a-z_][a-z0-9_]*\z/) && ParadeDB::Tokenizer.respond_to?(name)
         args = positional_args.map { |arg| ruby_literal(arg) }
         args << "options: #{ruby_hash_literal(options)}" unless options.empty?
-        return "Tokenizer.#{name}(#{args.join(', ')})"
+        return "ParadeDB::Tokenizer.#{name}(#{args.join(', ')})"
       end
 
-      "Tokenizer.new(#{name.inspect}, #{ruby_literal(positional_args.empty? ? nil : positional_args)}, #{ruby_literal(options.empty? ? nil : options)})"
+      "ParadeDB::Tokenizer.new(#{name.inspect}, #{ruby_literal(positional_args.empty? ? nil : positional_args)}, #{ruby_literal(options.empty? ? nil : options)})"
     end
 
     def split_sql_arguments(args_sql)
