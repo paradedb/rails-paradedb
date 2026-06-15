@@ -302,7 +302,7 @@ module ParadeDB
       def apply_tokenizer(node, tokenizer)
         return node if tokenizer.nil?
 
-        unless tokenizer.is_a?(Tokenizer)
+        unless tokenizer.is_a?(ParadeDB::Tokenizer)
           raise ArgumentError, "tokenizer must be a Tokenizer"
         end
 

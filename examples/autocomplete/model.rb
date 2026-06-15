@@ -18,9 +18,9 @@ class MockItemIndex < ParadeDB::Index
     id: nil,
     description: nil,
     rating: nil,
-    category: { tokenizer: Tokenizer.literal() },
-    "metadata->>'color'" => { tokenizer: Tokenizer.literal(options: {alias: "metadata_color"}) },
-    "metadata->>'location'" => { tokenizer: Tokenizer.literal(options: {alias: "metadata_location"}) }
+    category: { tokenizer: ParadeDB::Tokenizer.literal() },
+    "metadata->>'color'" => { tokenizer: ParadeDB::Tokenizer.literal(options: {alias: "metadata_color"}) },
+    "metadata->>'location'" => { tokenizer: ParadeDB::Tokenizer.literal(options: {alias: "metadata_location"}) }
   }
 end
 
@@ -39,10 +39,10 @@ class AutocompleteItemIndex < ParadeDB::Index
     id: nil,
     description: {
       tokenizers: [
-        Tokenizer.unicode_words(),
-        Tokenizer.ngram(3, 8, options: {alias: "description_ngram"})
+        ParadeDB::Tokenizer.unicode_words(),
+        ParadeDB::Tokenizer.ngram(3, 8, options: {alias: "description_ngram"})
       ]
     },
-    category: { tokenizer: Tokenizer.literal() }
+    category: { tokenizer: ParadeDB::Tokenizer.literal() }
   }
 end

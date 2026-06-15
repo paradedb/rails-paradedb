@@ -127,13 +127,13 @@ RSpec.describe "GuardsUnitTest" do
   end
   it "matching_any rejects tokenizer combined with fuzzy options" do
     error = assert_raises(ArgumentError) do
-      builder.match_any(:description, "shoes", tokenizer: Tokenizer.whitespace(), distance: 1)
+      builder.match_any(:description, "shoes", tokenizer: ParadeDB::Tokenizer.whitespace(), distance: 1)
     end
     assert_includes error.message, "tokenizer cannot be combined with fuzzy options"
   end
   it "matching_all rejects tokenizer combined with fuzzy options" do
     error = assert_raises(ArgumentError) do
-      builder.match(:description, "shoes", tokenizer: Tokenizer.whitespace(), prefix: true)
+      builder.match(:description, "shoes", tokenizer: ParadeDB::Tokenizer.whitespace(), prefix: true)
     end
     assert_includes error.message, "tokenizer cannot be combined with fuzzy options"
   end
