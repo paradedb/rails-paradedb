@@ -90,7 +90,7 @@ module ParadeDB
       when String
         quote_term(value)
       else
-        raise InvalidArgumentError, "Unsupported tokenizer arg type: #{value.class}"
+        raise ArgumentError, "Unsupported tokenizer arg type: #{value.class}"
       end
     end
   end
