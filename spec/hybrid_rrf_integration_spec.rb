@@ -126,7 +126,7 @@ RSpec.describe "HybridRrfIntegrationTest" do
 
   def fulltext_ranked_cte(query, top_k:)
     fulltext_source = HybridRrfProduct.search(:description)
-                                      .match_all(*query.to_s.split(/\s+/))
+                                      .match_all(query.to_s)
                                       .with_score
                                       .order(search_score: :desc)
                                       .limit(top_k)

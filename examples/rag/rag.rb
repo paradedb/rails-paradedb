@@ -87,7 +87,7 @@ if $PROGRAM_NAME == __FILE__
               []
             else
               MockItem.search(:description)
-                      .match_any(*terms)
+                      .match_any(terms.join(" "))
                       .with_score
                       .order(search_score: :desc)
                       .limit(5)

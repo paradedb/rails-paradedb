@@ -50,8 +50,8 @@ RSpec.describe "ArelBuilderUnitTest" do
     node = @builder.match(:description, "shoes")
     assert_equal %("products"."description" &&& 'shoes'), sql(node)
   end
-  it "match multiple terms joined" do
-    node = @builder.match(:description, "running", "shoes", "lightweight")
+  it "match query" do
+    node = @builder.match(:description, "running shoes lightweight")
     assert_equal %("products"."description" &&& 'running shoes lightweight'), sql(node)
   end
   it "match accepts sql function term" do
@@ -81,8 +81,8 @@ RSpec.describe "ArelBuilderUnitTest" do
     node = @builder.match_any(:description, "wireless")
     assert_equal %("products"."description" ||| 'wireless'), sql(node)
   end
-  it "match any multiple terms" do
-    node = @builder.match_any(:description, "wireless", "bluetooth", "earbuds")
+  it "match any query" do
+    node = @builder.match_any(:description, "wireless bluetooth earbuds")
     assert_equal %("products"."description" ||| 'wireless bluetooth earbuds'), sql(node)
   end
   it "match any accepts sql function term" do

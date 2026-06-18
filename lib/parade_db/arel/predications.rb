@@ -7,16 +7,16 @@ module ParadeDB
       TOKENIZER_EXPRESSION = /\A[a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\s*[a-zA-Z0-9_'".,=\s:-]*\s*\))?\z/.freeze
       BUILDER = Builder.new.freeze
 
-      def pdb_match(*terms, tokenizer: nil, distance: nil, prefix: nil, transposition_cost_one: nil, boost: nil)
-        rhs = pdb_term_query_node(terms)
+      def pdb_match(term = nil, tokenizer: nil, distance: nil, prefix: nil, transposition_cost_one: nil, boost: nil)
+        rhs = pdb_term_query_node(term)
         rhs = pdb_apply_fuzzy(rhs, distance: distance, prefix: prefix, transposition_cost_one: transposition_cost_one)
         rhs = pdb_apply_tokenizer(rhs, tokenizer)
         rhs = pdb_apply_boost(rhs, boost)
         ::Arel::Nodes::InfixOperation.new("&&&", self, rhs)
       end
 
-      def pdb_match_any(*terms, tokenizer: nil, distance: nil, prefix: nil, transposition_cost_one: nil, boost: nil)
-        rhs = pdb_term_query_node(terms)
+      def pdb_match_any(term = nil, tokenizer: nil, distance: nil, prefix: nil, transposition_cost_one: nil, boost: nil)
+        rhs = pdb_term_query_node(term)
         rhs = pdb_apply_fuzzy(rhs, distance: distance, prefix: prefix, transposition_cost_one: transposition_cost_one)
         rhs = pdb_apply_tokenizer(rhs, tokenizer)
         rhs = pdb_apply_boost(rhs, boost)
@@ -193,20 +193,13 @@ module ParadeDB
         ::Arel::Nodes.build_quoted(value)
       end
 
-      def pdb_join_terms(terms)
-        joined = terms.flatten.compact.map(&:to_s).join(" ")
+      def pdb_term_query_node(term)
+        return term if pdb_arel_expression?(term)
+
+        joined = term.to_s
         raise ArgumentError, "at least one search term is required" if joined.strip.empty?
 
-        joined
-      end
-
-      def pdb_term_query_node(terms)
-        values = terms.flatten.compact
-        if values.length == 1 && pdb_arel_expression?(values.first)
-          return values.first
-        end
-
-        pdb_quoted(pdb_join_terms(values))
+        pdb_quoted(joined)
       end
 
       def pdb_arel_expression?(value)

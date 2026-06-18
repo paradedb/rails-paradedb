@@ -21,7 +21,7 @@ module ParadeDB
 
       def match(
         column,
-        *terms,
+        term = nil,
         tokenizer: nil,
         distance: nil,
         prefix: nil,
@@ -35,7 +35,7 @@ module ParadeDB
           prefix: prefix,
           transposition_cost_one: transposition_cost_one
         )
-        rhs = term_query_node(terms)
+        rhs = term_query_node(term)
         rhs = apply_fuzzy(
           rhs,
           distance: distance,
@@ -50,7 +50,7 @@ module ParadeDB
 
       def match_any(
         column,
-        *terms,
+        term = nil,
         tokenizer: nil,
         distance: nil,
         prefix: nil,
@@ -64,7 +64,7 @@ module ParadeDB
           prefix: prefix,
           transposition_cost_one: transposition_cost_one
         )
-        rhs = term_query_node(terms)
+        rhs = term_query_node(term)
         rhs = apply_fuzzy(
           rhs,
           distance: distance,
@@ -538,19 +538,16 @@ module ParadeDB
         )
       end
 
-      def join_terms(terms)
-        joined = terms.flatten.compact.map(&:to_s).join(" ")
+      def join_term(term)
+        joined = term.to_s
         raise ArgumentError, "at least one search term is required" if joined.strip.empty?
         joined
       end
 
-      def term_query_node(terms)
-        values = terms.flatten.compact
-        if values.length == 1 && arel_expression?(values.first)
-          return values.first
-        end
+      def term_query_node(term)
+        return term if arel_expression?(term)
 
-        quoted_value(join_terms(values))
+        quoted_value(join_term(term))
       end
 
       def arel_expression?(value)
