@@ -87,7 +87,7 @@ if $PROGRAM_NAME == __FILE__
               []
             else
               MockItem.search(:description)
-                      .matching_any(*terms)
+                      .match_any(*terms)
                       .with_score
                       .order(search_score: :desc)
                       .limit(5)
@@ -95,7 +95,7 @@ if $PROGRAM_NAME == __FILE__
             end
 
     puts "\nRetrieved #{items.length} products:"
-    puts items.map { |item| "  - #{item.description} (score: #{item.search_score.round(2)})" }
+    puts(items.map { |item| "  - #{item.description} (score: #{item.search_score.round(2)})" })
 
     context = format_context(items)
     puts "\nAnswer:"

@@ -20,10 +20,10 @@ def demo_similar_to_single_product
                     .order(search_score: :desc)
                     .limit(5)
 
-  puts similar.map { |item|
+  puts(similar.map { |item|
     marker = item.id == source_id ? " (source)" : ""
     "  #{item.id}: #{item.description.truncate(50)} [#{item.category}]#{marker}"
-  }
+  })
 end
 
 def demo_similar_to_multiple_products
@@ -35,7 +35,7 @@ def demo_similar_to_multiple_products
   browsed = MockItem.where(id: browsed_ids)
 
   puts "\nUser's browsing history:"
-  puts browsed.map { |item| "  #{item.id}: #{item.description.truncate(50)} [#{item.category}]" }
+  puts(browsed.map { |item| "  #{item.id}: #{item.description.truncate(50)} [#{item.category}]" })
 
   combined_description = browsed.pluck(:description).join(" ")
   json_doc = { description: combined_description }.to_json
@@ -47,7 +47,7 @@ def demo_similar_to_multiple_products
                     .order(search_score: :desc)
                     .limit(5)
 
-  puts similar.map { |item| "  #{item.id}: #{item.description.truncate(50)} [#{item.category}]" }
+  puts(similar.map { |item| "  #{item.id}: #{item.description.truncate(50)} [#{item.category}]" })
 end
 
 def demo_combined_with_filters
@@ -64,7 +64,7 @@ def demo_combined_with_filters
                     .order(search_score: :desc)
                     .limit(5)
 
-  puts results.map { |item| "  #{item.id}: #{item.description.truncate(40)} (rating: #{item.rating})" }
+  puts(results.map { |item| "  #{item.id}: #{item.description.truncate(40)} (rating: #{item.rating})" })
 end
 
 def demo_multifield_similarity
@@ -78,11 +78,11 @@ def demo_multifield_similarity
 
   puts "\nSimilar by DESCRIPTION only:"
   by_description = MockItem.more_like_this(source_id, fields: [:description]).where.not(id: source_id).limit(3)
-  puts by_description.map { |item| "  #{item.id}: #{item.description.truncate(40)} [#{item.category}]" }
+  puts(by_description.map { |item| "  #{item.id}: #{item.description.truncate(40)} [#{item.category}]" })
 
   puts "\nSimilar by DESCRIPTION + CATEGORY:"
   by_both = MockItem.more_like_this(source_id, fields: [:description, :category]).where.not(id: source_id).limit(3)
-  puts by_both.map { |item| "  #{item.id}: #{item.description.truncate(40)} [#{item.category}]" }
+  puts(by_both.map { |item| "  #{item.id}: #{item.description.truncate(40)} [#{item.category}]" })
 end
 
 def demo_advanced_mlt_options
@@ -114,7 +114,7 @@ def demo_advanced_mlt_options
 
   begin
     puts "\nResults:"
-    puts relation.map { |item| "  #{item.id}: #{item.description.truncate(50)} [#{item.category}]" }
+    puts(relation.map { |item| "  #{item.id}: #{item.description.truncate(50)} [#{item.category}]" })
   rescue ActiveRecord::StatementInvalid => e
     puts "\nAdvanced MLT options are not supported by this ParadeDB server build."
     puts "Error: #{e.message.lines.first.strip}"

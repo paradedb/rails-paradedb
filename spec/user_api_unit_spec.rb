@@ -15,7 +15,7 @@ end
 RSpec.describe "UserApiUnitTest" do
   it "matching all with filters" do
     sql = Product.search(:description)
-                 .matching_all("running", "shoes")
+                 .match_all("running", "shoes")
                  .where(in_stock: true)
                  .where("products.price < 100")
                  .where(rating: 4..)
@@ -33,7 +33,7 @@ RSpec.describe "UserApiUnitTest" do
   end
   it "closed range filter" do
     sql = Product.search(:description)
-                 .matching_all("shoes")
+                 .match_all("shoes")
                  .where(price: 10..100)
                  .to_sql
 
@@ -47,7 +47,7 @@ RSpec.describe "UserApiUnitTest" do
   end
   it "exclusive end range filter" do
     sql = Product.search(:description)
-                 .matching_all("shoes")
+                 .match_all("shoes")
                  .where(price: 10...100)
                  .to_sql
 
@@ -60,7 +60,7 @@ RSpec.describe "UserApiUnitTest" do
     assert_sql_equal expected, sql
   end
   it "chain multiple search fields and" do
-    sql = Product.search(:description).matching_all("running", "shoes")
+    sql = Product.search(:description).match_all("running", "shoes")
                  .search(:category).phrase("Footwear")
                  .to_sql
 
@@ -72,25 +72,25 @@ RSpec.describe "UserApiUnitTest" do
     assert_sql_equal expected, sql
   end
   it "matching any or semantics" do
-    sql = Product.search(:description).matching_any("wireless", "bluetooth").to_sql
+    sql = Product.search(:description).match_any("wireless", "bluetooth").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ||| 'wireless bluetooth')), sql
   end
   it "matching all with tokenizer override" do
-    sql = Product.search(:description).matching_all("running shoes", tokenizer: ParadeDB::Tokenizer.whitespace()).to_sql
+    sql = Product.search(:description).match_all("running shoes", tokenizer: ParadeDB::Tokenizer.whitespace()).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" &&& 'running shoes'::pdb.whitespace)), sql
   end
   it "matching all with tokenizer args" do
-    sql = Product.search(:description).matching_all("running shoes", tokenizer: ParadeDB::Tokenizer.whitespace(options: {lowercase: false})).to_sql
+    sql = Product.search(:description).match_all("running shoes", tokenizer: ParadeDB::Tokenizer.whitespace(options: {lowercase: false})).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" &&& 'running shoes'::pdb.whitespace('lowercase=false'))), sql
   end
   it "matching all with sql function argument" do
     term = Arel::Nodes::NamedFunction.new("lower", [Arel::Nodes.build_quoted("SHOES")])
-    sql = Product.search(:description).matching_all(term).to_sql
+    sql = Product.search(:description).match_all(term).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" &&& lower('SHOES'))), sql
   end
   it "excluding terms" do
     sql = Product.search(:description)
-                 .matching_all("shoes")
+                 .match_all("shoes")
                  .excluding("cheap", "budget")
                  .to_sql
 
@@ -102,13 +102,13 @@ RSpec.describe "UserApiUnitTest" do
     assert_sql_equal expected, sql
   end
   it "excluding" do
-    sql = Product.search(:description).matching_all("shoes").excluding("cheap").to_sql
+    sql = Product.search(:description).match_all("shoes").excluding("cheap").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" &&& 'shoes') AND (NOT ("products"."description" &&& 'cheap'))), sql
   end
   it "or composition" do
     base = Product.where(in_stock: true).order(id: :desc).limit(10)
-    left = base.search(:description).matching_all("shoes")
-    right = base.search(:category).matching_all("footwear")
+    left = base.search(:description).match_all("shoes")
+    right = base.search(:category).match_all("footwear")
     sql = left.or(right).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE "products"."in_stock" = TRUE AND ("products"."description" &&& 'shoes' OR "products"."category" &&& 'footwear') ORDER BY "products"."id" DESC LIMIT 10), sql
   end
@@ -285,7 +285,7 @@ RSpec.describe "UserApiUnitTest" do
   end
   it "with score and order" do
     sql = Product.search(:description)
-                 .matching_all("running", "shoes")
+                 .match_all("running", "shoes")
                  .with_score
                  .order(search_score: :desc)
                  .to_sql
@@ -299,13 +299,13 @@ RSpec.describe "UserApiUnitTest" do
     assert_sql_equal expected, sql
   end
   it "with score" do
-    sql = Product.search(:description).matching_all("shoes").with_score.to_sql
+    sql = Product.search(:description).match_all("shoes").with_score.to_sql
     assert_sql_equal %(SELECT products.*, pdb.score("products"."id") AS search_score FROM products
       WHERE ("products"."description" &&& 'shoes')), sql
   end
   it "with snippet default" do
     sql = Product.search(:description)
-                 .matching_all("running shoes")
+                 .match_all("running shoes")
                  .with_snippet(:description)
                  .to_sql
 
@@ -318,7 +318,7 @@ RSpec.describe "UserApiUnitTest" do
   end
   it "with snippet custom" do
     sql = Product.search(:description)
-                 .matching_all("running shoes")
+                 .match_all("running shoes")
                  .with_snippet(:description, start_tag: '<mark>', end_tag: '</mark>', max_chars: 100)
                  .to_sql
 
@@ -331,7 +331,7 @@ RSpec.describe "UserApiUnitTest" do
   end
   it "with snippets custom options" do
     sql = Product.search(:description)
-                 .matching_all("running shoes")
+                 .match_all("running shoes")
                  .with_snippets(:description, max_chars: 15, limit: 1, offset: 0, sort_by: :position)
                  .to_sql
 
@@ -344,7 +344,7 @@ RSpec.describe "UserApiUnitTest" do
   end
   it "with snippet positions" do
     sql = Product.search(:description)
-                 .matching_all("running shoes")
+                 .match_all("running shoes")
                  .with_snippet_positions(:description)
                  .to_sql
 
@@ -357,7 +357,7 @@ RSpec.describe "UserApiUnitTest" do
   end
   it "with score then with snippet keeps both projections" do
     sql = Product.search(:description)
-                 .matching_all("shoes")
+                 .match_all("shoes")
                  .with_score
                  .with_snippet(:description)
                  .to_sql
@@ -371,7 +371,7 @@ RSpec.describe "UserApiUnitTest" do
   end
   it "with snippet then with score keeps both projections" do
     sql = Product.search(:description)
-                 .matching_all("shoes")
+                 .match_all("shoes")
                  .with_snippet(:description)
                  .with_score
                  .to_sql
@@ -384,7 +384,7 @@ RSpec.describe "UserApiUnitTest" do
     assert_sql_equal expected, sql
   end
   it "with snippets default alias" do
-    sql = Product.search(:description).matching_all("shoes")
+    sql = Product.search(:description).match_all("shoes")
                      .with_snippets(:description, max_chars: 30, limit: 1, offset: 0, sort_by: :position)
                      .to_sql
 
@@ -392,7 +392,7 @@ RSpec.describe "UserApiUnitTest" do
       WHERE ("products"."description" &&& 'shoes')), sql
   end
   it "with snippets custom alias" do
-    sql = Product.search(:description).matching_all("shoes")
+    sql = Product.search(:description).match_all("shoes")
                      .with_snippets(:description, as: :all_snips)
                      .to_sql
 
@@ -400,7 +400,7 @@ RSpec.describe "UserApiUnitTest" do
       WHERE ("products"."description" &&& 'shoes')), sql
   end
   it "with snippet positions default alias" do
-    sql = Product.search(:description).matching_all("shoes")
+    sql = Product.search(:description).match_all("shoes")
                      .with_snippet_positions(:description)
                      .to_sql
 
@@ -408,7 +408,7 @@ RSpec.describe "UserApiUnitTest" do
       WHERE ("products"."description" &&& 'shoes')), sql
   end
   it "with snippet positions custom alias" do
-    sql = Product.search(:description).matching_all("shoes")
+    sql = Product.search(:description).match_all("shoes")
                      .with_snippet_positions(:description, as: "positions")
                      .to_sql
 
@@ -417,8 +417,8 @@ RSpec.describe "UserApiUnitTest" do
   end
   it "or across fields" do
     base = Product.where(in_stock: true).order(id: :desc).limit(10)
-    left = base.search(:description).matching_all("shoes")
-    right = base.search(:category).matching_all("footwear")
+    left = base.search(:description).match_all("shoes")
+    right = base.search(:category).match_all("footwear")
 
     sql = left.or(right).to_sql
 
@@ -432,7 +432,7 @@ RSpec.describe "UserApiUnitTest" do
     assert_sql_equal expected, sql
   end
   it "facets only" do
-    facet_sql = Product.search(:description).matching_all("shoes")
+    facet_sql = Product.search(:description).match_all("shoes")
                        .build_facet_query(fields: [:category, :brand], size: 10, order: :count_desc)
                        .sql
 
@@ -441,7 +441,7 @@ RSpec.describe "UserApiUnitTest" do
     assert_sql_equal expected, facet_sql
   end
   it "with facets rows plus facets" do
-    sql = Product.search(:description).matching_all("shoes")
+    sql = Product.search(:description).match_all("shoes")
                  .where(in_stock: true)
                  .with_facets(:category, :brand, size: 10)
                  .order(rating: :desc)
@@ -458,7 +458,7 @@ RSpec.describe "UserApiUnitTest" do
     assert_sql_equal expected, sql
   end
   it "with facets exact false emits second agg argument" do
-    sql = Product.search(:description).matching_all("shoes")
+    sql = Product.search(:description).match_all("shoes")
                  .with_facets(:category, size: 10, exact: false)
                  .to_sql
 
@@ -470,7 +470,7 @@ RSpec.describe "UserApiUnitTest" do
     assert_sql_equal expected, sql
   end
   it "facets with custom agg without fields still projects aggregate" do
-    facet_sql = Product.search(:description).matching_all("shoes")
+    facet_sql = Product.search(:description).match_all("shoes")
                            .build_facet_query(
                              fields: [],
                              size: 99,
@@ -506,7 +506,7 @@ RSpec.describe "UserApiUnitTest" do
     assert_sql_equal expected, facet_sql
   end
   it "facets with size nil omits size clause" do
-    facet_sql = Product.search(:description).matching_all("shoes")
+    facet_sql = Product.search(:description).match_all("shoes")
                            .build_facet_query(fields: [:category], size: nil, order: nil)
                            .sql
 
@@ -534,7 +534,7 @@ RSpec.describe "UserApiUnitTest" do
   it "facets with mixed paradedb and standard predicates keeps existing paradedb predicate" do
     facet_sql = Product.where(in_stock: true)
                            .search(:description)
-                           .matching_all("shoes")
+                           .match_all("shoes")
                            .build_facet_query(fields: [:category], size: 10, order: nil)
                            .sql
 
@@ -557,7 +557,7 @@ RSpec.describe "UserApiUnitTest" do
   end
   it "with facets default order is desc count" do
     sql = Product.search(:description)
-                     .matching_all("shoes")
+                     .match_all("shoes")
                      .with_facets(:category, size: 10)
                      .to_sql
 
@@ -566,7 +566,7 @@ RSpec.describe "UserApiUnitTest" do
   end
   it "with facets exact false emits second agg argument" do
     sql = Product.search(:description)
-                     .matching_all("shoes")
+                     .match_all("shoes")
                      .with_facets(:category, size: 10, exact: false)
                      .to_sql
 
@@ -575,13 +575,13 @@ RSpec.describe "UserApiUnitTest" do
   end
   it "facets exact false raises" do
     error = assert_raises(ArgumentError) do
-      Product.search(:description).matching_all("shoes").facets(:category, exact: false)
+      Product.search(:description).match_all("shoes").facets(:category, exact: false)
     end
     assert_includes error.message, "facets(exact: false)"
   end
   it "with facets uses custom agg and ignores field size order missing" do
     sql = Product.search(:description)
-                     .matching_all("shoes")
+                     .match_all("shoes")
                      .with_facets(
                        :category,
                        size: 20,
@@ -599,11 +599,11 @@ RSpec.describe "UserApiUnitTest" do
   end
   it "facets_agg builds one pdb.agg projection per named aggregation" do
     facet_sql = Product.search(:description)
-                           .matching_all("shoes")
+                           .match_all("shoes")
                            .send(
                              :build_aggregation_query,
                              Product.search(:description)
-                                        .matching_all("shoes")
+                                        .match_all("shoes")
                                         .send(
                                           :normalize_named_aggregation_specs,
                                           docs: ParadeDB::Aggregations.value_count(:id),
@@ -617,7 +617,7 @@ RSpec.describe "UserApiUnitTest" do
   end
   it "with_agg adds multiple window aggregates" do
     sql = Product.search(:description)
-                     .matching_all("shoes")
+                     .match_all("shoes")
                      .with_agg(
                        docs: ParadeDB::Aggregations.value_count(:id),
                        avg_rating: ParadeDB::Aggregations.avg(:rating)
@@ -629,7 +629,7 @@ RSpec.describe "UserApiUnitTest" do
   end
   it "with_agg exact false emits second agg argument" do
     sql = Product.search(:description)
-                     .matching_all("shoes")
+                     .match_all("shoes")
                      .with_agg(
                        exact: false,
                        docs: ParadeDB::Aggregations.value_count(:id)
@@ -652,11 +652,11 @@ RSpec.describe "UserApiUnitTest" do
   end
   it "facets_agg supports filtered named aggregations" do
     facet_sql = Product.search(:description)
-                           .matching_all("shoes")
+                           .match_all("shoes")
                            .send(
                              :build_aggregation_query,
                              Product.search(:description)
-                                        .matching_all("shoes")
+                                        .match_all("shoes")
                                         .send(
                                           :normalize_named_aggregation_specs,
                                           electronics_count: ParadeDB::Aggregations.filtered(
@@ -706,7 +706,7 @@ RSpec.describe "UserApiUnitTest" do
   end
   it "with facets load requires order and limit" do
     rel = Product.search(:description)
-                     .matching_all("shoes")
+                     .match_all("shoes")
                      .with_facets(:category, size: 10)
 
     error = assert_raises(ParadeDB::FacetQueryError) { rel.load }
@@ -714,7 +714,7 @@ RSpec.describe "UserApiUnitTest" do
   end
   it "with facets load requires limit" do
     rel = Product.search(:description)
-                     .matching_all("shoes")
+                     .match_all("shoes")
                      .with_facets(:category, size: 10)
                      .order(:id)
 
@@ -723,7 +723,7 @@ RSpec.describe "UserApiUnitTest" do
   end
   it "with facets load requires order" do
     rel = Product.search(:description)
-                     .matching_all("shoes")
+                     .match_all("shoes")
                      .with_facets(:category, size: 10)
                      .limit(10)
 
@@ -734,7 +734,7 @@ RSpec.describe "UserApiUnitTest" do
     # Verify .search() works on relations and preserves WHERE clauses
     sql = Product.where(in_stock: true)
                      .search(:description)
-                     .matching_all("shoes")
+                     .match_all("shoes")
                      .to_sql
 
     expected = <<~SQL.strip
@@ -750,7 +750,7 @@ RSpec.describe "UserApiUnitTest" do
                      .order(rating: :desc)
                      .limit(10)
                      .search(:description)
-                     .matching_all("wireless")
+                     .match_all("wireless")
                      .to_sql
 
     expected = <<~SQL.strip
@@ -769,7 +769,7 @@ RSpec.describe "UserApiUnitTest" do
     sql = Product.where(in_stock: true)
                  .where(price: 10..100)
                  .search(:description)
-                 .matching_all("wireless")
+                 .match_all("wireless")
                  .to_sql
 
     expected = <<~SQL.strip
@@ -785,7 +785,7 @@ RSpec.describe "UserApiUnitTest" do
     # Search combined with JOIN
     sql = Product.joins("LEFT JOIN categories ON products.category_id = categories.id")
                  .search(:description)
-                 .matching_all("shoes")
+                 .match_all("shoes")
                  .where("categories.active = true")
                  .to_sql
 
@@ -801,7 +801,7 @@ RSpec.describe "UserApiUnitTest" do
   it "search with group and having" do
     # Search with GROUP BY and HAVING
     sql = Product.search(:description)
-                 .matching_all("shoes")
+                 .match_all("shoes")
                  .select("products.*, COUNT(*) as order_count")
                  .group("products.id")
                  .having("COUNT(*) > 5")
@@ -819,7 +819,7 @@ RSpec.describe "UserApiUnitTest" do
   it "search with offset and limit" do
     # Pagination with search
     sql = Product.search(:description)
-                 .matching_all("wireless")
+                 .match_all("wireless")
                  .where(in_stock: true)
                  .order(created_at: :desc)
                  .limit(20)
@@ -840,7 +840,7 @@ RSpec.describe "UserApiUnitTest" do
   it "search with distinct" do
     # DISTINCT with search
     sql = Product.search(:description)
-                 .matching_all("shoes")
+                 .match_all("shoes")
                  .distinct
                  .to_sql
 
@@ -856,7 +856,7 @@ RSpec.describe "UserApiUnitTest" do
     sql = Product.where(in_stock: true)
                  .references(:categories)
                  .search(:description)
-                 .matching_all("electronics")
+                 .match_all("electronics")
                  .to_sql
 
     # Note: includes would trigger eager loading, but references just ensures JOIN
@@ -871,7 +871,7 @@ RSpec.describe "UserApiUnitTest" do
   it "search with multiple orders" do
     # Multiple ORDER BY clauses
     sql = Product.search(:description)
-                 .matching_all("shoes")
+                 .match_all("shoes")
                  .with_score
                  .order(search_score: :desc)
                  .order(created_at: :desc)
@@ -889,11 +889,11 @@ RSpec.describe "UserApiUnitTest" do
     # Complex OR with different WHERE conditions on each side
     left = Product.where(price: 0..50)
                   .search(:description)
-                  .matching_all("budget", "cheap")
+                  .match_all("budget", "cheap")
 
     right = Product.where(rating: 4..)
                    .search(:description)
-                   .matching_all("premium")
+                   .match_all("premium")
 
     sql = left.or(right).to_sql
 
@@ -908,7 +908,7 @@ RSpec.describe "UserApiUnitTest" do
   it "search with not conditions" do
     # Search combined with NOT conditions
     sql = Product.search(:description)
-                 .matching_all("shoes")
+                 .match_all("shoes")
                  .where.not(category: "Discontinued")
                  .where.not(in_stock: false)
                  .to_sql
@@ -925,7 +925,7 @@ RSpec.describe "UserApiUnitTest" do
   it "search with in condition" do
     # Search with IN clause
     sql = Product.search(:description)
-                 .matching_all("wireless")
+                 .match_all("wireless")
                  .where(category: ["Electronics", "Audio", "Video"])
                  .to_sql
 
@@ -940,7 +940,7 @@ RSpec.describe "UserApiUnitTest" do
   it "search with like pattern" do
     # Search combined with LIKE
     sql = Product.search(:description)
-                 .matching_all("shoes")
+                 .match_all("shoes")
                  .where("products.sku LIKE ?", "RUN-%")
                  .to_sql
 
@@ -955,7 +955,7 @@ RSpec.describe "UserApiUnitTest" do
   it "search with null checks" do
     # Search with NULL checks
     sql = Product.search(:description)
-                 .matching_all("shoes")
+                 .match_all("shoes")
                  .where.not(description: nil)
                  .where(discontinued_at: nil)
                  .to_sql
@@ -973,7 +973,7 @@ RSpec.describe "UserApiUnitTest" do
     # Multiple search fields with WHERE clauses interspersed
     sql = Product.where(in_stock: true)
                  .search(:description)
-                 .matching_all("wireless")
+                 .match_all("wireless")
                  .where(price: 0..200)
                  .search(:category)
                  .phrase("Electronics")
@@ -994,7 +994,7 @@ RSpec.describe "UserApiUnitTest" do
   it "search with subquery in where" do
     # Search with subquery
     sql = Product.search(:description)
-                 .matching_all("shoes")
+                 .match_all("shoes")
                  .where("price < (SELECT AVG(price) FROM products)")
                  .to_sql
 
@@ -1011,7 +1011,7 @@ RSpec.describe "UserApiUnitTest" do
     query = Product.where(in_stock: true)
 
     # Conditionally add search
-    query = query.search(:description).matching_all("wireless")
+    query = query.search(:description).match_all("wireless")
 
     # Conditionally add filters
     query = query.where(price: 0..100)
@@ -1035,7 +1035,7 @@ RSpec.describe "UserApiUnitTest" do
   it "search with readonly" do
     # Readonly doesn't affect SQL but ensures proper chaining
     sql = Product.search(:description)
-                 .matching_all("shoes")
+                 .match_all("shoes")
                  .readonly
                  .to_sql
 
@@ -1051,7 +1051,7 @@ RSpec.describe "UserApiUnitTest" do
     scoped = Product.where(in_stock: true).order(created_at: :desc)
 
     sql = scoped.search(:description)
-                .matching_all("shoes")
+                .match_all("shoes")
                 .limit(5)
                 .to_sql
 
@@ -1070,7 +1070,7 @@ RSpec.describe "UserApiUnitTest" do
     sql = Product.where(in_stock: true)
                  .order(created_at: :desc)
                  .search(:description)
-                 .matching_all("shoes")
+                 .match_all("shoes")
                  .unscope(:order)
                  .to_sql
 
@@ -1086,7 +1086,7 @@ RSpec.describe "UserApiUnitTest" do
     # Rewhere to replace existing condition
     sql = Product.where(in_stock: true)
                  .search(:description)
-                 .matching_all("shoes")
+                 .match_all("shoes")
                  .rewhere(in_stock: false)
                  .to_sql
 

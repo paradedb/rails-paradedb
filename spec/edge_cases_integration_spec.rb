@@ -19,14 +19,14 @@ RSpec.describe "EdgeCasesIntegrationTest" do
   # 1. NULLs
   # ──────────────────────────────────────────────
   it "null description invisible to text search" do
-    ids = search(:description).matching_all("alpha").order(:id).pluck(:id)
+    ids = search(:description).match_all("alpha").order(:id).pluck(:id)
     assert_includes ids, @p_null_cat.id
     refute_includes ids, @p_null_desc.id
     refute_includes ids, @p_both_null.id
   end
   it "null description invisible to phrase and fuzzy" do
     phrase_ids = search(:description).phrase("alpha beta").order(:id).pluck(:id)
-    fuzzy_ids  = search(:description).matching_any("alph", distance: 1, prefix: true).order(:id).pluck(:id)
+    fuzzy_ids  = search(:description).match_any("alph", distance: 1, prefix: true).order(:id).pluck(:id)
     regex_ids  = search(:description).regex("alpha.*").order(:id).pluck(:id)
 
     [phrase_ids, fuzzy_ids, regex_ids].each do |ids|
@@ -86,7 +86,7 @@ RSpec.describe "EdgeCasesIntegrationTest" do
     assert_includes ids, @p_long.id
   end
   it "long text fuzzy finds misspelled needle" do
-    ids = search(:description).matching_any("needlephras", distance: 2).order(:id).pluck(:id)
+    ids = search(:description).match_any("needlephras", distance: 2).order(:id).pluck(:id)
     assert_includes ids, @p_long.id
   end
   it "long text near finds needle terms" do
@@ -94,14 +94,14 @@ RSpec.describe "EdgeCasesIntegrationTest" do
     assert_includes ids, @p_long.id
   end
   it "long text with score ranks unique term higher" do
-    rows = search(:description).matching_any("needlephrase")
+    rows = search(:description).match_any("needlephrase")
              .with_score.order(search_score: :desc).limit(10).to_a
     refute_empty rows
     assert_equal @p_long.id, rows.first.id
     assert rows.first.search_score.to_f > 0
   end
   it "long text snippet is bounded and highlights" do
-    rows = search(:description).matching_all("needlephrase")
+    rows = search(:description).match_all("needlephrase")
              .with_snippet(:description, start_tag: "<b>", end_tag: "</b>", max_chars: 200)
              .order(:id).to_a
 
@@ -119,11 +119,11 @@ RSpec.describe "EdgeCasesIntegrationTest" do
   # 4. Unicode (CJK, emoji, accented)
   # ──────────────────────────────────────────────
   it "unicode accented matching" do
-    ids = search(:description).matching_any("café").order(:id).pluck(:id)
+    ids = search(:description).match_any("café").order(:id).pluck(:id)
     assert_includes ids, @p_unicode.id
   end
   it "unicode cjk matching" do
-    ids = search(:description).matching_any("漢字").order(:id).pluck(:id)
+    ids = search(:description).match_any("漢字").order(:id).pluck(:id)
     assert_includes ids, @p_unicode.id
   end
   it "unicode phrase with accents" do
@@ -142,7 +142,7 @@ RSpec.describe "EdgeCasesIntegrationTest" do
     refute_includes upper_ids, @p_unicode.id
   end
   it "unicode with snippet does not produce invalid output" do
-    rows = search(:description).matching_any("café")
+    rows = search(:description).match_any("café")
              .with_snippet(:description, start_tag: "<b>", end_tag: "</b>")
              .order(:id).to_a
 
@@ -166,7 +166,7 @@ RSpec.describe "EdgeCasesIntegrationTest" do
   it "punctuation tokenized at word boundaries" do
     # "end" is a token in both: @p_punct has {c,end,to,end,foo.bar,can't,json,xml,test}
     # @p_plain has {end,to,end,foo,bar,cant,json,xml,test,plain}
-    ids = search(:description).matching_any("end").order(:id).pluck(:id)
+    ids = search(:description).match_any("end").order(:id).pluck(:id)
     assert_includes ids, @p_punct.id
     assert_includes ids, @p_plain.id
   end
@@ -183,7 +183,7 @@ RSpec.describe "EdgeCasesIntegrationTest" do
   end
   it "punctuation excluding works" do
     # "plain" only exists in @p_plain, so excluding "plain" should remove @p_plain
-    ids = search(:description).matching_all("test")
+    ids = search(:description).match_all("test")
             .excluding("plain")
             .order(:id).pluck(:id)
     assert_includes ids, @p_punct.id
@@ -194,13 +194,13 @@ RSpec.describe "EdgeCasesIntegrationTest" do
   # 6. Duplicated tokens
   # ──────────────────────────────────────────────
   it "duplicated tokens both matched" do
-    ids = search(:description).matching_any("spam").order(:id).pluck(:id)
+    ids = search(:description).match_any("spam").order(:id).pluck(:id)
     assert_includes ids, @p_dupe_tokens.id
     assert_includes ids, @p_single_spam.id
     refute_includes ids, @p_no_spam.id
   end
   it "duplicated tokens score higher for more occurrences" do
-    rows = search(:description).matching_any("spam")
+    rows = search(:description).match_any("spam")
              .with_score.order(search_score: :desc).to_a
 
     dupe_row   = rows.find { |r| r.id == @p_dupe_tokens.id }
@@ -217,7 +217,7 @@ RSpec.describe "EdgeCasesIntegrationTest" do
     refute_includes ids, @p_single_spam.id
   end
   it "duplicated tokens excluding removes correctly" do
-    ids = search(:description).matching_all("spam")
+    ids = search(:description).match_all("spam")
             .excluding("eggs")
             .order(:id).pluck(:id)
 
@@ -238,7 +238,7 @@ RSpec.describe "EdgeCasesIntegrationTest" do
     assert_match(/bulk/, json)
   end
   it "skewed matching all within bulk category" do
-    ids = search(:description).matching_all("bulkneedle")
+    ids = search(:description).match_all("bulkneedle")
             .where(category: "bulk")
             .order(:id).pluck(:id)
 
@@ -248,8 +248,8 @@ RSpec.describe "EdgeCasesIntegrationTest" do
     end
   end
   it "skewed excluding noop term" do
-    all_ids = search(:description).matching_all("bulkneedle").order(:id).pluck(:id)
-    exc_ids = search(:description).matching_all("bulkneedle")
+    all_ids = search(:description).match_all("bulkneedle").order(:id).pluck(:id)
+    exc_ids = search(:description).match_all("bulkneedle")
                 .excluding("zzzneverexists")
                 .order(:id).pluck(:id)
 
@@ -260,7 +260,7 @@ RSpec.describe "EdgeCasesIntegrationTest" do
   # 8. High bucket cardinality facets (60 categories)
   # ──────────────────────────────────────────────
   it "high cardinality facets returns all buckets" do
-    facets = search(:description).matching_any("facetneedle")
+    facets = search(:description).match_any("facetneedle")
                .facets(:category, size: 200)
 
     assert_kind_of Hash, facets
@@ -272,7 +272,7 @@ RSpec.describe "EdgeCasesIntegrationTest" do
            "Expected at least 60 unique category buckets, got #{unique_cats.length}"
   end
   it "high cardinality facets respects size limit" do
-    facets = search(:description).matching_any("facetneedle")
+    facets = search(:description).match_any("facetneedle")
                .facets(:category, size: 5)
 
     result = facets["category"]
@@ -281,7 +281,7 @@ RSpec.describe "EdgeCasesIntegrationTest" do
            "Expected at most 5 buckets with size: 5, got #{result_keys.length}"
   end
   it "high cardinality facets with where filter" do
-    facets = search(:description).matching_any("facetneedle")
+    facets = search(:description).match_any("facetneedle")
                .where("price > ?", 25)
                .facets(:category, size: 200)
 

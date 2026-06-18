@@ -35,7 +35,7 @@ RSpec.describe "MltAndFacetsIntegrationTest" do
   end
   it "facets with custom agg returns single payload" do
     facets = MltFacetProduct.search(:description)
-                            .matching_all("running")
+                            .match_all("running")
                             .facets(agg: { "value_count" => { "field" => "id" } })
 
     assert_kind_of Hash, facets
@@ -44,7 +44,7 @@ RSpec.describe "MltAndFacetsIntegrationTest" do
   end
   it "with facets with custom agg returns rows and facets" do
     relation = MltFacetProduct.search(:description)
-                             .matching_all("running")
+                             .match_all("running")
                              .with_facets(agg: { "value_count" => { "field" => "id" } })
                              .order(:id)
                              .limit(10)
@@ -72,7 +72,7 @@ RSpec.describe "MltAndFacetsIntegrationTest" do
     assert_operator facets["agg"]["value"].to_f, :>=, 1.0
   end
   it "facets_agg helper returns named aggregations" do
-    rel = MltFacetProduct.search(:description).matching_all("running")
+    rel = MltFacetProduct.search(:description).match_all("running")
     aggs = rel.facets_agg(
       docs: ParadeDB::Aggregations.value_count(:id),
       avg_rating: ParadeDB::Aggregations.avg(:rating),
@@ -86,7 +86,7 @@ RSpec.describe "MltAndFacetsIntegrationTest" do
   end
   it "with_agg helper returns rows and named aggregations" do
     rel = MltFacetProduct.search(:description)
-                        .matching_all("running")
+                        .match_all("running")
                         .with_agg(
                           docs: ParadeDB::Aggregations.value_count(:id),
                           by_rating: ParadeDB::Aggregations.range(

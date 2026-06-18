@@ -18,11 +18,11 @@ RSpec.describe "GuardsUnitTest" do
     GuardTestProduct.all.extending(ParadeDB::SearchMethods)
   end
   it "matching all without search raises" do
-    error = assert_raises(ArgumentError) { bare_relation.matching_all("shoes") }
+    error = assert_raises(ArgumentError) { bare_relation.match_all("shoes") }
     assert_includes error.message, "No search field set"
   end
   it "matching any without search raises" do
-    error = assert_raises(ArgumentError) { bare_relation.matching_any("shoes") }
+    error = assert_raises(ArgumentError) { bare_relation.match_any("shoes") }
     assert_includes error.message, "No search field set"
   end
   it "excluding without search raises" do
@@ -33,8 +33,8 @@ RSpec.describe "GuardsUnitTest" do
     error = assert_raises(ArgumentError) { bare_relation.phrase("running shoes") }
     assert_includes error.message, "No search field set"
   end
-  it "fuzzy-style matching_any without search raises" do
-    error = assert_raises(ArgumentError) { bare_relation.matching_any("shoes", distance: 1) }
+  it "fuzzy-style match_any without search raises" do
+    error = assert_raises(ArgumentError) { bare_relation.match_any("shoes", distance: 1) }
     assert_includes error.message, "No search field set"
   end
   it "regex without search raises" do
@@ -121,17 +121,17 @@ RSpec.describe "GuardsUnitTest" do
     error = assert_raises(ArgumentError) { builder.term(:description, "shoes", distance: 5) }
     assert_includes error.message, "distance must be between 0 and 2"
   end
-  it "fuzzy distance on matching_any rejects out of range" do
+  it "fuzzy distance on match_any rejects out of range" do
     error = assert_raises(ArgumentError) { builder.match_any(:description, "shoes", distance: 5) }
     assert_includes error.message, "distance must be between 0 and 2"
   end
-  it "matching_any rejects tokenizer combined with fuzzy options" do
+  it "match_any rejects tokenizer combined with fuzzy options" do
     error = assert_raises(ArgumentError) do
       builder.match_any(:description, "shoes", tokenizer: ParadeDB::Tokenizer.whitespace(), distance: 1)
     end
     assert_includes error.message, "tokenizer cannot be combined with fuzzy options"
   end
-  it "matching_all rejects tokenizer combined with fuzzy options" do
+  it "match_all rejects tokenizer combined with fuzzy options" do
     error = assert_raises(ArgumentError) do
       builder.match(:description, "shoes", tokenizer: ParadeDB::Tokenizer.whitespace(), prefix: true)
     end
@@ -267,21 +267,21 @@ RSpec.describe "GuardsUnitTest" do
   it "with snippet max chars rejects non integer" do
     error = assert_raises(ArgumentError) do
       GuardTestProduct.search(:description)
-                      .matching_all("shoes")
+                      .match_all("shoes")
                       .with_snippet(:description, max_chars: "abc")
     end
     assert_match(/invalid value|ArgumentError/i, error.class.name)
   end
   it "with snippet max chars accepts integer" do
     rel = GuardTestProduct.search(:description)
-                          .matching_all("shoes")
+                          .match_all("shoes")
                           .with_snippet(:description, max_chars: 100)
     refute_nil rel.to_sql
   end
   it "with snippets max chars rejects non integer" do
     error = assert_raises(ArgumentError) do
       GuardTestProduct.search(:description)
-                      .matching_all("shoes")
+                      .match_all("shoes")
                       .with_snippets(:description, max_chars: "abc")
     end
     assert_includes error.message, "max_chars must be an integer"
@@ -289,7 +289,7 @@ RSpec.describe "GuardsUnitTest" do
   it "with snippets limit rejects non integer" do
     error = assert_raises(ArgumentError) do
       GuardTestProduct.search(:description)
-                      .matching_all("shoes")
+                      .match_all("shoes")
                       .with_snippets(:description, limit: "abc")
     end
     assert_includes error.message, "limit must be an integer"
@@ -297,7 +297,7 @@ RSpec.describe "GuardsUnitTest" do
   it "with snippets offset rejects non integer" do
     error = assert_raises(ArgumentError) do
       GuardTestProduct.search(:description)
-                      .matching_all("shoes")
+                      .match_all("shoes")
                       .with_snippets(:description, offset: "abc")
     end
     assert_includes error.message, "offset must be an integer"
@@ -305,7 +305,7 @@ RSpec.describe "GuardsUnitTest" do
   it "with snippets sort by validates values" do
     error = assert_raises(ArgumentError) do
       GuardTestProduct.search(:description)
-                      .matching_all("shoes")
+                      .match_all("shoes")
                       .with_snippets(:description, sort_by: :unknown)
     end
     assert_includes error.message, "sort_by must be one of: score, position"
@@ -313,7 +313,7 @@ RSpec.describe "GuardsUnitTest" do
   it "with snippets as rejects blank aliases" do
     error = assert_raises(ArgumentError) do
       GuardTestProduct.search(:description)
-                      .matching_all("shoes")
+                      .match_all("shoes")
                       .with_snippets(:description, as: "   ")
     end
     assert_includes error.message, "as cannot be blank"
@@ -321,7 +321,7 @@ RSpec.describe "GuardsUnitTest" do
   it "with snippet positions as rejects blank aliases" do
     error = assert_raises(ArgumentError) do
       GuardTestProduct.search(:description)
-                      .matching_all("shoes")
+                      .match_all("shoes")
                       .with_snippet_positions(:description, as: "")
     end
     assert_includes error.message, "as cannot be blank"
@@ -335,7 +335,7 @@ RSpec.describe "GuardsUnitTest" do
   it "facets size rejects non integer string" do
     error = assert_raises(ArgumentError) do
       GuardTestProduct.search(:description)
-                      .matching_all("shoes")
+                      .match_all("shoes")
                       .build_facet_query(fields: [:category], size: "abc")
     end
     assert_match(/invalid value|ArgumentError/i, error.class.name)
@@ -373,7 +373,7 @@ RSpec.describe "GuardsUnitTest" do
   it "facets requires fields or agg" do
     error = assert_raises(ArgumentError) do
       GuardTestProduct.search(:description)
-                      .matching_all("shoes")
+                      .match_all("shoes")
                       .build_facet_query(fields: [])
     end
     assert_includes error.message, "facets requires at least one field or agg"
@@ -381,7 +381,7 @@ RSpec.describe "GuardsUnitTest" do
   it "facets rejects duplicate fields" do
     error = assert_raises(ArgumentError) do
       GuardTestProduct.search(:description)
-                      .matching_all("shoes")
+                      .match_all("shoes")
                       .build_facet_query(fields: [:category, "category"])
     end
     assert_includes error.message, "Facet field names must be unique"
@@ -389,7 +389,7 @@ RSpec.describe "GuardsUnitTest" do
   it "facets rejects non string or symbol fields" do
     error = assert_raises(TypeError) do
       GuardTestProduct.search(:description)
-                      .matching_all("shoes")
+                      .match_all("shoes")
                       .build_facet_query(fields: [123])
     end
     assert_includes error.message, "Facet field names must be strings or symbols"
@@ -397,20 +397,20 @@ RSpec.describe "GuardsUnitTest" do
   it "facets rejects negative size" do
     error = assert_raises(ArgumentError) do
       GuardTestProduct.search(:description)
-                      .matching_all("shoes")
+                      .match_all("shoes")
                       .build_facet_query(fields: [:category], size: -1)
     end
     assert_includes error.message, "Facet size must be an integer greater than or equal to 0."
   end
   it "facets with agg ignores fields" do
     facet_query = GuardTestProduct.search(:description)
-                                  .matching_all("shoes")
+                                  .match_all("shoes")
                                   .build_facet_query(fields: [Object.new], agg: { "value_count" => { "field" => "id" } })
     assert_includes facet_query.sql, %(pdb.agg('{"value_count":{"field":"id"}}'))
   end
   it "facets exact false raises on non-windowed API" do
     error = assert_raises(ArgumentError) do
-      GuardTestProduct.search(:description).matching_all("shoes").facets(:category, exact: false)
+      GuardTestProduct.search(:description).match_all("shoes").facets(:category, exact: false)
     end
     assert_includes error.message, "facets(exact: false)"
   end
@@ -421,7 +421,7 @@ RSpec.describe "GuardsUnitTest" do
   it "facets with invalid order raises" do
     error = assert_raises(ArgumentError) do
       GuardTestProduct.search(:description)
-                      .matching_all("shoes")
+                      .match_all("shoes")
                       .build_facet_query(fields: [:category], order: "bogus")
     end
     assert_includes error.message, "Unknown facet order"
@@ -430,14 +430,14 @@ RSpec.describe "GuardsUnitTest" do
   it "facets with valid orders do not raise" do
     %i[count_desc count_asc key_desc key_asc].each do |order|
       facet_query = GuardTestProduct.search(:description)
-                                    .matching_all("shoes")
+                                    .match_all("shoes")
                                     .build_facet_query(fields: [:category], order: order)
       refute_nil facet_query.sql
     end
   end
   it "facets with nil order does not raise" do
     facet_query = GuardTestProduct.search(:description)
-                                  .matching_all("shoes")
+                                  .match_all("shoes")
                                   .build_facet_query(fields: [:category], order: nil)
     refute_nil facet_query.sql
   end
@@ -448,21 +448,21 @@ RSpec.describe "GuardsUnitTest" do
   it "with facets agg rejects non hash non string" do
     error = assert_raises(ArgumentError) do
       GuardTestProduct.search(:description)
-                      .matching_all("shoes")
+                      .match_all("shoes")
                       .with_facets(:category, agg: 12345)
     end
     assert_includes error.message, "agg must be a Hash or JSON String"
   end
   it "with facets agg accepts hash" do
     rel = GuardTestProduct.search(:description)
-                          .matching_all("shoes")
+                          .match_all("shoes")
                           .with_facets(:category, agg: { "terms" => { "field" => "category" } })
                           .order(:id).limit(10)
     refute_nil rel.to_sql
   end
   it "with facets agg accepts string" do
     rel = GuardTestProduct.search(:description)
-                          .matching_all("shoes")
+                          .match_all("shoes")
                           .with_facets(:category, agg: '{"terms": {"field": "category"}}')
                           .order(:id).limit(10)
     refute_nil rel.to_sql
@@ -470,7 +470,7 @@ RSpec.describe "GuardsUnitTest" do
   it "facets agg rejects non hash non string" do
     error = assert_raises(ArgumentError) do
       GuardTestProduct.search(:description)
-                      .matching_all("shoes")
+                      .match_all("shoes")
                       .facets(:category, agg: Object.new)
     end
     assert_includes error.message, "agg must be a Hash or JSON String"
@@ -478,7 +478,7 @@ RSpec.describe "GuardsUnitTest" do
   it "with agg rejects empty payload" do
     error = assert_raises(ArgumentError) do
       GuardTestProduct.search(:description)
-                      .matching_all("shoes")
+                      .match_all("shoes")
                       .with_agg
     end
     assert_includes error.message, "at least one named aggregation"
@@ -486,7 +486,7 @@ RSpec.describe "GuardsUnitTest" do
   it "with agg rejects multi-key aggregation specs" do
     error = assert_raises(ArgumentError) do
       GuardTestProduct.search(:description)
-                      .matching_all("shoes")
+                      .match_all("shoes")
                       .with_agg(
                         broken: { value_count: { field: "id" }, avg: { field: "rating" } }
                       )
@@ -500,7 +500,7 @@ RSpec.describe "GuardsUnitTest" do
   # ──────────────────────────────────────────────
   it "with facets missing both order and limit raises" do
     rel = GuardTestProduct.search(:description)
-                          .matching_all("shoes")
+                          .match_all("shoes")
                           .with_facets(:category, size: 10)
     error = assert_raises(ParadeDB::FacetQueryError) { rel.load }
     assert_includes error.message, "ORDER BY"
@@ -508,7 +508,7 @@ RSpec.describe "GuardsUnitTest" do
   end
   it "with facets missing limit only raises" do
     rel = GuardTestProduct.search(:description)
-                          .matching_all("shoes")
+                          .match_all("shoes")
                           .with_facets(:category, size: 10)
                           .order(:id)
     error = assert_raises(ParadeDB::FacetQueryError) { rel.load }
@@ -516,7 +516,7 @@ RSpec.describe "GuardsUnitTest" do
   end
   it "with facets missing order only raises" do
     rel = GuardTestProduct.search(:description)
-                          .matching_all("shoes")
+                          .match_all("shoes")
                           .with_facets(:category, size: 10)
                           .limit(10)
     error = assert_raises(ParadeDB::FacetQueryError) { rel.load }

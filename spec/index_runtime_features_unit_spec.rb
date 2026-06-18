@@ -106,7 +106,7 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
     conn = ActiveRecord::Base.connection
     conn.create_paradedb_index(RuntimeProductIndex, if_not_exists: true)
 
-    sql = RuntimeProduct.search(:description_simple).matching_all("shoes").to_sql
+    sql = RuntimeProduct.search(:description_simple).match_all("shoes").to_sql
     assert_includes sql, "::pdb.alias('description_simple')"
   end
 
@@ -128,7 +128,7 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
     conn = ActiveRecord::Base.connection
     conn.create_paradedb_index(RuntimeProductIndex, if_not_exists: true)
 
-    sql = RuntimeProduct.search(:category).search(:description_simple).matching_all("shoes").to_sql
+    sql = RuntimeProduct.search(:category).search(:description_simple).match_all("shoes").to_sql
     assert_includes sql, "::pdb.alias('description_simple')"
   end
 
@@ -282,7 +282,7 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
     conn.create_paradedb_index(RuntimeProductIndex, if_not_exists: true)
 
     error = assert_raises(ParadeDB::FieldNotIndexed) do
-      RuntimeProduct.search(:description).matching_all("shoe").build_facet_query(fields: [:price]).sql
+      RuntimeProduct.search(:description).match_all("shoe").build_facet_query(fields: [:price]).sql
     end
     assert_includes error.message, "non-indexed fields"
   end

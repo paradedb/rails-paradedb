@@ -45,7 +45,7 @@ RSpec.describe "ArelBuilderUnitTest" do
     assert_equal %("products"."description"), sql(attr)
   end
 
-  # ---- match (matching_all) ----
+  # ---- match (match_all) ----
   it "match single term" do
     node = @builder.match(:description, "shoes")
     assert_equal %("products"."description" &&& 'shoes'), sql(node)

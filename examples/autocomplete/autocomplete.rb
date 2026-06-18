@@ -18,7 +18,7 @@ def demo_autocomplete
                               .with_score
                               .order(search_score: :desc)
                               .limit(5)
-    puts results.map { |item| "  - #{item.description.truncate(50)} (score: #{item.search_score.round(2)})" }
+    puts(results.map { |item| "  - #{item.description.truncate(50)} (score: #{item.search_score.round(2)})" })
   end
 end
 
