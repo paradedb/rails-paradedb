@@ -11,11 +11,11 @@ RSpec.describe "ArelVisitorTest" do
     ParadeDB::Arel.to_sql(node)
   end
   it "match" do
-    node = @builder.match(:description, "running", "shoes")
+    node = @builder.match(:description, "running shoes")
     assert_equal %("products"."description" &&& 'running shoes'), sql(node)
   end
   it "match any" do
-    node = @builder.match_any(:description, "wireless", "bluetooth")
+    node = @builder.match_any(:description, "wireless bluetooth")
     assert_equal %("products"."description" ||| 'wireless bluetooth'), sql(node)
   end
   it "match any with tokenizer override" do

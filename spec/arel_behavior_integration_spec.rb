@@ -32,7 +32,7 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
 
   # ---- match (match_all) ----
   it "match returns expected rows" do
-    ids = search(:description).match_all("running", "shoes").order(:id).pluck(:id)
+    ids = search(:description).match_all("running shoes").order(:id).pluck(:id)
     assert_equal [1, 2], ids
   end
   it "match single term broader results" do
@@ -41,13 +41,13 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
   end
   it "match with boost returns same rows" do
     # Boost affects scoring, not result set
-    ids = search(:description).match_all("running", "shoes", boost: 2).order(:id).pluck(:id)
+    ids = search(:description).match_all("running shoes", boost: 2).order(:id).pluck(:id)
     assert_equal [1, 2], ids
   end
 
   # ---- match_any ----
   it "match any returns union" do
-    ids = search(:description).match_any("wireless", "hiking").order(:id).pluck(:id)
+    ids = search(:description).match_any("wireless hiking").order(:id).pluck(:id)
     assert_equal [3, 5], ids
   end
   it "match any single term" do
@@ -260,7 +260,7 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
   end
   it "with score ordering" do
     rows = search(:description)
-             .match_all("running", "shoes")
+             .match_all("running shoes")
              .with_score
              .order(search_score: :desc)
              .to_a
@@ -339,7 +339,7 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
   # ---- with_facets ----
   it "with facets returns rows and facets" do
     rel = search(:description)
-            .match_all("running", "shoes")
+            .match_all("running shoes")
             .with_facets(:rating, size: 10)
             .order(:id)
             .limit(10)
@@ -374,7 +374,7 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
   # ---- Arel builder executed via where(Arel.sql(...)) ----
   it "arel builder match via where" do
     builder = ParadeDB::Arel::Builder.new(:products)
-    predicate = builder.match(:description, "running", "shoes")
+    predicate = builder.match(:description, "running shoes")
     predicate_sql = ParadeDB::Arel.to_sql(predicate, ArelBehaviorProduct.connection)
 
     ids = ArelBehaviorProduct.where(Arel.sql(predicate_sql)).order(:id).pluck(:id)
@@ -443,7 +443,7 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
   end
   it "arel builder results match search api" do
     # Verify Arel builder produces identical results to the high-level API
-    api_ids = search(:description).match_all("running", "shoes").order(:id).pluck(:id)
+    api_ids = search(:description).match_all("running shoes").order(:id).pluck(:id)
 
     builder = ParadeDB::Arel::Builder.new(:products)
     predicate = builder.match(:description, "running shoes")

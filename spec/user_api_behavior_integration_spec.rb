@@ -32,7 +32,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
   end
   it "matching all executes and returns rows" do
     ids = BehaviorProduct.search(:description)
-                         .match_all("running", "shoes")
+                         .match_all("running shoes")
                          .order(:id)
                          .pluck(:id)
 
@@ -40,7 +40,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
   end
   it "matching any executes and returns rows" do
     ids = BehaviorProduct.search(:description)
-                         .match_any("wireless", "hiking")
+                         .match_any("wireless hiking")
                          .order(:id)
                          .pluck(:id)
 
@@ -345,7 +345,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
     SQL
 
     relation = BehaviorProduct.search(:description)
-                              .match_all("running", "shoes")
+                              .match_all("running shoes")
                               .where("price <= ?", 120)
                               .order(rating: :desc, id: :asc)
                               .limit(2)
@@ -449,16 +449,16 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       seed_range_items!
     end
 
-    it "match_all multiple terms matches raw SQL array docs example" do
+    it "match_all query matches raw SQL" do
       raw_sql = <<~SQL
         SELECT id
         FROM products
-        WHERE description &&& ARRAY['running', 'shoes']
+        WHERE description &&& 'running shoes'
         ORDER BY id
       SQL
 
       relation = BehaviorProduct.search(:description)
-                                .match_all("running", "shoes")
+                                .match_all("running shoes")
                                 .order(:id)
 
       expected_ids = [1, 2, 3, 5]

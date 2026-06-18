@@ -12,8 +12,8 @@ RSpec.describe "ArelIntegrationTest" do
   end
   it "full matrix of operators" do
     nodes = []
-    nodes << @builder.match(:description, "running", "shoes")
-    nodes << @builder.match_any(:description, "wireless", "bluetooth")
+    nodes << @builder.match(:description, "running shoes")
+    nodes << @builder.match_any(:description, "wireless bluetooth")
     nodes << @builder.phrase(:description, "running shoes", slop: 2)
     nodes << @builder.term(:description, "shose", distance: 2, prefix: false, boost: 2)
     nodes << @builder.term(:description, "literal")

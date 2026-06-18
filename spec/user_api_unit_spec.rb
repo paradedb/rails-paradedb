@@ -15,7 +15,7 @@ end
 RSpec.describe "UserApiUnitTest" do
   it "matching all with filters" do
     sql = Product.search(:description)
-                 .match_all("running", "shoes")
+                 .match_all("running shoes")
                  .where(in_stock: true)
                  .where("products.price < 100")
                  .where(rating: 4..)
@@ -60,7 +60,7 @@ RSpec.describe "UserApiUnitTest" do
     assert_sql_equal expected, sql
   end
   it "chain multiple search fields and" do
-    sql = Product.search(:description).match_all("running", "shoes")
+    sql = Product.search(:description).match_all("running shoes")
                  .search(:category).phrase("Footwear")
                  .to_sql
 
@@ -72,7 +72,7 @@ RSpec.describe "UserApiUnitTest" do
     assert_sql_equal expected, sql
   end
   it "matching any or semantics" do
-    sql = Product.search(:description).match_any("wireless", "bluetooth").to_sql
+    sql = Product.search(:description).match_any("wireless bluetooth").to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ||| 'wireless bluetooth')), sql
   end
   it "matching all with tokenizer override" do
@@ -91,7 +91,7 @@ RSpec.describe "UserApiUnitTest" do
   it "excluding terms" do
     sql = Product.search(:description)
                  .match_all("shoes")
-                 .excluding("cheap", "budget")
+                 .excluding("cheap budget")
                  .to_sql
 
     expected = <<~SQL.strip
@@ -285,7 +285,7 @@ RSpec.describe "UserApiUnitTest" do
   end
   it "with score and order" do
     sql = Product.search(:description)
-                 .match_all("running", "shoes")
+                 .match_all("running shoes")
                  .with_score
                  .order(search_score: :desc)
                  .to_sql
@@ -889,7 +889,7 @@ RSpec.describe "UserApiUnitTest" do
     # Complex OR with different WHERE conditions on each side
     left = Product.where(price: 0..50)
                   .search(:description)
-                  .match_all("budget", "cheap")
+                  .match_all("budget cheap")
 
     right = Product.where(rating: 4..)
                    .search(:description)

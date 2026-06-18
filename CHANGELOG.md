@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file. The format 
 
 ### Changed
 
+- **BREAKING**: Restrict match APIs to a single query argument.
 - **BREAKING**: Rename relation query methods `matching_all` and `matching_any`
   to `match_all` and `match_any`.
 
