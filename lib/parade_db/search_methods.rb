@@ -120,7 +120,7 @@ module ParadeDB
       extending(SearchMethods).tap { |rel| rel._paradedb_current_field = search_column }
     end
 
-    def matching_all(
+    def match_all(
       *terms,
       tokenizer: nil,
       distance: nil,
@@ -131,20 +131,25 @@ module ParadeDB
     )
       require_search_field!
 
-      node = builder.match(
-        _paradedb_current_field,
-        *terms,
-        tokenizer: tokenizer,
-        distance: distance,
-        prefix: prefix,
-        transposition_cost_one: transposition_cost_one,
-        boost: boost,
-        constant_score: constant_score
-      )
+      node =
+        if terms.empty? && tokenizer.nil? && distance.nil? && prefix.nil? && transposition_cost_one.nil?
+          builder.match_all(_paradedb_current_field, boost: boost, constant_score: constant_score)
+        else
+          builder.match(
+            _paradedb_current_field,
+            *terms,
+            tokenizer: tokenizer,
+            distance: distance,
+            prefix: prefix,
+            transposition_cost_one: transposition_cost_one,
+            boost: boost,
+            constant_score: constant_score
+          )
+        end
       where(grouped(node))
     end
 
-    def matching_any(
+    def match_any(
       *terms,
       tokenizer: nil,
       distance: nil,
@@ -271,14 +276,6 @@ module ParadeDB
         constant_score: constant_score
       )
       where(grouped(node))
-    end
-
-    # Match-all wrapper for APIs that need an explicit ParadeDB predicate.
-    # Use with `.search(:id)` (or any indexed field): `Product.search(:id).match_all`.
-    def match_all(boost: nil, constant_score: nil)
-      require_search_field!
-
-      where(grouped(builder.match_all(_paradedb_current_field, boost: boost, constant_score: constant_score)))
     end
 
     # Exists wrapper to match rows where the indexed field has a value.

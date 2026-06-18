@@ -52,7 +52,7 @@ RSpec.describe "KeyFieldRuntimeIntegrationTest" do
 
   it "with_score works with non-primary-key key_field" do
     rows = RuntimeKeyDoc.search(:body)
-                        .matching_all("wireless")
+                        .match_all("wireless")
                         .with_score
                         .order(search_score: :desc)
                         .limit(3)

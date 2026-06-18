@@ -83,7 +83,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     IndexMigrationBook.create!(title: "Ruby on Rails guide", author: "DHH")
     IndexMigrationBook.create!(title: "Distributed systems", author: "Tanenbaum")
 
-    ids = IndexMigrationBook.search(:title_simple).matching_all("rails").pluck(:id)
+    ids = IndexMigrationBook.search(:title_simple).match_all("rails").pluck(:id)
     assert_equal 1, ids.length
   end
 
@@ -127,7 +127,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     assert index_exists?("books_bm25_idx")
 
     IndexMigrationBook.create!(title: "Concurrent indexing", author: "ParadeDB")
-    ids = IndexMigrationBook.search(:title_simple).matching_all("concurrent").pluck(:id)
+    ids = IndexMigrationBook.search(:title_simple).match_all("concurrent").pluck(:id)
 
     assert_equal 1, ids.length
   end

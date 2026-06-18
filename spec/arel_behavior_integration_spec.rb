@@ -30,28 +30,28 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
     seed_products!
   end
 
-  # ---- match (matching_all) ----
+  # ---- match (match_all) ----
   it "match returns expected rows" do
-    ids = search(:description).matching_all("running", "shoes").order(:id).pluck(:id)
+    ids = search(:description).match_all("running", "shoes").order(:id).pluck(:id)
     assert_equal [1, 2], ids
   end
   it "match single term broader results" do
-    ids = search(:description).matching_all("running").order(:id).pluck(:id)
+    ids = search(:description).match_all("running").order(:id).pluck(:id)
     assert_equal [1, 2, 6], ids
   end
   it "match with boost returns same rows" do
     # Boost affects scoring, not result set
-    ids = search(:description).matching_all("running", "shoes", boost: 2).order(:id).pluck(:id)
+    ids = search(:description).match_all("running", "shoes", boost: 2).order(:id).pluck(:id)
     assert_equal [1, 2], ids
   end
 
   # ---- match_any ----
   it "match any returns union" do
-    ids = search(:description).matching_any("wireless", "hiking").order(:id).pluck(:id)
+    ids = search(:description).match_any("wireless", "hiking").order(:id).pluck(:id)
     assert_equal [3, 5], ids
   end
   it "match any single term" do
-    ids = search(:description).matching_any("waterproof").order(:id).pluck(:id)
+    ids = search(:description).match_any("waterproof").order(:id).pluck(:id)
     assert_equal [5], ids
   end
 
@@ -59,7 +59,7 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
   it "excluding removes matching rows" do
     # "running" hits [1,2,6]; excluding "lightweight" removes 1
     ids = search(:description)
-            .matching_all("running")
+            .match_all("running")
             .excluding("lightweight")
             .order(:id)
             .pluck(:id)
@@ -67,7 +67,7 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
   end
   it "excluding multiple terms" do
     ids = search(:description)
-            .matching_all("earbuds")
+            .match_all("earbuds")
             .excluding("budget")
             .order(:id)
             .pluck(:id)
@@ -247,7 +247,7 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
   # ---- with_score ----
   it "with score returns positive floats" do
     rows = search(:description)
-             .matching_all("running shoes")
+             .match_all("running shoes")
              .with_score
              .order(:id)
              .to_a
@@ -260,7 +260,7 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
   end
   it "with score ordering" do
     rows = search(:description)
-             .matching_all("running", "shoes")
+             .match_all("running", "shoes")
              .with_score
              .order(search_score: :desc)
              .to_a
@@ -272,7 +272,7 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
   # ---- with_snippet ----
   it "with snippet default tags" do
     rows = search(:description)
-             .matching_all("running shoes")
+             .match_all("running shoes")
              .with_snippet(:description)
              .order(:id)
              .to_a
@@ -285,7 +285,7 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
   end
   it "with snippet custom tags" do
     rows = search(:description)
-             .matching_all("running shoes")
+             .match_all("running shoes")
              .with_snippet(:description, start_tag: "<mark>", end_tag: "</mark>", max_chars: 100)
              .order(:id)
              .to_a
@@ -300,7 +300,7 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
   end
   it "with snippet and score together" do
     rows = search(:description)
-             .matching_all("running shoes")
+             .match_all("running shoes")
              .with_score
              .with_snippet(:description, start_tag: "<b>", end_tag: "</b>")
              .order(:id)
@@ -316,7 +316,7 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
 
   # ---- facets ----
   it "facets rating from search" do
-    facets = search(:description).matching_all("running").facets(:rating)
+    facets = search(:description).match_all("running").facets(:rating)
     assert_kind_of Hash, facets
     assert_includes facets, "rating"
     # running matches rows 1 (rating 5), 2 (rating 4), 6 (rating 2)
@@ -339,7 +339,7 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
   # ---- with_facets ----
   it "with facets returns rows and facets" do
     rel = search(:description)
-            .matching_all("running", "shoes")
+            .match_all("running", "shoes")
             .with_facets(:rating, size: 10)
             .order(:id)
             .limit(10)
@@ -364,7 +364,7 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
   end
   it "with facets requires order and limit" do
     rel = search(:description)
-            .matching_all("running shoes")
+            .match_all("running shoes")
             .with_facets(:category, size: 10)
 
     error = assert_raises(ParadeDB::FacetQueryError) { rel.to_a }
@@ -443,7 +443,7 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
   end
   it "arel builder results match search api" do
     # Verify Arel builder produces identical results to the high-level API
-    api_ids = search(:description).matching_all("running", "shoes").order(:id).pluck(:id)
+    api_ids = search(:description).match_all("running", "shoes").order(:id).pluck(:id)
 
     builder = ParadeDB::Arel::Builder.new(:products)
     predicate = builder.match(:description, "running shoes")
@@ -456,7 +456,7 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
   # ---- Complex real-world patterns ----
   it "search with where filter" do
     ids = search(:description)
-            .matching_all("running")
+            .match_all("running")
             .where(in_stock: true)
             .where("price <= ?", 100)
             .order(:id)
@@ -468,10 +468,10 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
   it "search or composition" do
     left = ArelBehaviorProduct.where(in_stock: true)
                               .search(:description)
-                              .matching_all("earbuds")
+                              .match_all("earbuds")
     right = ArelBehaviorProduct.where("rating >= ?", 4)
                                .search(:description)
-                               .matching_all("boots")
+                               .match_all("boots")
 
     ids = left.or(right).order(:id).pluck(:id)
     # left: earbuds + in_stock -> row 3
@@ -483,7 +483,7 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
     assert_equal [3, 4], ids
   end
   it "chained search fields" do
-    ids = search(:description).matching_all("running")
+    ids = search(:description).match_all("running")
             .search(:category).term("footwear")
             .order(:id)
             .pluck(:id)

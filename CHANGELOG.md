@@ -6,7 +6,12 @@ All notable changes to this project will be documented in this file. The format 
 
 ### Added
 
-- Allow SQL/Arel function nodes as `matching_all` and `matching_any` query arguments.
+- Allow SQL/Arel function nodes as `match_all` and `match_any` query arguments.
+
+### Changed
+
+- **BREAKING**: Rename relation query methods `matching_all` and `matching_any`
+  to `match_all` and `match_any`.
 
 ## [0.8.0] - 2026-06-15
 

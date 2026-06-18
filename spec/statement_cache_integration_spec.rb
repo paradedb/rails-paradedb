@@ -14,9 +14,9 @@ RSpec.describe "StatementCacheIntegrationTest" do
   it "arel node identity in ast" do
     # Verifies that ParadeDB nodes allow Arel ASTs to be compared for equality,
     # which is a prerequisite for effective ActiveRecord statement caching.
-    rel1 = StatementCacheProduct.search(:description).matching_all("shoes", boost: 2.0)
-    rel2 = StatementCacheProduct.search(:description).matching_all("shoes", boost: 2.0)
-    rel3 = StatementCacheProduct.search(:description).matching_all("shoes", boost: 3.0)
+    rel1 = StatementCacheProduct.search(:description).match_all("shoes", boost: 2.0)
+    rel2 = StatementCacheProduct.search(:description).match_all("shoes", boost: 2.0)
+    rel3 = StatementCacheProduct.search(:description).match_all("shoes", boost: 3.0)
 
     assert_equal rel1.arel.ast, rel2.arel.ast
     assert_equal rel1.arel.ast.hash, rel2.arel.ast.hash
@@ -27,7 +27,7 @@ RSpec.describe "StatementCacheIntegrationTest" do
   it "statement cache execution" do
     # Verifies that a cached statement containing ParadeDB nodes can be executed.
     cache = ActiveRecord::StatementCache.create(StatementCacheProduct.connection) do
-      StatementCacheProduct.search(:description).matching_all("shoes", boost: 2.0)
+      StatementCacheProduct.search(:description).match_all("shoes", boost: 2.0)
     end
 
     results = cache.execute([], StatementCacheProduct.connection)

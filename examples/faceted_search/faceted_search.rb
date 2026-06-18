@@ -16,7 +16,7 @@ if $PROGRAM_NAME == __FILE__
 
   puts "\n--- Facets + Rows (Top K) ---"
   relation = MockItem.search(:description)
-                     .matching_all(search_query)
+                     .match_all(search_query)
                      .with_facets(:category, :rating, :metadata_color)
                      .order(rating: :desc)
                      .limit(5)
@@ -25,16 +25,16 @@ if $PROGRAM_NAME == __FILE__
   facets = relation.facets
 
   puts "Top results:"
-  puts rows.map { |item|
+  puts(rows.map { |item|
     color = item.metadata&.fetch("color", nil) || "N/A"
     "  - #{item.description.truncate(50)} [#{item.category}] (rating: #{item.rating}, color: #{color})"
-  }
+  })
 
   puts "\nFacet buckets:"
   facets.each do |key, data|
     buckets = data.is_a?(Hash) ? Array(data["buckets"]) : []
     puts "#{key} (#{buckets.length} buckets)"
-    puts buckets.map { |bucket| "  - #{bucket["key"]}: #{bucket["doc_count"]}" }
+    puts(buckets.map { |bucket| "  - #{bucket["key"]}: #{bucket["doc_count"]}" })
   end
 
   puts "\n#{"=" * 60}"

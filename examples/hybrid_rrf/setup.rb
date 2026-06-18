@@ -146,7 +146,7 @@ module HybridRrfSetup
     connect!
     embedding = MockItem.where.not(embedding: nil)
                         .search(:description)
-                        .matching_all(seed_text)
+                        .match_all(seed_text)
                         .order(id: :asc)
                         .limit(1)
                         .pick(:embedding)

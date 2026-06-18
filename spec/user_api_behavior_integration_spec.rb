@@ -32,7 +32,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
   end
   it "matching all executes and returns rows" do
     ids = BehaviorProduct.search(:description)
-                         .matching_all("running", "shoes")
+                         .match_all("running", "shoes")
                          .order(:id)
                          .pluck(:id)
 
@@ -40,7 +40,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
   end
   it "matching any executes and returns rows" do
     ids = BehaviorProduct.search(:description)
-                         .matching_any("wireless", "hiking")
+                         .match_any("wireless", "hiking")
                          .order(:id)
                          .pluck(:id)
 
@@ -48,7 +48,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
   end
   it "matching with tokenizer override executes" do
     ids = BehaviorProduct.search(:description)
-                         .matching_any("running shoes", tokenizer: ParadeDB::Tokenizer.whitespace())
+                         .match_any("running shoes", tokenizer: ParadeDB::Tokenizer.whitespace())
                          .order(:id)
                          .pluck(:id)
 
@@ -73,7 +73,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       ["pdb.source_code", ParadeDB::Tokenizer.source_code()]
     ].each do |expected, tokenizer|
       relation = BehaviorProduct.search(:description)
-                                .matching_all("running shoes", tokenizer: tokenizer)
+                                .match_all("running shoes", tokenizer: tokenizer)
                                 .order(:id)
 
       relation.load
@@ -88,7 +88,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
   it "matching with tokenizer + fuzzy distance raises argument error" do
     error = assert_raises(ArgumentError) do
       BehaviorProduct.search(:description)
-                     .matching_any("runing shose", tokenizer: ParadeDB::Tokenizer.whitespace(), distance: 1)
+                     .match_any("runing shose", tokenizer: ParadeDB::Tokenizer.whitespace(), distance: 1)
                      .order(:id)
                      .pluck(:id)
     end
@@ -97,7 +97,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
   it "matching with tokenizer + fuzzy constant score raises argument error" do
     error = assert_raises(ArgumentError) do
       BehaviorProduct.search(:description)
-                     .matching_any("runing shose", tokenizer: ParadeDB::Tokenizer.whitespace(), distance: 1, constant_score: 1.0)
+                     .match_any("runing shose", tokenizer: ParadeDB::Tokenizer.whitespace(), distance: 1, constant_score: 1.0)
                      .order(:id)
                      .pluck(:id)
     end
@@ -238,7 +238,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
   end
   it "with score and with snippet materialize columns" do
     rows = BehaviorProduct.search(:description)
-                          .matching_all("running shoes")
+                          .match_all("running shoes")
                           .with_score
                           .with_snippet(:description, start_tag: "<b>", end_tag: "</b>", max_chars: 60)
                           .order(:id)
@@ -252,7 +252,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
   end
   it "with snippets materialize array column with rails-style options" do
     rows = BehaviorProduct.search(:description)
-                          .matching_all("running")
+                          .match_all("running")
                           .with_snippets(
                             :description,
                             start_tag: "<em>",
@@ -275,7 +275,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
   end
   it "with snippet positions materialize offsets column" do
     rows = BehaviorProduct.search(:description)
-                          .matching_all("running")
+                          .match_all("running")
                           .with_snippet_positions(:description)
                           .order(:id)
                           .limit(2)
@@ -289,13 +289,13 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
     end
   end
   it "facets and with facets execute and parse results" do
-    facet_hash = BehaviorProduct.search(:description).matching_all("earbuds").facets(:rating)
+    facet_hash = BehaviorProduct.search(:description).match_all("earbuds").facets(:rating)
     assert_kind_of Hash, facet_hash
     assert_includes facet_hash, "rating"
     assert_match(/[35]/, facet_hash["rating"].to_json)
 
     rel = BehaviorProduct.search(:description)
-                         .matching_all("running shoes")
+                         .match_all("running shoes")
                          .with_facets(:rating, size: 10)
                          .order(:id)
                          .limit(10)
@@ -309,7 +309,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
   end
   it "with facets exact false executes" do
     rel = BehaviorProduct.search(:description)
-                         .matching_all("running shoes")
+                         .match_all("running shoes")
                          .with_facets(:rating, size: 10, exact: false)
                          .order(:id)
                          .limit(10)
@@ -322,7 +322,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
     assert_includes rel_facets, "rating"
   end
   it "with facets without topk shape raises friendly error" do
-    rel = BehaviorProduct.search(:description).matching_all("running shoes").with_facets(:rating, size: 10)
+    rel = BehaviorProduct.search(:description).match_all("running shoes").with_facets(:rating, size: 10)
     error = assert_raises(ParadeDB::FacetQueryError) { rel.to_a }
     assert_includes error.message, "ORDER BY and LIMIT"
   end
@@ -345,7 +345,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
     SQL
 
     relation = BehaviorProduct.search(:description)
-                              .matching_all("running", "shoes")
+                              .match_all("running", "shoes")
                               .where("price <= ?", 120)
                               .order(rating: :desc, id: :asc)
                               .limit(2)
@@ -364,7 +364,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
 
     relation = BehaviorProduct.joins("INNER JOIN categories ON categories.name = products.category")
                               .search(:description)
-                              .matching_all("running")
+                              .match_all("running")
                               .where(categories: { name: "footwear" })
                               .order(:id)
 
@@ -381,10 +381,10 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
 
     left = BehaviorProduct.where(in_stock: true)
                           .search(:description)
-                          .matching_all("earbuds")
+                          .match_all("earbuds")
     right = BehaviorProduct.where("rating >= ?", 4)
                            .search(:description)
-                           .matching_all("boots")
+                           .match_all("boots")
 
     relation = left.or(right).order(:id)
 
@@ -401,7 +401,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
     SQL
 
     actual = BehaviorProduct.search(:description)
-                            .matching_all("running")
+                            .match_all("running")
                             .group(:category)
                             .having("COUNT(*) >= 2")
                             .order(:category)
@@ -421,7 +421,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
     avg_footwear = BehaviorProduct.where(category: "footwear").select("AVG(price)")
 
     relation = BehaviorProduct.search(:description)
-                              .matching_all("running")
+                              .match_all("running")
                               .where("price < (?)", avg_footwear)
                               .order(:id)
 
@@ -449,7 +449,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       seed_range_items!
     end
 
-    it "matching_all multiple terms matches raw SQL array docs example" do
+    it "match_all multiple terms matches raw SQL array docs example" do
       raw_sql = <<~SQL
         SELECT id
         FROM products
@@ -458,7 +458,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       SQL
 
       relation = BehaviorProduct.search(:description)
-                                .matching_all("running", "shoes")
+                                .match_all("running", "shoes")
                                 .order(:id)
 
       expected_ids = [1, 2, 3, 5]
@@ -531,9 +531,9 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       description = BehaviorProduct.arel_table[:description]
       relation = BehaviorOrder.joins("JOIN products ON orders.product_id = products.id")
                               .search(:customer_name)
-                              .matching_any("Johnson")
+                              .match_any("Johnson")
                               .search(description)
-                              .matching_any("running shoes")
+                              .match_any("running shoes")
                               .select("orders.order_id")
                               .order(Arel.sql("pdb.score(orders.order_id) + pdb.score(products.id) DESC, orders.order_id"))
                               .limit(5)
