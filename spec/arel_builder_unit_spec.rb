@@ -54,6 +54,11 @@ RSpec.describe "ArelBuilderUnitTest" do
     node = @builder.match(:description, "running", "shoes", "lightweight")
     assert_equal %("products"."description" &&& 'running shoes lightweight'), sql(node)
   end
+  it "match accepts sql function term" do
+    term = Arel::Nodes::NamedFunction.new("lower", [Arel::Nodes.build_quoted("SHOES")])
+    node = @builder.match(:description, term)
+    assert_equal %("products"."description" &&& lower('SHOES')), sql(node)
+  end
   it "match with boost" do
     node = @builder.match(:description, "shoes", boost: 2.5)
     assert_equal %("products"."description" &&& 'shoes'::pdb.boost(2.5)), sql(node)
@@ -79,6 +84,11 @@ RSpec.describe "ArelBuilderUnitTest" do
   it "match any multiple terms" do
     node = @builder.match_any(:description, "wireless", "bluetooth", "earbuds")
     assert_equal %("products"."description" ||| 'wireless bluetooth earbuds'), sql(node)
+  end
+  it "match any accepts sql function term" do
+    term = Arel.sql("trim(' shoes ')")
+    node = @builder.match_any(:description, term)
+    assert_equal %("products"."description" ||| trim(' shoes ')), sql(node)
   end
 
   # ---- phrase ----
@@ -131,6 +141,11 @@ RSpec.describe "ArelBuilderUnitTest" do
   it "term with integer value" do
     node = @builder.term(:rating, 5)
     assert_equal %("products"."rating" === 5), sql(node)
+  end
+  it "term accepts sql function value" do
+    term = Arel::Nodes::NamedFunction.new("lower", [Arel::Nodes.build_quoted("SHOES")])
+    node = @builder.term(:description, term)
+    assert_equal %("products"."description" === lower('SHOES')), sql(node)
   end
   it "term set with strings" do
     node = @builder.term_set(:category, %w[audio footwear])
@@ -188,6 +203,10 @@ RSpec.describe "ArelBuilderUnitTest" do
   it "regex complex pattern" do
     node = @builder.regex(:description, "(wireless|bluetooth).*earbuds")
     assert_equal %("products"."description" @@@ pdb.regex('(wireless|bluetooth).*earbuds')), sql(node)
+  end
+  it "regex accepts sql function pattern" do
+    node = @builder.regex(:description, Arel.sql("lower('RUN.*')"))
+    assert_equal %("products"."description" @@@ pdb.regex(lower('RUN.*'))), sql(node)
   end
   it "regex phrase" do
     node = @builder.regex_phrase(:description, "run.*", "sho.*")

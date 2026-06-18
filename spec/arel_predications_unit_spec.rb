@@ -20,6 +20,11 @@ RSpec.describe "ArelPredicationsUnitTest" do
     node = @t[:description].pdb_match("running", "shoes", "lightweight")
     assert_equal %("products"."description" &&& 'running shoes lightweight'), sql(node)
   end
+  it "pdb_match accepts sql function term" do
+    term = Arel::Nodes::NamedFunction.new("lower", [Arel::Nodes.build_quoted("SHOES")])
+    node = @t[:description].pdb_match(term)
+    assert_equal %("products"."description" &&& lower('SHOES')), sql(node)
+  end
   it "pdb_match with boost" do
     node = @t[:description].pdb_match("shoes", boost: 2.5)
     assert_equal %("products"."description" &&& 'shoes'::pdb.boost(2.5)), sql(node)
@@ -40,6 +45,11 @@ RSpec.describe "ArelPredicationsUnitTest" do
   it "pdb_match_any multiple terms" do
     node = @t[:description].pdb_match_any("wireless", "bluetooth", "earbuds")
     assert_equal %("products"."description" ||| 'wireless bluetooth earbuds'), sql(node)
+  end
+  it "pdb_match_any accepts sql function term" do
+    term = Arel.sql("trim(' shoes ')")
+    node = @t[:description].pdb_match_any(term)
+    assert_equal %("products"."description" ||| trim(' shoes ')), sql(node)
   end
   it "pdb_match with tokenizer override" do
     node = @t[:description].pdb_match("running shoes", tokenizer: "whitespace")
@@ -89,6 +99,11 @@ RSpec.describe "ArelPredicationsUnitTest" do
     node = @t[:rating].pdb_term(5)
     assert_equal %("products"."rating" === 5), sql(node)
   end
+  it "pdb_term accepts sql function value" do
+    term = Arel::Nodes::NamedFunction.new("lower", [Arel::Nodes.build_quoted("SHOES")])
+    node = @t[:description].pdb_term(term)
+    assert_equal %("products"."description" === lower('SHOES')), sql(node)
+  end
   it "pdb_term_set" do
     node = @t[:category].pdb_term_set(%w[audio footwear])
     assert_equal %("products"."category" @@@ pdb.term_set(ARRAY['audio', 'footwear'])), sql(node)
@@ -124,6 +139,10 @@ RSpec.describe "ArelPredicationsUnitTest" do
   it "pdb_regex complex pattern" do
     node = @t[:description].pdb_regex("(wireless|bluetooth).*earbuds")
     assert_equal %("products"."description" @@@ pdb.regex('(wireless|bluetooth).*earbuds')), sql(node)
+  end
+  it "pdb_regex accepts sql function pattern" do
+    node = @t[:description].pdb_regex(Arel.sql("lower('RUN.*')"))
+    assert_equal %("products"."description" @@@ pdb.regex(lower('RUN.*'))), sql(node)
   end
   it "pdb_regex_phrase" do
     node = @t[:description].pdb_regex_phrase("run.*", "sho.*", slop: 2, max_expansions: 100)
