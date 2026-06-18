@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Added
+
+- Allow SQL/Arel function nodes as `matching_all` and `matching_any` query arguments.
+
 ## [0.8.0] - 2026-06-15
 
 ### Changed

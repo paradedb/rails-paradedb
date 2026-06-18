@@ -35,7 +35,7 @@ module ParadeDB
           prefix: prefix,
           transposition_cost_one: transposition_cost_one
         )
-        rhs = quoted_value(join_terms(terms))
+        rhs = term_query_node(terms)
         rhs = apply_fuzzy(
           rhs,
           distance: distance,
@@ -64,7 +64,7 @@ module ParadeDB
           prefix: prefix,
           transposition_cost_one: transposition_cost_one
         )
-        rhs = quoted_value(join_terms(terms))
+        rhs = term_query_node(terms)
         rhs = apply_fuzzy(
           rhs,
           distance: distance,
@@ -542,6 +542,21 @@ module ParadeDB
         joined = terms.flatten.compact.map(&:to_s).join(" ")
         raise ArgumentError, "at least one search term is required" if joined.strip.empty?
         joined
+      end
+
+      def term_query_node(terms)
+        values = terms.flatten.compact
+        if values.length == 1 && arel_expression?(values.first)
+          return values.first
+        end
+
+        quoted_value(join_terms(values))
+      end
+
+      def arel_expression?(value)
+        value.is_a?(::Arel::Nodes::Node) ||
+          value.is_a?(::Arel::Attributes::Attribute) ||
+          value.is_a?(::Arel::Nodes::SqlLiteral)
       end
 
       def normalize_term_set_terms(terms)

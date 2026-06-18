@@ -83,6 +83,11 @@ RSpec.describe "UserApiUnitTest" do
     sql = Product.search(:description).matching_all("running shoes", tokenizer: ParadeDB::Tokenizer.whitespace(options: {lowercase: false})).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" &&& 'running shoes'::pdb.whitespace('lowercase=false'))), sql
   end
+  it "matching all with sql function argument" do
+    term = Arel::Nodes::NamedFunction.new("lower", [Arel::Nodes.build_quoted("SHOES")])
+    sql = Product.search(:description).matching_all(term).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" &&& lower('SHOES'))), sql
+  end
   it "excluding terms" do
     sql = Product.search(:description)
                  .matching_all("shoes")
@@ -114,6 +119,11 @@ RSpec.describe "UserApiUnitTest" do
   it "phrase with tokenizer" do
     sql = Product.search(:description).phrase("running shoes", tokenizer: ParadeDB::Tokenizer.whitespace()).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ### 'running shoes'::pdb.whitespace)), sql
+  end
+  it "phrase with sql function argument" do
+    phrase = Arel::Nodes::NamedFunction.new("lower", [Arel::Nodes.build_quoted("RUNNING SHOES")])
+    sql = Product.search(:description).phrase(phrase).to_sql
+    assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ### lower('RUNNING SHOES'))), sql
   end
   it "phrase with pretokenized array" do
     sql = Product.search(:description).phrase(%w[running shoes]).to_sql

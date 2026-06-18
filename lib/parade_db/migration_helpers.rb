@@ -422,7 +422,7 @@ module ParadeDB
 
       with_sql = indexdef[start..pos - 2]
       trailing_sql = indexdef[pos..]&.strip
-      trailing_sql = nil if trailing_sql&.empty?
+      trailing_sql = nil if trailing_sql == ""
 
       [with_sql, trailing_sql]
     end
