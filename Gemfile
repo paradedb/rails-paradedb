@@ -9,7 +9,7 @@ gem "rspec", "~> 3.13"
 
 group :test do
   gem "simplecov", "~> 0.22", require: false
-  gem "simplecov-cobertura", "~> 3.1", require: false
+  gem "simplecov-cobertura", "~> 3.2", require: false
 end
 
 group :development do
