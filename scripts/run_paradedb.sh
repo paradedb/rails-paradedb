@@ -8,16 +8,19 @@ else
   RUNNING=0
 fi
 
-IMAGE="${PARADEDB_IMAGE:-paradedb/paradedb:latest-pg18}"
+PARADEDB_VERSION="${PARADEDB_VERSION:-0.24.2}"
+PARADEDB_POSTGRES_VERSION="${PARADEDB_POSTGRES_VERSION:-18}"
+IMAGE="${PARADEDB_IMAGE:-paradedb/paradedb:${PARADEDB_VERSION}-pg${PARADEDB_POSTGRES_VERSION}}"
 CONTAINER_NAME="${PARADEDB_CONTAINER_NAME:-paradedb-integration}"
 
 # Allow overriding connection details via env vars
 PORT="${PARADEDB_PORT:-5432}"
+HOST="${PARADEDB_HOST:-127.0.0.1}"
 USER="${PARADEDB_USER:-postgres}"
 PASSWORD="${PARADEDB_PASSWORD:-postgres}"
 DB="${PARADEDB_DB:-postgres}"
 
-DATABASE_URL="${DATABASE_URL:-postgresql://${USER}:${PASSWORD}@localhost:${PORT}/${DB}}"
+DATABASE_URL="${DATABASE_URL:-postgresql://${USER}:${PASSWORD}@${HOST}:${PORT}/${DB}}"
 export DATABASE_URL
 
 if ! command -v docker >/dev/null 2>&1; then
