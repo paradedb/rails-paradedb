@@ -40,7 +40,6 @@ module ParadeDB
       max_word_length
       stopwords
     ].freeze
-
     # Internal state tracking
     attr_accessor :_paradedb_current_field
     attr_accessor :_paradedb_facet_fields
@@ -121,7 +120,7 @@ module ParadeDB
     end
 
     def match_all(
-      *terms,
+      term = nil,
       tokenizer: nil,
       distance: nil,
       prefix: nil,
@@ -132,12 +131,12 @@ module ParadeDB
       require_search_field!
 
       node =
-        if terms.empty? && tokenizer.nil? && distance.nil? && prefix.nil? && transposition_cost_one.nil?
+        if term.nil? && tokenizer.nil? && distance.nil? && prefix.nil? && transposition_cost_one.nil?
           builder.match_all(_paradedb_current_field, boost: boost, constant_score: constant_score)
         else
           builder.match(
             _paradedb_current_field,
-            *terms,
+            term,
             tokenizer: tokenizer,
             distance: distance,
             prefix: prefix,
@@ -150,7 +149,7 @@ module ParadeDB
     end
 
     def match_any(
-      *terms,
+      term,
       tokenizer: nil,
       distance: nil,
       prefix: nil,
@@ -162,7 +161,7 @@ module ParadeDB
 
       node = builder.match_any(
         _paradedb_current_field,
-        *terms,
+        term,
         tokenizer: tokenizer,
         distance: distance,
         prefix: prefix,
@@ -173,10 +172,10 @@ module ParadeDB
       where(grouped(node))
     end
 
-    def excluding(*terms)
+    def excluding(term)
       require_search_field!
 
-      neg = builder.match(_paradedb_current_field, *terms)
+      neg = builder.match(_paradedb_current_field, term)
       where(grouped(neg.not))
     end
 

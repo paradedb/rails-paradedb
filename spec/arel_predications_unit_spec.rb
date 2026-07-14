@@ -16,8 +16,8 @@ RSpec.describe "ArelPredicationsUnitTest" do
     node = @t[:description].pdb_match("shoes")
     assert_equal %("products"."description" &&& 'shoes'), sql(node)
   end
-  it "pdb_match multiple terms joined" do
-    node = @t[:description].pdb_match("running", "shoes", "lightweight")
+  it "pdb_match query" do
+    node = @t[:description].pdb_match("running shoes lightweight")
     assert_equal %("products"."description" &&& 'running shoes lightweight'), sql(node)
   end
   it "pdb_match accepts sql function term" do
@@ -42,8 +42,8 @@ RSpec.describe "ArelPredicationsUnitTest" do
     node = @t[:description].pdb_match_any("wireless")
     assert_equal %("products"."description" ||| 'wireless'), sql(node)
   end
-  it "pdb_match_any multiple terms" do
-    node = @t[:description].pdb_match_any("wireless", "bluetooth", "earbuds")
+  it "pdb_match_any query" do
+    node = @t[:description].pdb_match_any("wireless bluetooth earbuds")
     assert_equal %("products"."description" ||| 'wireless bluetooth earbuds'), sql(node)
   end
   it "pdb_match_any accepts sql function term" do
