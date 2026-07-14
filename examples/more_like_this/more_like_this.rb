@@ -99,7 +99,6 @@ def demo_advanced_mlt_options
     min_term_freq: 1,
     max_query_terms: 12,
     min_doc_freq: 1,
-    max_term_freq: 100,
     max_doc_freq: 10_000,
     min_word_length: 3,
     max_word_length: 20,

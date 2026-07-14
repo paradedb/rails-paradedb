@@ -13,8 +13,6 @@ module ParadeDB
       max_query_terms: :max_query_terms,
       min_doc_freq: :min_doc_frequency,
       min_doc_frequency: :min_doc_frequency,
-      max_term_freq: :max_term_frequency,
-      max_term_frequency: :max_term_frequency,
       max_doc_freq: :max_doc_frequency,
       max_doc_frequency: :max_doc_frequency,
       min_word_length: :min_word_length,
@@ -25,7 +23,6 @@ module ParadeDB
       min_term_frequency
       max_query_terms
       min_doc_frequency
-      max_term_frequency
       max_doc_frequency
       min_word_length
       max_word_length
@@ -34,7 +31,6 @@ module ParadeDB
       min_term_frequency
       max_query_terms
       min_doc_frequency
-      max_term_frequency
       max_doc_frequency
       min_word_length
       max_word_length
