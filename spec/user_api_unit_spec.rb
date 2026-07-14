@@ -265,14 +265,13 @@ RSpec.describe "UserApiUnitTest" do
       min_term_freq: 2,
       max_query_terms: 10,
       min_doc_freq: 1,
-      max_term_freq: 20,
       max_doc_freq: 200,
       min_word_length: 3,
       max_word_length: 15,
       stopwords: %w[the a]
     ).to_sql
 
-    expected = %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.more_like_this(5, ARRAY['description'], min_term_frequency => 2, max_query_terms => 10, min_doc_frequency => 1, max_term_frequency => 20, max_doc_frequency => 200, min_word_length => 3, max_word_length => 15, stopwords => ARRAY['the', 'a'])))
+    expected = %(SELECT products.* FROM products WHERE ("products"."id" @@@ pdb.more_like_this(5, ARRAY['description'], min_term_frequency => 2, max_query_terms => 10, min_doc_frequency => 1, max_doc_frequency => 200, min_word_length => 3, max_word_length => 15, stopwords => ARRAY['the', 'a'])))
     assert_sql_equal expected, sql
   end
   it "more like this key extraction does not fallback to id for non-id key fields" do
