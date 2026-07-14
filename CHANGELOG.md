@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+[0.9.0] - 2026-07-14
+
 ### Added
 
 - Allow SQL/Arel function nodes as `match_all` and `match_any` query arguments.
@@ -13,6 +15,10 @@ All notable changes to this project will be documented in this file. The format 
 - **BREAKING**: Restrict match APIs to a single query argument.
 - **BREAKING**: Rename relation query methods `matching_all` and `matching_any`
   to `match_all` and `match_any`.
+
+### Removed
+
+- **BREAKING**: Removed max_term_freq from the more_like_this API.
 
 ## [0.8.0] - 2026-06-15
 
@@ -148,7 +154,8 @@ All notable changes to this project will be documented in this file. The format 
 - Schema dump/load round-trip for tokenizer configuration and index options
   (including `target_segment_count`)
 
-[Unreleased]: https://github.com/paradedb/rails-paradedb/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/paradedb/rails-paradedb/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.9.0
 [0.8.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.8.0
 [0.7.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.7.0
 [0.6.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.6.0
