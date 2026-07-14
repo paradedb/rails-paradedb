@@ -450,8 +450,8 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     end.not_to raise_error
 
     assert_sql_equal <<~SQL, indexdef_for("search_idx")
-      CREATE INDEX search_idx ON public.mock_items
-      USING bm25 (id, description, (((rating + 1))::pdb.alias('rating')))
+      CREATE INDEX search_idx ON public.mock_items USING bm25
+      (id, description, (((rating + 1))::pdb.alias('alias=rating')))
       WITH (key_field=id)
     SQL
     assert index_exists?("search_idx")
