@@ -30,11 +30,12 @@ if [[ -z "${CI:-}" ]]; then
 fi
 
 PORT="${PARADEDB_PORT:-5432}"
+HOST="${PARADEDB_HOST:-127.0.0.1}"
 USER="${PARADEDB_USER:-postgres}"
 PASSWORD="${PARADEDB_PASSWORD:-postgres}"
 DB="${PARADEDB_DB:-postgres}"
 
-export PARADEDB_TEST_DSN="postgres://${USER}:${PASSWORD}@localhost:${PORT}/${DB}"
+export PARADEDB_TEST_DSN="postgres://${USER}:${PASSWORD}@${HOST}:${PORT}/${DB}"
 export PGPASSWORD="${PASSWORD}"
 
 if [[ $# -gt 0 ]]; then
