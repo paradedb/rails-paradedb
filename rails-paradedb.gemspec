@@ -9,7 +9,7 @@ Gem::Specification.new do |spec|
   spec.email = ["support@paradedb.com"]
 
   spec.summary = "ParadeDB integration for ActiveRecord"
-  spec.description = "Simple, Elastic-quality search for Postgres via ParadeDB and ActiveRecord."
+  spec.description = "Elastic-quality full-text search, vector retrieval, and aggregations in Postgres via ParadeDB and ActiveRecord."
   spec.homepage = "https://github.com/paradedb/rails-paradedb"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.2"
