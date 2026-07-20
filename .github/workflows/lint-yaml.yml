@@ -20,6 +20,9 @@ concurrency:
   group: lint-yaml-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   lint-yaml:
     name: Lint YAML Files
