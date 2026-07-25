@@ -185,6 +185,8 @@ module ParadeDB
     def paradedb_entry_sql(entry)
       source_sql = paradedb_source_sql(entry)
 
+      return "#{source_sql} #{ParadeDB::Vector::OPCLASSES.fetch(entry.metric)}" if entry.metric
+
       if entry.tokenizer.nil? && entry.query_key != entry.source
         return "(#{source_sql}::pdb.alias(#{quote(entry.query_key)}))"
       end
@@ -331,7 +333,9 @@ module ParadeDB
         fields_pairs = grouped.map do |source, entries|
           source_ruby = source.match?(/[^a-zA-Z0-9_]/) ? "#{source.inspect} =>" : "#{source}:"
 
-          if entries.all? { |e| e[:tokenizer].nil? }
+          if entries.length == 1 && entries.first[:metric]
+            "#{source_ruby} { metric: #{entries.first[:metric].inspect} }"
+          elsif entries.all? { |e| e[:tokenizer].nil? }
             "#{source_ruby} {}"
           elsif entries.length == 1
             "#{source_ruby} #{paradedb_tokenizer_config_ruby(entries.first)}"
@@ -481,6 +485,18 @@ module ParadeDB
 
     def paradedb_parse_column_entry(field_sql)
       stripped = field_sql.strip
+
+      opclass_match = stripped.match(/\A(.+?)\s+(vector_(?:l2|cosine|ip)_ops)\z/m)
+      if opclass_match
+        source_sql = opclass_match[1].strip
+        source_name = identifier_sql?(source_sql) ? unquote_identifier(source_sql) : source_sql
+        return {
+          source: source_name,
+          tokenizer: nil,
+          options: {},
+          metric: ParadeDB::Vector::METRICS_BY_OPCLASS.fetch(opclass_match[2])
+        }
+      end
 
       if stripped.start_with?("(") && stripped.end_with?(")")
         inner = stripped[1..-2].strip

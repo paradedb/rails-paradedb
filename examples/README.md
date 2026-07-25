@@ -18,9 +18,6 @@ Each example folder uses a Rails-like layout:
 BUNDLE_GEMFILE=examples/Gemfile bundle install
 ```
 
-The hybrid RRF example uses pgvector via `neighbor`, which is already included
-in `examples/Gemfile`.
-
 ### 2. Start ParadeDB
 
 ```bash
@@ -109,7 +106,7 @@ Structure:
 1. Hybrid Search with RRF (`hybrid_rrf/`)
 
 Demonstrates Reciprocal Rank Fusion (RRF) by composing a ParadeDB BM25 relation
-with a semantic relation (via `neighbor`) using CTEs.
+with a semantic relation (using the native vector distance helpers) via CTEs.
 
 ```bash
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/hybrid_rrf/setup.rb
@@ -121,6 +118,22 @@ Structure:
 - `examples/hybrid_rrf/model.rb`
 - `examples/hybrid_rrf/setup.rb`
 - `examples/hybrid_rrf/hybrid_rrf.rb`
+
+1. Vector Search (`vector_search/`)
+
+Top-K vector search inside the ParadeDB index: `vector(n)` columns, metric
+opclasses, and `nearest` queries. Requires pg_search 0.25.0+.
+
+```bash
+BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/vector_search/setup.rb
+BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/vector_search/vector_search.rb
+```
+
+Structure:
+
+- `examples/vector_search/model.rb`
+- `examples/vector_search/setup.rb`
+- `examples/vector_search/vector_search.rb`
 
 1. RAG (`rag/rag.rb`)
 

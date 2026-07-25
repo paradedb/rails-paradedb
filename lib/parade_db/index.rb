@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "tokenizer"
+require_relative "vector"
 
 module ParadeDB
   class Index
@@ -96,7 +97,7 @@ module ParadeDB
           @where = where
         end
       end
-      Entry = Struct.new(:source, :expression, :tokenizer, :options, :query_key, keyword_init: true)
+      Entry = Struct.new(:source, :expression, :tokenizer, :options, :query_key, :metric, keyword_init: true)
 
       class << self
         def compile!(klass)
@@ -153,7 +154,7 @@ module ParadeDB
             end
             normalized = (config || {}).each_with_object({}) { |(k, v), memo| memo[k.to_sym] = v }
 
-            unknown_keys = normalized.keys - (TokenizerParser::TOKENIZER_SINGLE_KEYS + [:tokenizers] + FIELD_OPTION_KEYS)
+            unknown_keys = normalized.keys - (TokenizerParser::TOKENIZER_SINGLE_KEYS + %i[tokenizers metric] + FIELD_OPTION_KEYS)
             unless unknown_keys.empty?
               raise InvalidIndexDefinition,
                     "unknown field config keys for #{source_name.inspect}: #{unknown_keys.map(&:inspect).join(', ')}"
@@ -163,7 +164,27 @@ module ParadeDB
             single_tokenizer_keys_present = TokenizerParser::TOKENIZER_SINGLE_KEYS.any? { |key| normalized.key?(key) }
 
             is_alias = normalized[:alias] && normalized.length == 1
-            if is_alias
+            if normalized.key?(:metric)
+              unless normalized.length == 1
+                raise InvalidIndexDefinition,
+                      "field #{source_name.inspect} cannot mix :metric with other field config keys"
+              end
+
+              begin
+                metric = ParadeDB::Vector.normalize_metric(normalized[:metric])
+              rescue ArgumentError => e
+                raise InvalidIndexDefinition, "field #{source_name.inspect}: #{e.message}"
+              end
+
+              entries << Entry.new(
+                source: source_name,
+                expression: expression?(source_name),
+                tokenizer: nil,
+                options: {},
+                query_key: source_name,
+                metric: metric
+              )
+            elsif is_alias
               entries << Entry.new(
                 source: source_name,
                 expression: expression?(source_name),

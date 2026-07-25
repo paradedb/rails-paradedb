@@ -171,3 +171,5 @@ jobs:
           run_example examples/faceted_search/faceted_search.rb "rails-paradedb Faceted Search Example"
           run_example examples/hybrid_rrf/setup.rb "Hybrid Search Setup"
           run_example examples/hybrid_rrf/hybrid_rrf.rb "Hybrid Search with Reciprocal Rank Fusion (single SQL query)"
+          run_example examples/vector_search/setup.rb "Vector Search Setup - Creating vector_items Table"
+          run_example examples/vector_search/vector_search.rb "rails-paradedb Vector Search Example"

@@ -47,6 +47,34 @@ The official ActiveRecord integration for [ParadeDB](https://paradedb.com) (powe
 | ParadeDB   | 0.25.0+                                          |
 | PostgreSQL | 15+ (PostgreSQL adapter with ParadeDB extension) |
 
+## Vector Search
+
+rails-paradedb natively supports pgvector `vector(n)` columns — no `neighbor` or other pgvector gem required. Declare the column, list it in the ParadeDB index with a distance metric, and run Top-K queries:
+
+```ruby
+class AddVectorSearchToProducts < ActiveRecord::Migration[8.1]
+  def change
+    add_column :products, :embedding, :vector, limit: 384
+
+    add_paradedb_index :products,
+                   fields: { id: {}, description: {}, embedding: { metric: :l2 } },
+                   key_field: :id
+  end
+end
+```
+
+```ruby
+Product.nearest(:embedding, query_embedding).limit(10)
+```
+
+`nearest` orders by the pgvector distance operator for the chosen metric — `:l2` → `<->`, `:cosine` → `<=>`, `:ip` → `<#>` — and defaults to the metric declared in the index (`:l2` when none is declared). ParadeDB requires a `@@@` predicate alongside the vector `ORDER BY` to activate the index scan; `nearest` adds `key_field @@@ pdb.all()` automatically when the relation has no ParadeDB predicate, and composes with full-text search:
+
+```ruby
+Product.search(:description).match_all("shoes").nearest(:embedding, query_embedding).limit(10)
+```
+
+Top-K index pushdown requires a `LIMIT`, and the query metric must match the index opclass metric — a mismatch still returns correct results but silently falls back to a plain sort. Vector columns inside ParadeDB indexes require pg_search 0.25.0+; the plain `vector(n)` column type and distance expressions work on any ParadeDB or Postgres with pgvector.
+
 ## Examples
 
 - [Quickstart](examples/quickstart/quickstart.rb)
@@ -54,6 +82,7 @@ The official ActiveRecord integration for [ParadeDB](https://paradedb.com) (powe
 - [Autocomplete](examples/autocomplete/autocomplete.rb)
 - [More Like This](examples/more_like_this/more_like_this.rb)
 - [Hybrid Search (RRF)](examples/hybrid_rrf/hybrid_rrf.rb)
+- [Vector Search](examples/vector_search/vector_search.rb)
 - [RAG](examples/rag/rag.rb)
 
 ## Contributing

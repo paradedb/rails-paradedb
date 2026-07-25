@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 require "date"
 require_relative "../tokenizer_sql"
+require_relative "../vector"
 
 module ParadeDB
   module Arel
@@ -220,6 +221,23 @@ module ParadeDB
         infix("@@@", column_node(column), rhs)
       end
 
+      def l2_distance(column, vector)
+        vector_distance(column, vector, metric: :l2)
+      end
+
+      def cosine_distance(column, vector)
+        vector_distance(column, vector, metric: :cosine)
+      end
+
+      def inner_product(column, vector)
+        vector_distance(column, vector, metric: :ip)
+      end
+
+      def vector_distance(column, vector, metric: ParadeDB::Vector::DEFAULT_METRIC)
+        operator = ParadeDB::Vector::DISTANCE_OPERATORS.fetch(ParadeDB::Vector.normalize_metric(metric))
+        infix(operator, column_node(column), vector_operand(vector))
+      end
+
       def score(key)
         ::Arel::Nodes::NamedFunction.new("pdb.score", [column_node(key)])
       end
@@ -336,6 +354,13 @@ module ParadeDB
 
       def quoted_value(value)
         ::Arel::Nodes.build_quoted(value)
+      end
+
+      def vector_operand(vector)
+        return vector if arel_expression?(vector)
+
+        literal = vector.is_a?(String) ? vector : ParadeDB::Vector.literal(vector)
+        Nodes::TypeCast.new(quoted_value(literal), "vector")
       end
 
       def proximity_query_node(proximity, boost: nil, const: nil)
