@@ -3,17 +3,17 @@
 require "active_record"
 require_relative "../../lib/parade_db"
 
-class VectorItem < ActiveRecord::Base
+class MockItem < ActiveRecord::Base
   include ParadeDB::Model
 
-  self.table_name = "vector_items"
+  self.table_name = "mock_items"
   self.primary_key = "id"
 end
 
-class VectorItemIndex < ParadeDB::Index
-  self.table_name = :vector_items
+class MockItemIndex < ParadeDB::Index
+  self.table_name = :mock_items
   self.key_field = :id
-  self.index_name = :vector_items_bm25_idx
+  self.index_name = :search_idx
   self.fields = {
     id: nil,
     description: nil,

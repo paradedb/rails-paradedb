@@ -10,7 +10,7 @@ All notable changes to this project will be documented in this file. The format 
 - Vector fields in ParadeDB indexes via `embedding: { metric: :l2 | :cosine | :ip }` in `ParadeDB::Index` fields and `add_paradedb_index`, emitted as `vector_l2_ops` / `vector_cosine_ops` / `vector_ip_ops` opclasses and round-tripped through the schema dumper.
 - `Model.nearest(column, vector, metric: nil)` for Top-K vector search. Orders by the pgvector distance operator (`<->`, `<=>`, `<#>`), defaults the metric from the index definition, and adds `key_field @@@ pdb.all()` when the relation has no ParadeDB predicate.
 - `l2_distance` / `cosine_distance` / `inner_product` / `vector_distance` Arel builder methods and `pdb_l2_distance` / `pdb_cosine_distance` / `pdb_inner_product` / `pdb_vector_distance` attribute predications.
-- `examples/vector_search` example. `examples/hybrid_rrf` now uses the native vector support instead of `neighbor`.
+- `examples/vector_search` example. `examples/hybrid_rrf` now uses the native vector support instead of `neighbor`, and `examples/rag` retrieval combines full-text search with `nearest`.
 
 ### Changed
 

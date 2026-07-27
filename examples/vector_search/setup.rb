@@ -20,16 +20,7 @@ require_relative "model"
 module VectorSearchSetup
   module_function
 
-  SEED_ITEMS = [
-    { description: "Sleek running shoes", category: "Footwear", embedding: [1.0, 0.1, 0.0] },
-    { description: "Trail running shoes with grip", category: "Footwear", embedding: [0.9, 0.2, 0.1] },
-    { description: "White leather sneakers", category: "Footwear", embedding: [0.7, 0.4, 0.2] },
-    { description: "Innovative wireless earbuds", category: "Electronics", embedding: [0.0, 1.0, 0.1] },
-    { description: "Over-ear noise cancelling headphones", category: "Electronics", embedding: [0.1, 0.9, 0.2] },
-    { description: "Portable bluetooth speaker", category: "Electronics", embedding: [0.2, 0.8, 0.4] },
-    { description: "Insulated camping tent", category: "Outdoor", embedding: [0.1, 0.2, 1.0] },
-    { description: "Lightweight hiking backpack", category: "Outdoor", embedding: [0.3, 0.1, 0.9] }
-  ].freeze
+  QUERY_SEED_TEXT = "Sleek running shoes"
 
   def database_url
     return ENV["DATABASE_URL"] if ENV["DATABASE_URL"]
@@ -54,34 +45,38 @@ module VectorSearchSetup
     connect!
 
     conn = ActiveRecord::Base.connection
-    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search;")
-    conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search CASCADE;")
+    conn.execute(
+      "CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');"
+    )
+    conn.remove_paradedb_index(:mock_items, name: :search_idx, if_exists: true)
+    conn.create_paradedb_index(MockItemIndex)
 
-    conn.execute("DROP TABLE IF EXISTS vector_items CASCADE;")
-    ActiveRecord::Schema.define do
-      suppress_messages do
-        create_table :vector_items, force: true do |t|
-          t.text :description
-          t.text :category
-          t.vector :embedding, limit: 3
-        end
-      end
-    end
+    MockItem.reset_column_information
+    MockItem.count
+  end
 
-    VectorItem.reset_column_information
-    SEED_ITEMS.each { |attrs| VectorItem.create!(attrs) }
+  def query_embedding
+    connect!
 
-    conn.create_paradedb_index(VectorItemIndex, if_not_exists: true)
-    VectorItem.count
+    embedding = MockItem.where.not(embedding: nil)
+                        .search(:description)
+                        .match_all(QUERY_SEED_TEXT)
+                        .order(id: :asc)
+                        .limit(1)
+                        .pick(:embedding)
+    raise "No embedding found for seed '#{QUERY_SEED_TEXT}'" if embedding.nil?
+
+    embedding
   end
 end
 
 if $PROGRAM_NAME == __FILE__
   puts "=" * 60
-  puts "Vector Search Setup - Creating vector_items Table"
+  puts "Vector Search Setup - Loading mock_items Table"
   puts "=" * 60
 
   count = VectorSearchSetup.setup!
-  puts "+ Seeded #{count} items with vector(3) embeddings"
+  puts "+ Loaded #{count} mock items with pre-populated vector(8) embeddings"
   puts "\nSetup complete! Run: BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/vector_search/vector_search.rb"
 end

@@ -19,6 +19,12 @@ require_relative "model"
 module RagSetup
   module_function
 
+  QUERY_SEED_TEXT = {
+    "What running shoes do you have?" => "Sleek running shoes",
+    "I need comfortable shoes for everyday use" => "Sleek running shoes",
+    "Do you have any wireless audio products?" => "Innovative wireless earbuds"
+  }.freeze
+
   def database_url
     return ENV["DATABASE_URL"] if ENV["DATABASE_URL"]
 
@@ -51,5 +57,21 @@ module RagSetup
 
     MockItem.reset_column_information
     MockItem.count
+  end
+
+  def query_embedding_for(query)
+    seed_text = QUERY_SEED_TEXT[query.to_s.strip]
+    raise "No query embedding seed configured for '#{query}'" unless seed_text
+
+    connect!
+    embedding = MockItem.where.not(embedding: nil)
+                        .search(:description)
+                        .match_all(seed_text)
+                        .order(id: :asc)
+                        .limit(1)
+                        .pick(:embedding)
+    raise "No embedding found for seed '#{seed_text}'" if embedding.nil?
+
+    embedding
   end
 end

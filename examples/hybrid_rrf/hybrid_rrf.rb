@@ -134,7 +134,7 @@ if $PROGRAM_NAME == __FILE__
   puts "=" * 80
   puts "Hybrid Search with Reciprocal Rank Fusion (single SQL query)"
   puts "=" * 80
-  puts "\nCombining ParadeDB BM25 + native vector distance in one CTE-based query"
+  puts "\nCombining ParadeDB BM25 + vector distance in one CTE-based query"
 
   HybridRrfSetup.setup!
   MockItem.reset_column_information

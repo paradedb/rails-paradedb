@@ -25,6 +25,11 @@ class IndexMigrationBookIndex < ParadeDB::Index
   }
 end
 
+class IndexMigrationMockItem < ActiveRecord::Base
+  include ParadeDB::Model
+  self.table_name = :mock_items
+end
+
 class IndexMigrationBookByNameIndex < ParadeDB::Index
   self.table_name = :books
   self.key_field = :id
@@ -631,10 +636,70 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     SQL
   end
 
+  it "round-trips vector values through a vector(n) column" do
+    create_mock_items!
+    IndexMigrationMockItem.reset_column_information
+
+    column = IndexMigrationMockItem.columns_hash["embedding"]
+    assert_equal :vector, column.type
+    assert_equal "vector(8)", column.sql_type
+    assert_equal 8, column.limit
+
+    item = IndexMigrationMockItem.create!(description: "unit x", embedding: [1, 0, 0, 0, 0, 0, 0, 0])
+    assert_equal [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], item.reload.embedding
+
+    item.update!(embedding: [0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    assert_equal [0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], item.reload.embedding
+  ensure
+    drop_mock_items!
+  end
+
+  it "dumps vector columns in schema.rb" do
+    create_mock_items!
+
+    assert_match(/t\.vector "embedding", limit: 8/, dump_schema)
+  ensure
+    drop_mock_items!
+  end
+
+  it "round-trips vector opclasses through the schema dumper" do
+    create_mock_items!
+
+    conn = ActiveRecord::Base.connection
+    cosine_index = Class.new(ParadeDB::Index) do
+      self.table_name = :mock_items
+      self.key_field = :id
+      self.fields = { id: {}, description: {}, embedding: { metric: :cosine } }
+    end
+    conn.create_paradedb_index(cosine_index)
+
+    assert_match(/add_paradedb_index :mock_items,.*embedding: \{ metric: :cosine \}/, dump_schema)
+  ensure
+    drop_mock_items!
+  end
+
   private
 
   def postgresql?
     ActiveRecord::Base.connection.adapter_name.downcase.include?("postgres")
+  end
+
+  def create_mock_items!
+    conn = ActiveRecord::Base.connection
+    conn.drop_table(:mock_items, if_exists: true)
+    conn.execute("CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');")
+  end
+
+  def drop_mock_items!
+    ActiveRecord::Base.connection.drop_table(:mock_items, if_exists: true)
+  rescue StandardError
+    nil
+  end
+
+  def dump_schema
+    io = StringIO.new
+    ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection_pool, io)
+    io.string
   end
 
   def index_exists?(index_name)

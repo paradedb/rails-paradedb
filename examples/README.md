@@ -56,6 +56,22 @@ Core search operations:
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/quickstart/quickstart.rb
 ```
 
+1. Vector Search (`vector_search/`)
+
+Top-K vector search inside the ParadeDB index: `vector(n)` columns, metric
+opclasses, and `nearest` queries. Requires pg_search 0.25.0+.
+
+```bash
+BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/vector_search/setup.rb
+BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/vector_search/vector_search.rb
+```
+
+Structure:
+
+- `examples/vector_search/model.rb`
+- `examples/vector_search/setup.rb`
+- `examples/vector_search/vector_search.rb`
+
 1. Faceted Search (`faceted_search/faceted_search.rb`)
 
 Top K rows plus facet buckets in one flow.
@@ -119,25 +135,10 @@ Structure:
 - `examples/hybrid_rrf/setup.rb`
 - `examples/hybrid_rrf/hybrid_rrf.rb`
 
-1. Vector Search (`vector_search/`)
-
-Top-K vector search inside the ParadeDB index: `vector(n)` columns, metric
-opclasses, and `nearest` queries. Requires pg_search 0.25.0+.
-
-```bash
-BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/vector_search/setup.rb
-BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/vector_search/vector_search.rb
-```
-
-Structure:
-
-- `examples/vector_search/model.rb`
-- `examples/vector_search/setup.rb`
-- `examples/vector_search/vector_search.rb`
-
 1. RAG (`rag/rag.rb`)
 
-Retrieves products with ParadeDB and sends context to OpenRouter.
+Retrieves products by combining full-text search with `nearest` vector
+retrieval, then sends the context to OpenRouter.
 
 ```bash
 export OPENROUTER_API_KEY=sk-...
