@@ -10,6 +10,6 @@ class <%= migration_class_name %> < ActiveRecord::Migration[<%= ActiveRecord::Mi
   end
 
   def down
-    remove_bm25_index :<%= table_name %>, name: :<%= index_name %>, if_exists: true
+    remove_paradedb_index :<%= table_name %>, name: :<%= index_name %>, if_exists: true
   end
 end

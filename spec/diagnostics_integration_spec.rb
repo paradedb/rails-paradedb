@@ -10,28 +10,28 @@ RSpec.describe "DiagnosticsIntegrationTest" do
     require_diagnostic_functions!
   end
 
-  it "indexes helper returns bm25 index metadata" do
+  it "indexes helper returns paradedb index metadata" do
     rows = ParadeDB.paradedb_indexes
     assert_kind_of Array, rows
-    assert(rows.any? { |row| row["indexname"] == "products_bm25_idx" })
+    assert(rows.any? { |row| row["indexname"] == "products_search_idx" })
   end
 
   it "index_segments helper returns segment metadata" do
-    rows = ParadeDB.paradedb_index_segments("products_bm25_idx")
+    rows = ParadeDB.paradedb_index_segments("products_search_idx")
     refute_empty rows
     assert_includes rows.first.keys, "segment_idx"
     assert_includes rows.first.keys, "segment_id"
   end
 
   it "verify_index helper returns checks" do
-    rows = ParadeDB.paradedb_verify_index("products_bm25_idx", sample_rate: 0.1)
+    rows = ParadeDB.paradedb_verify_index("products_search_idx", sample_rate: 0.1)
     refute_empty rows
     assert_includes rows.first.keys, "check_name"
     assert_includes rows.first.keys, "passed"
   end
 
   it "verify_all_indexes helper returns checks" do
-    rows = ParadeDB.paradedb_verify_all_indexes(index_pattern: "products_bm25_idx")
+    rows = ParadeDB.paradedb_verify_all_indexes(index_pattern: "products_search_idx")
     refute_empty rows
     assert_includes rows.first.keys, "check_name"
     assert_includes rows.first.keys, "passed"
@@ -45,11 +45,11 @@ RSpec.describe "DiagnosticsIntegrationTest" do
 
   def ensure_paradedb_setup!
     conn = ActiveRecord::Base.connection
-    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search;")
-    conn.execute("DROP INDEX IF EXISTS products_bm25_idx;")
+    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search CASCADE;")
+    conn.execute("DROP INDEX IF EXISTS products_search_idx;")
     conn.execute(<<~SQL)
-      CREATE INDEX products_bm25_idx ON products
-      USING bm25 (id, description, category, rating, in_stock, price)
+      CREATE INDEX products_search_idx ON products
+      USING paradedb (id, description, category, rating, in_stock, price)
       WITH (key_field='id');
     SQL
   end

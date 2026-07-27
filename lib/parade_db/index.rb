@@ -34,7 +34,7 @@ module ParadeDB
       def default_index_name
         return nil if table_name.nil?
 
-        "#{table_name}_bm25_idx"
+        "#{table_name}_search_idx"
       end
 
       def compiled_definition

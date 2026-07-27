@@ -28,7 +28,7 @@ end
 class IndexMigrationBookByNameIndex < ParadeDB::Index
   self.table_name = :books
   self.key_field = :id
-  self.index_name = :books_by_name_bm25_idx
+  self.index_name = :books_by_name_search_idx
   self.fields = {
     id: {},
     title: { tokenizer: ParadeDB::Tokenizer.simple() }
@@ -40,7 +40,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     skip "Integration test requires PostgreSQL" unless postgresql?
 
     conn = ActiveRecord::Base.connection
-    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search;")
+    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search CASCADE;")
 
     ActiveRecord::Schema.define do
       suppress_messages do
@@ -52,7 +52,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
       end
     end
 
-    conn.remove_bm25_index(:books, if_exists: true)
+    conn.remove_paradedb_index(:books, if_exists: true)
     conn.create_paradedb_index(IndexMigrationBookIndex)
   end
 
@@ -60,23 +60,23 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     next unless postgresql?
 
     conn = ActiveRecord::Base.connection
-    conn.remove_bm25_index(:books, if_exists: true) rescue nil
+    conn.remove_paradedb_index(:books, if_exists: true) rescue nil
     conn.drop_table(:books, if_exists: true) rescue nil
   end
 
-  it "creates bm25 index through create_paradedb_index" do
+  it "creates a paradedb index through create_paradedb_index" do
     sql = <<~SQL
       SELECT am.amname
       FROM pg_class c
       JOIN pg_namespace n ON n.oid = c.relnamespace
       JOIN pg_index i ON i.indexrelid = c.oid
       JOIN pg_am am ON am.oid = c.relam
-      WHERE c.relname = 'books_bm25_idx' AND n.nspname = current_schema()
+      WHERE c.relname = 'books_search_idx' AND n.nspname = current_schema()
       LIMIT 1
     SQL
 
     am_name = ActiveRecord::Base.connection.select_value(sql)
-    assert_equal "bm25", am_name
+    assert_equal "paradedb", am_name
   end
 
   it "supports searching data after index creation" do
@@ -110,21 +110,21 @@ RSpec.describe "IndexMigrationIntegrationTest" do
 
   it "supports create_paradedb_index with string class names" do
     conn = ActiveRecord::Base.connection
-    conn.remove_bm25_index(:books, if_exists: true)
-    conn.remove_bm25_index(:books, name: :books_by_name_bm25_idx, if_exists: true)
+    conn.remove_paradedb_index(:books, if_exists: true)
+    conn.remove_paradedb_index(:books, name: :books_by_name_search_idx, if_exists: true)
 
     conn.create_paradedb_index("IndexMigrationBookByNameIndex", if_not_exists: true)
 
-    assert index_exists?("books_by_name_bm25_idx")
+    assert index_exists?("books_by_name_search_idx")
   end
 
   it "supports create_paradedb_index concurrently" do
     conn = ActiveRecord::Base.connection
-    conn.remove_bm25_index(:books, if_exists: true)
+    conn.remove_paradedb_index(:books, if_exists: true)
 
     conn.create_paradedb_index(IndexMigrationBookIndex, concurrently: true)
 
-    assert index_exists?("books_bm25_idx")
+    assert index_exists?("books_search_idx")
 
     IndexMigrationBook.create!(title: "Concurrent indexing", author: "ParadeDB")
     ids = IndexMigrationBook.search(:title_simple).match_all("concurrent").pluck(:id)
@@ -134,13 +134,13 @@ RSpec.describe "IndexMigrationIntegrationTest" do
 
   it "create_paradedb_index supports where" do
     conn = ActiveRecord::Base.connection
-    conn.remove_bm25_index(:books, if_exists: true)
-    conn.remove_bm25_index(:books, name: :books_filtered_bm25_idx, if_exists: true)
+    conn.remove_paradedb_index(:books, if_exists: true)
+    conn.remove_paradedb_index(:books, name: :books_filtered_search_idx, if_exists: true)
 
     index_klass = Class.new(ParadeDB::Index) do
       self.table_name = :books
       self.key_field = :id
-      self.index_name = :books_filtered_bm25_idx
+      self.index_name = :books_filtered_search_idx
       self.where = "author IS NOT NULL"
       self.fields = {
         id: {},
@@ -151,141 +151,204 @@ RSpec.describe "IndexMigrationIntegrationTest" do
 
     conn.create_paradedb_index(index_klass)
 
-    assert_sql_equal <<~SQL, indexdef_for("books_filtered_bm25_idx")
-      CREATE INDEX books_filtered_bm25_idx ON public.books
-      USING bm25 (id, ((title)::pdb.simple), author)
+    assert_sql_equal <<~SQL, indexdef_for("books_filtered_search_idx")
+      CREATE INDEX books_filtered_search_idx ON public.books
+      USING paradedb (id, ((title)::pdb.simple), author)
       WITH (key_field=id)
       WHERE (author IS NOT NULL)
     SQL
   end
 
-  it "supports add and remove bm25 index helpers" do
+  it "supports add and remove paradedb index helpers" do
     conn = ActiveRecord::Base.connection
-    conn.remove_bm25_index(:books, if_exists: true)
+    conn.remove_paradedb_index(:books, if_exists: true)
 
-    conn.add_bm25_index(
+    conn.add_paradedb_index(
       :books,
       fields: {
         id: {},
         title: { tokenizer: ParadeDB::Tokenizer.simple() }
       },
       key_field: :id,
-      name: :books_custom_bm25_idx,
+      name: :books_custom_search_idx,
       if_not_exists: true
     )
-    assert index_exists?("books_custom_bm25_idx")
+    assert index_exists?("books_custom_search_idx")
 
-    conn.remove_bm25_index(:books, name: :books_custom_bm25_idx, if_exists: true)
-    assert_not index_exists?("books_custom_bm25_idx")
+    conn.remove_paradedb_index(:books, name: :books_custom_search_idx, if_exists: true)
+    assert_not index_exists?("books_custom_search_idx")
   end
 
-  it "supports partial bm25 indexes with where clauses" do
+  it "supports partial paradedb indexes with where clauses" do
     conn = ActiveRecord::Base.connection
-    conn.remove_bm25_index(:books, if_exists: true)
+    conn.remove_paradedb_index(:books, if_exists: true)
 
-    conn.add_bm25_index(
+    conn.add_paradedb_index(
       :books,
       fields: {
         id: {},
         title: { tokenizer: ParadeDB::Tokenizer.simple() }
       },
       key_field: :id,
-      name: :books_partial_bm25_idx,
+      name: :books_partial_search_idx,
       where: "author IS NOT NULL",
       if_not_exists: true
     )
 
-    assert index_exists?("books_partial_bm25_idx")
-    assert_sql_equal <<~SQL, indexdef_for("books_partial_bm25_idx")
-      CREATE INDEX books_partial_bm25_idx ON public.books
-      USING bm25 (id, ((title)::pdb.simple))
+    assert index_exists?("books_partial_search_idx")
+    assert_sql_equal <<~SQL, indexdef_for("books_partial_search_idx")
+      CREATE INDEX books_partial_search_idx ON public.books
+      USING paradedb (id, ((title)::pdb.simple))
       WITH (key_field=id)
       WHERE (author IS NOT NULL)
     SQL
 
-    conn.remove_bm25_index(:books, name: :books_partial_bm25_idx, if_exists: true)
+    conn.remove_paradedb_index(:books, name: :books_partial_search_idx, if_exists: true)
   end
 
-  it "supports add_bm25_index concurrently" do
+  it "supports add_paradedb_index concurrently" do
     conn = ActiveRecord::Base.connection
-    conn.remove_bm25_index(:books, name: :books_concurrent_bm25_idx, if_exists: true)
+    conn.remove_paradedb_index(:books, name: :books_concurrent_search_idx, if_exists: true)
 
-    conn.add_bm25_index(
+    conn.add_paradedb_index(
       :books,
       fields: {
         id: {},
         title: { tokenizer: ParadeDB::Tokenizer.simple() }
       },
       key_field: :id,
-      name: :books_concurrent_bm25_idx,
+      name: :books_concurrent_search_idx,
       concurrently: true
     )
 
-    assert index_exists?("books_concurrent_bm25_idx")
+    assert index_exists?("books_concurrent_search_idx")
 
-    conn.remove_bm25_index(:books, name: :books_concurrent_bm25_idx, if_exists: true)
+    conn.remove_paradedb_index(:books, name: :books_concurrent_search_idx, if_exists: true)
   end
 
   it "rolls back create_paradedb_index in change migrations" do
     conn = ActiveRecord::Base.connection
-    conn.remove_bm25_index(:books, if_exists: true)
-    conn.remove_bm25_index(:books, name: :books_by_name_bm25_idx, if_exists: true)
+    conn.remove_paradedb_index(:books, if_exists: true)
+    conn.remove_paradedb_index(:books, name: :books_by_name_search_idx, if_exists: true)
 
     migration = build_change_migration do
       create_paradedb_index(IndexMigrationBookByNameIndex, if_not_exists: true)
     end
 
     run_migration(migration, :up, connection: conn)
-    assert index_exists?("books_by_name_bm25_idx")
+    assert index_exists?("books_by_name_search_idx")
 
     run_migration(migration, :down, connection: conn)
-    assert_not index_exists?("books_by_name_bm25_idx")
+    assert_not index_exists?("books_by_name_search_idx")
   end
 
-  it "rolls back add_bm25_index in change migrations" do
+  it "rolls back add_paradedb_index in change migrations" do
     conn = ActiveRecord::Base.connection
-    conn.remove_bm25_index(:books, if_exists: true)
-    conn.remove_bm25_index(:books, name: :books_custom_bm25_idx, if_exists: true)
+    conn.remove_paradedb_index(:books, if_exists: true)
+    conn.remove_paradedb_index(:books, name: :books_custom_search_idx, if_exists: true)
 
     migration = build_change_migration do
-      add_bm25_index(
+      add_paradedb_index(
         :books,
         fields: {
           id: {},
           title: { tokenizer: ParadeDB::Tokenizer.simple() }
         },
         key_field: :id,
-        name: :books_custom_bm25_idx,
+        name: :books_custom_search_idx,
         if_not_exists: true
       )
     end
 
     run_migration(migration, :up, connection: conn)
-    assert index_exists?("books_custom_bm25_idx")
+    assert index_exists?("books_custom_search_idx")
 
     run_migration(migration, :down, connection: conn)
-    assert_not index_exists?("books_custom_bm25_idx")
+    assert_not index_exists?("books_custom_search_idx")
   end
 
-  it "raises for remove_bm25_index in change migrations" do
+  it "supports the paradedb helpers end-to-end" do
     conn = ActiveRecord::Base.connection
+    conn.remove_paradedb_index(:books, if_exists: true)
+    conn.remove_paradedb_index(:books, name: :books_alias_idx, if_exists: true)
+
+    conn.add_paradedb_index(
+      :books,
+      fields: {
+        id: {},
+        title: { tokenizer: ParadeDB::Tokenizer.simple() }
+      },
+      key_field: :id,
+      name: :books_alias_idx
+    )
+    assert index_exists?("books_alias_idx")
+
+    conn.reindex_paradedb_index(:books, name: :books_alias_idx)
+
+    conn.remove_paradedb_index(:books, name: :books_alias_idx)
+    assert_not index_exists?("books_alias_idx")
+  end
+
+  it "rolls back add_paradedb_index in change migrations" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_paradedb_index(:books, if_exists: true)
+    conn.remove_paradedb_index(:books, name: :books_alias_idx, if_exists: true)
 
     migration = build_change_migration do
-      remove_bm25_index(:books, if_exists: true)
+      add_paradedb_index(
+        :books,
+        fields: {
+          id: {},
+          title: { tokenizer: ParadeDB::Tokenizer.simple() }
+        },
+        key_field: :id,
+        name: :books_alias_idx,
+        if_not_exists: true
+      )
     end
 
     run_migration(migration, :up, connection: conn)
-    assert_not index_exists?("books_bm25_idx")
+    assert index_exists?("books_alias_idx")
+
+    run_migration(migration, :down, connection: conn)
+    assert_not index_exists?("books_alias_idx")
+  end
+
+  it "raises for remove_paradedb_index in change migrations" do
+    conn = ActiveRecord::Base.connection
+
+    migration = build_change_migration do
+      remove_paradedb_index(:books, if_exists: true)
+    end
+
+    run_migration(migration, :up, connection: conn)
+    assert_not index_exists?("books_search_idx")
 
     error = assert_raises(ActiveRecord::IrreversibleMigration) do
       run_migration(migration, :down, connection: conn)
     end
-    assert_includes error.message, "remove_bm25_index"
+    assert_includes error.message, "remove_paradedb_index"
+  end
+
+  it "raises for remove_paradedb_index in change migrations" do
+    conn = ActiveRecord::Base.connection
+
+    migration = build_change_migration do
+      remove_paradedb_index(:books, if_exists: true)
+    end
+
+    run_migration(migration, :up, connection: conn)
+    assert_not index_exists?("books_search_idx")
+
+    error = assert_raises(ActiveRecord::IrreversibleMigration) do
+      run_migration(migration, :down, connection: conn)
+    end
+    assert_includes error.message, "remove_paradedb_index"
   end
 
   it "supports replace_paradedb_index helper" do
     conn = ActiveRecord::Base.connection
-    conn.remove_bm25_index(:books, if_exists: true)
+    conn.remove_paradedb_index(:books, if_exists: true)
 
     v1 = Class.new(ParadeDB::Index) do
       self.table_name = :books
@@ -306,27 +369,27 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     end
 
     conn.create_paradedb_index(v1)
-    before_indexdef = indexdef_for("books_bm25_idx")
+    before_indexdef = indexdef_for("books_search_idx")
 
     conn.replace_paradedb_index(v2)
-    after_indexdef = indexdef_for("books_bm25_idx")
+    after_indexdef = indexdef_for("books_search_idx")
 
     refute_equal before_indexdef, after_indexdef
     assert_sql_equal <<~SQL, after_indexdef
-      CREATE INDEX books_bm25_idx ON public.books
-      USING bm25 (id, ((title)::pdb.simple), ((author)::pdb.literal))
+      CREATE INDEX books_search_idx ON public.books
+      USING paradedb (id, ((title)::pdb.simple), ((author)::pdb.literal))
       WITH (key_field=id)
     SQL
   end
 
-  it "supports reindex_bm25 and guards concurrent reindex in a transaction" do
+  it "supports reindex_paradedb_index and guards concurrent reindex in a transaction" do
     conn = ActiveRecord::Base.connection
 
-    conn.reindex_bm25(:books)
+    conn.reindex_paradedb_index(:books)
 
     error = assert_raises(ArgumentError) do
       conn.transaction do
-        conn.reindex_bm25(:books, concurrently: true)
+        conn.reindex_paradedb_index(:books, concurrently: true)
       end
     end
     assert_includes error.message, "cannot run inside a transaction"
@@ -344,14 +407,14 @@ RSpec.describe "IndexMigrationIntegrationTest" do
 
     add_error = assert_raises(ArgumentError) do
       conn.transaction do
-        conn.add_bm25_index(
+        conn.add_paradedb_index(
           :books,
           fields: {
             id: {},
             title: { tokenizer: ParadeDB::Tokenizer.simple() }
           },
           key_field: :id,
-          name: :books_concurrent_bm25_idx,
+          name: :books_concurrent_search_idx,
           concurrently: true
         )
       end
@@ -361,18 +424,18 @@ RSpec.describe "IndexMigrationIntegrationTest" do
 
   it "makes create_paradedb_index idempotent with if_not_exists" do
     conn = ActiveRecord::Base.connection
-    conn.remove_bm25_index(:books, if_exists: true)
+    conn.remove_paradedb_index(:books, if_exists: true)
 
     conn.create_paradedb_index(IndexMigrationBookIndex, if_not_exists: true)
     conn.create_paradedb_index(IndexMigrationBookIndex, if_not_exists: true)
 
-    assert_equal 1, bm25_index_count("books_bm25_idx")
+    assert_equal 1, paradedb_index_count("books_search_idx")
   end
 
-  it "dumps bm25 indexes from catalog into schema output" do
+  it "dumps paradedb indexes from catalog into schema output" do
     conn = ActiveRecord::Base.connection
-    conn.remove_bm25_index(:books, if_exists: true)
-    conn.add_bm25_index(
+    conn.remove_paradedb_index(:books, if_exists: true)
+    conn.add_paradedb_index(
       :books,
       fields: {
         id: {},
@@ -389,21 +452,21 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     schema = stream.string
 
     add_stmt = schema.each_line.find do |line|
-      line.include?("add_bm25_index :books") &&
+      line.include?("add_paradedb_index :books") &&
         line.include?("title_simple") &&
         line.include?("target_segment_count")
     end
 
     assert_equal <<~RUBY.strip, add_stmt.to_s.strip
-      add_bm25_index :books, fields: { id: {}, title: { tokenizer: ParadeDB::Tokenizer.simple(options: { :alias => "title_simple" }) } }, key_field: :id, name: "books_bm25_idx", index_options: { :target_segment_count => 17 }
+      add_paradedb_index :books, fields: { id: {}, title: { tokenizer: ParadeDB::Tokenizer.simple(options: { :alias => "title_simple" }) } }, key_field: :id, name: "books_search_idx", index_options: { :target_segment_count => 17 }
     RUBY
-    expect(schema).not_to match(/add_index.*books_bm25_idx/)
-    expect(schema).not_to match(/t\.index.*books_bm25_idx/)
+    expect(schema).not_to match(/add_index.*books_search_idx/)
+    expect(schema).not_to match(/t\.index.*books_search_idx/)
   end
 
   it "creates tokenized expression indexes and persists expression in catalog" do
     conn = ActiveRecord::Base.connection
-    conn.remove_bm25_index(:books, if_exists: true)
+    conn.remove_paradedb_index(:books, if_exists: true)
 
     expression_index = Class.new(ParadeDB::Index) do
       self.table_name = :books
@@ -417,11 +480,11 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     end
 
     conn.create_paradedb_index(expression_index)
-    indexdef = indexdef_for("books_bm25_idx")
+    indexdef = indexdef_for("books_search_idx")
 
     assert_sql_equal <<~SQL, indexdef
-      CREATE INDEX books_bm25_idx ON public.books
-      USING bm25 (id, (((metadata ->> 'title'::text))::pdb.simple('alias=metadata_title')))
+      CREATE INDEX books_search_idx ON public.books
+      USING paradedb (id, (((metadata ->> 'title'::text))::pdb.simple('alias=metadata_title')))
       WITH (key_field=id)
     SQL
   end
@@ -437,7 +500,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     end
 
     expect do
-      conn.add_bm25_index(
+      conn.add_paradedb_index(
         :mock_items,
         fields: {
           id: {},
@@ -450,7 +513,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     end.not_to raise_error
 
     assert_sql_equal <<~SQL, indexdef_for("search_idx")
-      CREATE INDEX search_idx ON public.mock_items USING bm25
+      CREATE INDEX search_idx ON public.mock_items USING paradedb
       (id, description, (((rating + 1))::pdb.alias('alias=rating')))
       WITH (key_field=id)
     SQL
@@ -462,9 +525,9 @@ RSpec.describe "IndexMigrationIntegrationTest" do
 
   it "round-trips schema dump/load for structured multi-tokenizer fields" do
     conn = ActiveRecord::Base.connection
-    conn.remove_bm25_index(:books, if_exists: true)
+    conn.remove_paradedb_index(:books, if_exists: true)
 
-    conn.add_bm25_index(
+    conn.add_paradedb_index(
       :books,
       fields: {
         id: {},
@@ -484,25 +547,25 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection_pool, stream)
     schema = stream.string
     add_stmt = schema.each_line.find do |line|
-      line.include?("add_bm25_index :books") &&
+      line.include?("add_paradedb_index :books") &&
         line.include?("title_simple") &&
         line.include?("target_segment_count")
     end
 
     assert_equal <<~RUBY.strip, add_stmt.to_s.strip
-      add_bm25_index :books, fields: { id: {}, title: { tokenizers: [ParadeDB::Tokenizer.literal(), ParadeDB::Tokenizer.simple(options: { :alias => "title_simple" })] } }, key_field: :id, name: "books_bm25_idx", index_options: { :target_segment_count => 17 }
+      add_paradedb_index :books, fields: { id: {}, title: { tokenizers: [ParadeDB::Tokenizer.literal(), ParadeDB::Tokenizer.simple(options: { :alias => "title_simple" })] } }, key_field: :id, name: "books_search_idx", index_options: { :target_segment_count => 17 }
     RUBY
 
-    conn.remove_bm25_index(:books, if_exists: true)
+    conn.remove_paradedb_index(:books, if_exists: true)
     expect { conn.instance_eval(add_stmt.strip) }.not_to raise_error
-    assert index_exists?("books_bm25_idx")
+    assert index_exists?("books_search_idx")
   end
 
   it "round-trips schema dump/load for structured expression fields with casts" do
     conn = ActiveRecord::Base.connection
-    conn.remove_bm25_index(:books, if_exists: true)
+    conn.remove_paradedb_index(:books, if_exists: true)
 
-    conn.add_bm25_index(
+    conn.add_paradedb_index(
       :books,
       fields: {
         id: {},
@@ -518,23 +581,23 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection_pool, stream)
     schema = stream.string
     add_stmt = schema.each_line.find do |line|
-      line.include?("add_bm25_index :books") && line.include?("metadata_title_text")
+      line.include?("add_paradedb_index :books") && line.include?("metadata_title_text")
     end
 
     assert_equal <<~RUBY.strip, add_stmt.to_s.strip
-      add_bm25_index :books, fields: { id: {}, "metadata ->> 'title'::text" => { tokenizer: ParadeDB::Tokenizer.simple(options: { :lowercase => true, :alias => "metadata_title_text" }) } }, key_field: :id, name: "books_bm25_idx"
+      add_paradedb_index :books, fields: { id: {}, "metadata ->> 'title'::text" => { tokenizer: ParadeDB::Tokenizer.simple(options: { :lowercase => true, :alias => "metadata_title_text" }) } }, key_field: :id, name: "books_search_idx"
     RUBY
 
-    conn.remove_bm25_index(:books, if_exists: true)
+    conn.remove_paradedb_index(:books, if_exists: true)
     expect { conn.instance_eval(add_stmt.strip) }.not_to raise_error
-    assert index_exists?("books_bm25_idx")
+    assert index_exists?("books_search_idx")
   end
 
-  it "round-trips schema dump/load for partial bm25 indexes" do
+  it "round-trips schema dump/load for partial paradedb indexes" do
     conn = ActiveRecord::Base.connection
-    conn.remove_bm25_index(:books, if_exists: true)
+    conn.remove_paradedb_index(:books, if_exists: true)
 
-    conn.add_bm25_index(
+    conn.add_paradedb_index(
       :books,
       fields: {
         id: {},
@@ -549,20 +612,20 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection_pool, stream)
     schema = stream.string
     add_stmt = schema.each_line.find do |line|
-      line.include?("add_bm25_index :books") &&
+      line.include?("add_paradedb_index :books") &&
         line.include?("title_simple") &&
         line.include?("where:")
     end
 
     assert_equal <<~RUBY.strip, add_stmt.to_s.strip
-      add_bm25_index :books, fields: { id: {}, title: { tokenizer: ParadeDB::Tokenizer.simple(options: { :alias => "title_simple" }) } }, key_field: :id, name: "books_bm25_idx", where: "author IS NOT NULL"
+      add_paradedb_index :books, fields: { id: {}, title: { tokenizer: ParadeDB::Tokenizer.simple(options: { :alias => "title_simple" }) } }, key_field: :id, name: "books_search_idx", where: "author IS NOT NULL"
     RUBY
 
-    conn.remove_bm25_index(:books, if_exists: true)
+    conn.remove_paradedb_index(:books, if_exists: true)
     expect { conn.instance_eval(add_stmt.strip) }.not_to raise_error
-    assert_sql_equal <<~SQL, indexdef_for("books_bm25_idx")
-      CREATE INDEX books_bm25_idx ON public.books
-      USING bm25 (id, ((title)::pdb.simple('alias=title_simple')))
+    assert_sql_equal <<~SQL, indexdef_for("books_search_idx")
+      CREATE INDEX books_search_idx ON public.books
+      USING paradedb (id, ((title)::pdb.simple('alias=title_simple')))
       WITH (key_field=id)
       WHERE (author IS NOT NULL)
     SQL
@@ -575,10 +638,10 @@ RSpec.describe "IndexMigrationIntegrationTest" do
   end
 
   def index_exists?(index_name)
-    bm25_index_count(index_name).positive?
+    paradedb_index_count(index_name).positive?
   end
 
-  def bm25_index_count(index_name)
+  def paradedb_index_count(index_name)
     sql = <<~SQL
       SELECT COUNT(*)
       FROM pg_class c

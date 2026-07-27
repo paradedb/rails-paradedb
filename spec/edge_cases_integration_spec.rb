@@ -303,11 +303,11 @@ RSpec.describe "EdgeCasesIntegrationTest" do
     return if self.class.instance_variable_get(:@paradedb_setup_done)
 
     conn = ActiveRecord::Base.connection
-    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search;")
-    conn.execute("DROP INDEX IF EXISTS products_bm25_idx;")
+    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search CASCADE;")
+    conn.execute("DROP INDEX IF EXISTS products_search_idx;")
     conn.execute(<<~SQL)
-      CREATE INDEX products_bm25_idx ON products
-      USING bm25 (id, description, (category::pdb.literal), rating, in_stock, price)
+      CREATE INDEX products_search_idx ON products
+      USING paradedb (id, description, (category::pdb.literal), rating, in_stock, price)
       WITH (key_field='id');
     SQL
 
@@ -391,7 +391,7 @@ RSpec.describe "EdgeCasesIntegrationTest" do
       )
     end
 
-    # Force BM25 index rebuild by dropping and recreating
+    # Force paradedb index rebuild by dropping and recreating
     self.class.instance_variable_set(:@paradedb_setup_done, false)
     ensure_paradedb_setup!
   end

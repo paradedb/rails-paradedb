@@ -36,7 +36,7 @@
 
 ## ParadeDB for Rails
 
-The official ActiveRecord integration for [ParadeDB](https://paradedb.com) (powered by the [`pg_search`](https://github.com/paradedb/paradedb) Postgres extension), including first-class support for managing BM25 indexes and running queries using the full ParadeDB API. Follow the [getting started guide](https://docs.paradedb.com/documentation/getting-started/environment#rails) to begin.
+The official ActiveRecord integration for [ParadeDB](https://paradedb.com) (powered by the [`pg_search`](https://github.com/paradedb/paradedb) Postgres extension), including first-class support for managing ParadeDB indexes and running queries using the full ParadeDB API. Follow the [getting started guide](https://docs.paradedb.com/documentation/getting-started/environment#rails) to begin.
 
 ## Requirements & Compatibility
 
@@ -44,7 +44,7 @@ The official ActiveRecord integration for [ParadeDB](https://paradedb.com) (powe
 | ---------- | ------------------------------------------------ |
 | Ruby       | 3.2+                                             |
 | Rails      | 7.2+                                             |
-| ParadeDB   | 0.22.0+                                          |
+| ParadeDB   | 0.25.0+                                          |
 | PostgreSQL | 15+ (PostgreSQL adapter with ParadeDB extension) |
 
 ## Examples

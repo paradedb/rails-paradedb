@@ -46,97 +46,19 @@ module HybridRrfSetup
     ActiveRecord::Base.logger = nil
   end
 
-  def setup_mock_items!
+  def setup!
     connect!
 
     conn = ActiveRecord::Base.connection
-    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search;")
+    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search CASCADE;")
     conn.execute(
       "CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');"
     )
-    conn.execute("DROP TABLE IF EXISTS mock_items_hybrid_rrf CASCADE;")
-    conn.execute("CREATE TABLE mock_items_hybrid_rrf AS TABLE mock_items;")
-    conn.remove_bm25_index(:mock_items_hybrid_rrf, name: :mock_items_hybrid_rrf_bm25_idx, if_exists: true)
-    conn.create_paradedb_index(MockItemIndex, if_not_exists: true)
+    conn.remove_paradedb_index(:mock_items, name: :search_idx, if_exists: true)
+    conn.create_paradedb_index(MockItemIndex)
 
     MockItem.reset_column_information
     MockItem.count
-  end
-
-  def embeddings_csv_path
-    File.expand_path("mock_items_embeddings.csv", __dir__)
-  end
-
-  def load_embeddings_from_csv(path = embeddings_csv_path)
-    embeddings = {}
-
-    File.foreach(path).with_index do |line, index|
-      next if index.zero?
-
-      raw = line.strip
-      next if raw.empty?
-
-      id_part, _description, embedding_part = raw.split(",", 3)
-      next unless id_part && embedding_part
-
-      embedding_literal = embedding_part
-      if embedding_literal.start_with?("\"") && embedding_literal.end_with?("\"")
-        embedding_literal = embedding_literal[1..-2]
-      end
-
-      embeddings[id_part.to_i] = embedding_literal
-    end
-
-    embeddings
-  end
-
-  def setup!
-    count = setup_mock_items!
-
-    conn = ActiveRecord::Base.connection
-    conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-    conn.execute(<<~SQL)
-      DO $$
-      BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_name = '#{MockItem.table_name}' AND column_name = 'embedding'
-        ) THEN
-          ALTER TABLE #{MockItem.table_name} ADD COLUMN embedding vector(384);
-        END IF;
-      END $$;
-    SQL
-
-    MockItem.reset_column_information
-
-    existing = conn.select_value("SELECT COUNT(*) FROM #{MockItem.table_name} WHERE embedding IS NOT NULL").to_i
-    if existing.positive?
-      puts "+ #{existing} items already have embeddings"
-      return count
-    end
-
-    path = embeddings_csv_path
-    unless File.exist?(path)
-      warn "Embedding CSV not found: #{path}"
-      return count
-    end
-
-    puts "Loading embeddings from #{path}..."
-    embeddings = load_embeddings_from_csv(path)
-    total = embeddings.length
-    puts "Found #{total} embeddings in CSV"
-
-    embeddings.each_with_index do |(id, vector_literal), index|
-      conn.execute(
-        "UPDATE #{MockItem.table_name} SET embedding = #{conn.quote(vector_literal)}::vector WHERE id = #{id.to_i};"
-      )
-
-      current = index + 1
-      puts "  [#{current}/#{total}]" if (current % 10).zero? || current == total
-    end
-
-    puts "+ Loaded #{total} embeddings"
-    count
   end
 
   def query_embedding_for(query)
@@ -172,10 +94,11 @@ end
 
 if $PROGRAM_NAME == __FILE__
   puts "=" * 60
-  puts "Hybrid Search Setup - Loading Embeddings from CSV"
+  puts "Hybrid Search Setup"
   puts "=" * 60
 
-  HybridRrfSetup.setup!
+  count = HybridRrfSetup.setup!
+  puts "+ Loaded #{count} mock items with pre-populated embeddings"
 
   puts "\nSetup complete! Run: BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/hybrid_rrf/hybrid_rrf.rb"
 end

@@ -42,14 +42,12 @@ module FacetedSearchSetup
     connect!
 
     conn = ActiveRecord::Base.connection
-    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search;")
+    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search CASCADE;")
     conn.execute(
       "CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');"
     )
-    conn.execute("DROP TABLE IF EXISTS mock_items_faceted_search CASCADE;")
-    conn.execute("CREATE TABLE mock_items_faceted_search AS TABLE mock_items;")
-    conn.remove_bm25_index(:mock_items_faceted_search, name: :mock_items_faceted_search_bm25_idx, if_exists: true)
-    conn.create_paradedb_index(MockItemIndex, if_not_exists: true)
+    conn.remove_paradedb_index(:mock_items, name: :search_idx, if_exists: true)
+    conn.create_paradedb_index(MockItemIndex)
 
     MockItem.reset_column_information
     MockItem.count

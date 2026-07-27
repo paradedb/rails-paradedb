@@ -97,7 +97,7 @@ jobs:
 
     services:
       paradedb:
-        image: paradedb/paradedb:0.24.2-pg18
+        image: paradedb/paradedb:0.25.0-pg18
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -169,5 +169,5 @@ jobs:
           run_example examples/autocomplete/autocomplete.rb "rails-paradedb Autocomplete Example"
           run_example examples/more_like_this/more_like_this.rb "rails-paradedb MoreLikeThis Example"
           run_example examples/faceted_search/faceted_search.rb "rails-paradedb Faceted Search Example"
-          run_example examples/hybrid_rrf/setup.rb "Hybrid Search Setup - Loading Embeddings from CSV"
+          run_example examples/hybrid_rrf/setup.rb "Hybrid Search Setup"
           run_example examples/hybrid_rrf/hybrid_rrf.rb "Hybrid Search with Reciprocal Rank Fusion (single SQL query)"

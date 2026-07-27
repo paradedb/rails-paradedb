@@ -31,7 +31,7 @@ RSpec.describe ParadeDB::Generators::IndexGenerator do
   end
 
   def generated_migration_path(model)
-    Dir.glob(File.join(destination, "db/migrate/*_create_#{model.underscore.pluralize}_bm25_index.rb")).first
+    Dir.glob(File.join(destination, "db/migrate/*_create_#{model.underscore.pluralize}_search_index.rb")).first
   end
 
   before { FileUtils.mkdir_p(destination) }
@@ -90,10 +90,10 @@ RSpec.describe ParadeDB::Generators::IndexGenerator do
       expect(content).to include("create_paradedb_index(ProductIndex, if_not_exists: true)")
     end
 
-    it "calls remove_bm25_index in down" do
+    it "calls remove_paradedb_index in down" do
       run_generator(["Product"])
       content = File.read(generated_migration_path("Product"))
-      expect(content).to include("remove_bm25_index :products, name: :products_bm25_idx, if_exists: true")
+      expect(content).to include("remove_paradedb_index :products, name: :products_search_idx, if_exists: true")
     end
 
     it "does not include disable_ddl_transaction! by default" do
@@ -125,8 +125,8 @@ RSpec.describe ParadeDB::Generators::IndexGenerator do
     it "handles multi-word model names in migration class" do
       run_generator(["LineItem"])
       content = File.read(generated_migration_path("LineItem"))
-      expect(content).to include("class CreateLineItemBm25Index")
-      expect(content).to include("remove_bm25_index :line_items")
+      expect(content).to include("class CreateLineItemSearchIndex")
+      expect(content).to include("remove_paradedb_index :line_items")
     end
   end
 end

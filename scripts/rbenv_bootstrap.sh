@@ -27,25 +27,22 @@ if command -v ruby >/dev/null 2>&1 && ruby --version | grep -qE "ruby 4\.(0|1)";
     gem install "bundler:${BUNDLER_VERSION}"
   fi
   bundle install >/dev/null
-  bootstrap_return 0
-fi
-
-if ! command -v rbenv >/dev/null 2>&1; then
+elif ! command -v rbenv >/dev/null 2>&1; then
   echo "rbenv is not installed. Install rbenv and retry." >&2
   bootstrap_return 1
+else
+  eval "$(rbenv init -)"
+
+  if ! rbenv versions --bare | grep -qx "${RUBY_VERSION}"; then
+    rbenv install "${RUBY_VERSION}"
+  fi
+
+  rbenv local "${RUBY_VERSION}"
+
+  if ! rbenv exec gem list -i "bundler" -v "${BUNDLER_VERSION}" >/dev/null 2>&1; then
+    rbenv exec gem install "bundler:${BUNDLER_VERSION}"
+    rbenv rehash
+  fi
+
+  rbenv exec bundle install >/dev/null
 fi
-
-eval "$(rbenv init -)"
-
-if ! rbenv versions --bare | grep -qx "${RUBY_VERSION}"; then
-  rbenv install "${RUBY_VERSION}"
-fi
-
-rbenv local "${RUBY_VERSION}"
-
-if ! rbenv exec gem list -i "bundler" -v "${BUNDLER_VERSION}" >/dev/null 2>&1; then
-  rbenv exec gem install "bundler:${BUNDLER_VERSION}"
-  rbenv rehash
-fi
-
-rbenv exec bundle install >/dev/null
