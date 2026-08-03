@@ -165,6 +165,8 @@ jobs:
           }
 
           run_example examples/quickstart/quickstart.rb "rails-paradedb Quickstart Example"
+          run_example examples/vector_search/setup.rb "Vector Search Setup - Loading mock_items Table"
+          run_example examples/vector_search/vector_search.rb "rails-paradedb Vector Search Example"
           run_example examples/autocomplete/setup.rb "Autocomplete Setup - Creating Dedicated Table"
           run_example examples/autocomplete/autocomplete.rb "rails-paradedb Autocomplete Example"
           run_example examples/more_like_this/more_like_this.rb "rails-paradedb MoreLikeThis Example"

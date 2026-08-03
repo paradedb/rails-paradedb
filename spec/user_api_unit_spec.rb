@@ -12,6 +12,24 @@ class Category < ActiveRecord::Base
   self.table_name = :categories
 end
 
+class VectorIndexedProductIndex < ParadeDB::Index
+  self.table_name = :products
+  self.key_field = :id
+  self.index_name = :products_vector_search_idx
+  self.fields = {
+    id: {},
+    description: nil,
+    embedding: { metric: :cosine }
+  }
+end
+
+class VectorIndexedProduct < ActiveRecord::Base
+  include ParadeDB::Model
+  self.table_name = :products
+
+  paradedb_index VectorIndexedProductIndex
+end
+
 RSpec.describe "UserApiUnitTest" do
   it "matching all with filters" do
     sql = Product.search(:description)
@@ -1093,6 +1111,72 @@ RSpec.describe "UserApiUnitTest" do
       SELECT products.* FROM products
       WHERE ("products"."description" &&& 'shoes')
         AND "products"."in_stock" = FALSE
+    SQL
+
+    assert_sql_equal expected, sql
+  end
+  it "nearest adds match-all predicate and distance ordering" do
+    sql = Product.nearest(:embedding, [1, 2, 3]).limit(2).to_sql
+
+    expected = <<~SQL.strip
+      SELECT products.* FROM products
+      WHERE ("products"."id" @@@ pdb.all())
+      ORDER BY "products"."embedding" <-> '[1.0,2.0,3.0]'::vector ASC
+      LIMIT 2
+    SQL
+
+    assert_sql_equal expected, sql
+  end
+  it "nearest respects an explicit metric" do
+    sql = Product.nearest(:embedding, [1, 2, 3], metric: :ip).limit(2).to_sql
+
+    expected = <<~SQL.strip
+      SELECT products.* FROM products
+      WHERE ("products"."id" @@@ pdb.all())
+      ORDER BY "products"."embedding" <#> '[1.0,2.0,3.0]'::vector ASC
+      LIMIT 2
+    SQL
+
+    assert_sql_equal expected, sql
+  end
+  it "nearest defaults the metric from the index definition" do
+    sql = VectorIndexedProduct.nearest(:embedding, [1, 2, 3]).limit(2).to_sql
+
+    expected = <<~SQL.strip
+      SELECT products.* FROM products
+      WHERE ("products"."id" @@@ pdb.all())
+      ORDER BY "products"."embedding" <=> '[1.0,2.0,3.0]'::vector ASC
+      LIMIT 2
+    SQL
+
+    assert_sql_equal expected, sql
+  end
+  it "nearest preserves existing paradedb predicates" do
+    sql = Product.search(:description)
+                 .match_all("shoes")
+                 .nearest(:embedding, [1, 2, 3], metric: :l2)
+                 .limit(2)
+                 .to_sql
+
+    expected = <<~SQL.strip
+      SELECT products.* FROM products
+      WHERE ("products"."description" &&& 'shoes')
+      ORDER BY "products"."embedding" <-> '[1.0,2.0,3.0]'::vector ASC
+      LIMIT 2
+    SQL
+
+    assert_sql_equal expected, sql
+  end
+  it "nearest chains with standard relation filters" do
+    sql = Product.where(in_stock: true).extending(ParadeDB::SearchMethods)
+                 .nearest(:embedding, [1, 2, 3]).limit(5).to_sql
+
+    expected = <<~SQL.strip
+      SELECT products.* FROM products
+      WHERE "products"."in_stock" = true
+        AND ("products"."id" @@@ pdb.all())
+      ORDER BY "products"."embedding" <-> '[1.0,2.0,3.0]'::vector ASC
+      LIMIT 5
     SQL
 
     assert_sql_equal expected, sql

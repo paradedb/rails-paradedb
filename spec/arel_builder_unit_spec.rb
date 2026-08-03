@@ -534,4 +534,41 @@ RSpec.describe "ArelBuilderUnitTest" do
     assert_includes rendered, "AND NOT"
     assert_includes rendered, "'cheap'"
   end
+
+  # ---- vector distance ----
+  it "renders l2 distance" do
+    node = @builder.l2_distance(:embedding, [1, 2, 3])
+    assert_equal %("products"."embedding" <-> '[1.0,2.0,3.0]'::vector), sql(node)
+  end
+  it "renders cosine distance" do
+    node = @builder.cosine_distance(:embedding, [1, 2, 3])
+    assert_equal %("products"."embedding" <=> '[1.0,2.0,3.0]'::vector), sql(node)
+  end
+  it "renders inner product" do
+    node = @builder.inner_product(:embedding, [1, 2, 3])
+    assert_equal %("products"."embedding" <#> '[1.0,2.0,3.0]'::vector), sql(node)
+  end
+  it "dispatches vector_distance by metric" do
+    assert_includes sql(@builder.vector_distance(:embedding, [1.0], metric: :l2)), "<->"
+    assert_includes sql(@builder.vector_distance(:embedding, [1.0], metric: :cosine)), "<=>"
+    assert_includes sql(@builder.vector_distance(:embedding, [1.0], metric: :ip)), "<#>"
+    assert_includes sql(@builder.vector_distance(:embedding, [1.0], metric: :inner_product)), "<#>"
+    assert_includes sql(@builder.vector_distance(:embedding, [1.0])), "<->"
+  end
+  it "rejects unknown vector metrics" do
+    error = assert_raises(ArgumentError) { @builder.vector_distance(:embedding, [1.0], metric: :manhattan) }
+    assert_includes error.message, "unknown vector metric"
+  end
+  it "quotes string vector operands" do
+    node = @builder.l2_distance(:embedding, "[1,2,3]")
+    assert_equal %("products"."embedding" <-> '[1,2,3]'::vector), sql(node)
+  end
+  it "quotes malicious vector operands safely" do
+    node = @builder.l2_distance(:embedding, "[1]'; DROP TABLE products; --")
+    assert_includes sql(node), %('[1]''; DROP TABLE products; --'::vector)
+  end
+  it "passes arel vector operands through untouched" do
+    node = @builder.l2_distance(:embedding, ::Arel.sql("$1"))
+    assert_equal %("products"."embedding" <-> $1), sql(node)
+  end
 end

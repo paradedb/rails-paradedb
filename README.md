@@ -40,16 +40,22 @@ The official ActiveRecord integration for [ParadeDB](https://paradedb.com) (powe
 
 ## Requirements & Compatibility
 
-| Component  | Supported                                        |
-| ---------- | ------------------------------------------------ |
-| Ruby       | 3.2+                                             |
-| Rails      | 7.2+                                             |
-| ParadeDB   | 0.25.0+                                          |
-| PostgreSQL | 15+ (PostgreSQL adapter with ParadeDB extension) |
+| Component  | Supported                                                         |
+| ---------- | ----------------------------------------------------------------- |
+| Ruby       | 3.2+                                                              |
+| Rails      | 7.2+                                                              |
+| ParadeDB   | 0.25.0+                                                           |
+| PostgreSQL | 15+ (PostgreSQL adapter with ParadeDB extension)                  |
+| pgvector   | Required for vector search; included in the ParadeDB Docker image |
+
+## Vector Search
+
+rails-paradedb supports full-text search and vector search over pgvector `vector(n)` columns. See the [vector search documentation](https://docs.paradedb.com/documentation/vector/overview) for details.
 
 ## Examples
 
 - [Quickstart](examples/quickstart/quickstart.rb)
+- [Vector Search](examples/vector_search/vector_search.rb)
 - [Faceted Search](examples/faceted_search/faceted_search.rb)
 - [Autocomplete](examples/autocomplete/autocomplete.rb)
 - [More Like This](examples/more_like_this/more_like_this.rb)

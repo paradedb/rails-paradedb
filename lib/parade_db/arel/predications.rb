@@ -120,6 +120,22 @@ module ParadeDB
         ::Arel::Nodes::InfixOperation.new("@@@", self, rhs)
       end
 
+      def pdb_l2_distance(vector)
+        BUILDER.l2_distance(self, vector)
+      end
+
+      def pdb_cosine_distance(vector)
+        BUILDER.cosine_distance(self, vector)
+      end
+
+      def pdb_inner_product(vector)
+        BUILDER.inner_product(self, vector)
+      end
+
+      def pdb_vector_distance(vector, metric: ParadeDB::Vector::DEFAULT_METRIC)
+        BUILDER.vector_distance(self, vector, metric: metric)
+      end
+
       def pdb_score
         ::Arel::Nodes::NamedFunction.new("pdb.score", [self])
       end

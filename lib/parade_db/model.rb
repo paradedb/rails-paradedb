@@ -10,6 +10,7 @@ module ParadeDB
     INJECTED_CLASS_METHODS = [
       :paradedb_search,
       :more_like_this,
+      :nearest,
       :with_facets,
       :facets,
       :with_agg,
@@ -65,6 +66,12 @@ module ParadeDB
         ensure_postgres!
         paradedb_validate_index!
         all.extending(SearchMethods).more_like_this(key, fields: fields, **options)
+      end
+
+      def nearest(column, vector, metric: nil)
+        ensure_postgres!
+        paradedb_validate_index!
+        all.extending(SearchMethods).nearest(column, vector, metric: metric)
       end
 
       def with_facets(*fields, **opts)

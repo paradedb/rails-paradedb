@@ -479,6 +479,19 @@ module ParadeDB
       rel.except(:select, :group).select(*group_nodes, *aggregate_nodes).group(*group_nodes)
     end
 
+    # Orders by vector distance for Top-K pushdown inside the ParadeDB index.
+    # Adds `key_field @@@ pdb.all()` when the relation has no ParadeDB predicate,
+    # since vector ordering requires a @@@ predicate to activate the index scan.
+    # Callers must add `.limit(k)`; the metric defaults to the index opclass metric.
+    def nearest(column, vector, metric: nil)
+      ensure_paradedb_runtime!
+      resolved_metric = metric || index_vector_metric(column) || ParadeDB::Vector::DEFAULT_METRIC
+      node = builder.vector_distance(column, vector, metric: resolved_metric)
+
+      rel = has_paradedb_predicate? ? self : ensure_paradedb_predicate
+      rel.order(node.asc)
+    end
+
     def has_paradedb_predicate?
       PredicateInspector.relation_has_paradedb_predicate?(self)
     end
@@ -489,6 +502,12 @@ module ParadeDB
     end
 
     private
+
+    def index_vector_metric(column)
+      return nil unless klass.respond_to?(:paradedb_index_entry, true)
+
+      klass.send(:paradedb_index_entry, column)&.metric
+    end
 
     def paradedb_runtime_key_field
       return primary_key unless klass.respond_to?(:paradedb_key_field)

@@ -17,10 +17,7 @@ class MockItemIndex < ParadeDB::Index
   self.fields = {
     id: nil,
     description: nil,
-    rating: nil,
     category: { tokenizer: ParadeDB::Tokenizer.literal() },
-    "metadata->>'color'" => { tokenizer: ParadeDB::Tokenizer.literal(options: {alias: "metadata_color"}) },
-    "metadata->>'location'" => { tokenizer: ParadeDB::Tokenizer.literal(options: {alias: "metadata_location"}) },
     embedding: { metric: :l2 }
   }
 end

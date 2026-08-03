@@ -24,7 +24,10 @@ def fulltext_ranked_cte(query, top_k:)
 end
 
 def semantic_ranked_cte(query_embedding, top_k:)
-  semantic_source = MockItem.nearest_neighbors(:embedding, query_embedding, distance: "cosine")
+  distance = MockItem.paradedb_arel.cosine_distance(:embedding, query_embedding)
+  semantic_source = MockItem.where.not(embedding: nil)
+                            .select(MockItem.arel_table[:id], distance.as("neighbor_distance"))
+                            .order(distance.asc)
                             .limit(top_k)
 
   MockItem.from(semantic_source, :semantic_source)
@@ -131,7 +134,7 @@ if $PROGRAM_NAME == __FILE__
   puts "=" * 80
   puts "Hybrid Search with Reciprocal Rank Fusion (single SQL query)"
   puts "=" * 80
-  puts "\nCombining ParadeDB DSL + Neighbor DSL in one CTE-based query"
+  puts "\nCombining ParadeDB BM25 + vector distance in one CTE-based query"
 
   HybridRrfSetup.setup!
   MockItem.reset_column_information

@@ -331,4 +331,18 @@ RSpec.describe "ArelPredicationsUnitTest" do
     error = assert_raises(ArgumentError) { @t[:description].pdb_match("shoes", tokenizer: "bad;tokenizer") }
     assert_match(/invalid tokenizer expression/, error.message)
   end
+
+  # ---- vector distance predications ----
+  it "pdb_l2_distance renders the l2 operator" do
+    assert_equal %("products"."embedding" <-> '[1.0]'::vector), sql(@t[:embedding].pdb_l2_distance([1]))
+  end
+  it "pdb_cosine_distance renders the cosine operator" do
+    assert_equal %("products"."embedding" <=> '[1.0]'::vector), sql(@t[:embedding].pdb_cosine_distance([1]))
+  end
+  it "pdb_inner_product renders the inner product operator" do
+    assert_equal %("products"."embedding" <#> '[1.0]'::vector), sql(@t[:embedding].pdb_inner_product([1]))
+  end
+  it "pdb_vector_distance dispatches by metric" do
+    assert_equal %("products"."embedding" <=> '[1.0]'::vector), sql(@t[:embedding].pdb_vector_distance([1], metric: :cosine))
+  end
 end

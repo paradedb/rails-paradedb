@@ -65,8 +65,6 @@ GEM
     minitest (6.0.6)
       drb (~> 2.0)
       prism (~> 1.5)
-    neighbor (1.2.0)
-      activerecord (>= 7.2)
     nokogiri (1.19.4-aarch64-linux-gnu)
       racc (~> 1.4)
     nokogiri (1.19.4-arm64-darwin)
@@ -77,7 +75,6 @@ GEM
     parser (3.3.12.0)
       ast (~> 2.4.1)
       racc
-    pg (1.6.3)
     pg (1.6.3-aarch64-linux)
     pg (1.6.3-arm64-darwin)
     pg (1.6.3-x86_64-linux)
@@ -178,7 +175,6 @@ PLATFORMS
 DEPENDENCIES
   activerecord (~> 8.1)
   activesupport (~> 8.1)
-  neighbor
   pg (~> 1.5)
   railties (~> 8.1)
   rake (~> 13.4)

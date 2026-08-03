@@ -22,6 +22,22 @@ class BehaviorRangeItem < ActiveRecord::Base
   self.table_name = :range_items
 end
 
+class BehaviorMockItem < ActiveRecord::Base
+  include ParadeDB::Model
+  self.table_name = :mock_items
+end
+
+class BehaviorMockItemIndex < ParadeDB::Index
+  self.table_name = :mock_items
+  self.key_field = :id
+  self.index_name = :search_idx
+  self.fields = {
+    id: {},
+    description: {},
+    embedding: { metric: :l2 }
+  }
+end
+
 RSpec.describe "UserApiBehaviorIntegrationTest" do
   before do
     skip "Behavior integration tests require PostgreSQL" unless postgresql?
@@ -731,6 +747,63 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
     end
   end
 
+  describe "vector search" do
+    it "executes each distance operator ordering" do
+      setup_mock_items!
+
+      query_row = BehaviorMockItem.find_by!(description: "Sleek running shoes")
+      literal = ParadeDB::Vector.literal(query_row.embedding)
+
+      { l2: "<->", cosine: "<=>", ip: "<#>" }.each do |metric, operator|
+        raw_sql = <<~SQL
+          SELECT id FROM mock_items
+          ORDER BY embedding #{operator} '#{literal}'
+          LIMIT 5
+        SQL
+
+        ids = BehaviorMockItem.order(
+          BehaviorMockItem.paradedb_arel.vector_distance(:embedding, query_row.embedding, metric: metric).asc
+        ).limit(5).pluck(:id)
+
+        assert_equal ids_from_sql(raw_sql), ids, "metric #{metric}"
+        assert_equal query_row.id, ids.first, "metric #{metric}" unless metric == :ip
+      end
+    end
+
+    it "runs Top-K vector search through the ParadeDB index" do
+      setup_mock_items!
+
+      query_row = BehaviorMockItem.find_by!(description: "Sleek running shoes")
+      literal = ParadeDB::Vector.literal(query_row.embedding)
+
+      raw_sql = <<~SQL
+        SELECT id FROM mock_items
+        WHERE id @@@ pdb.all()
+        ORDER BY embedding <-> '#{literal}'
+        LIMIT 3
+      SQL
+
+      ids = BehaviorMockItem.nearest(:embedding, query_row.embedding).limit(3).pluck(:id)
+      assert_equal query_row.id, ids.first
+      assert_equal ids_from_sql(raw_sql), ids
+
+      filtered_raw_sql = <<~SQL
+        SELECT id FROM mock_items
+        WHERE description &&& 'shoes'
+        ORDER BY embedding <-> '#{literal}'
+        LIMIT 3
+      SQL
+
+      filtered = BehaviorMockItem.search(:description)
+                                 .match_all("shoes")
+                                 .nearest(:embedding, query_row.embedding)
+                                 .limit(3)
+                                 .pluck(:id)
+      assert_equal query_row.id, filtered.first
+      assert_equal ids_from_sql(filtered_raw_sql), filtered
+    end
+  end
+
   private
 
   def postgresql?
@@ -780,6 +853,18 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
     SQL
 
     self.class.instance_variable_set(:@behavior_support_tables_done, true)
+  end
+
+  def setup_mock_items!
+    return if self.class.instance_variable_get(:@mock_items_setup_done)
+
+    conn = ActiveRecord::Base.connection
+    conn.drop_table(:mock_items, if_exists: true)
+    conn.execute("CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');")
+    conn.create_paradedb_index(BehaviorMockItemIndex)
+
+    BehaviorMockItem.reset_column_information
+    self.class.instance_variable_set(:@mock_items_setup_done, true)
   end
 
   def seed_products!

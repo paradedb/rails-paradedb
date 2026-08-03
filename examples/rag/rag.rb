@@ -13,6 +13,21 @@ def tokenize(text)
   text.to_s.downcase.scan(/[[:alnum:]]+/)
 end
 
+def retrieve(query)
+  terms = tokenize(query)
+  return [] if terms.empty?
+
+  query_embedding = RagSetup.query_embedding_for(query)
+  distance = MockItem.paradedb_arel.l2_distance(:embedding, query_embedding)
+
+  MockItem.search(:description)
+          .match_any(terms.join(" "))
+          .nearest(:embedding, query_embedding)
+          .select(MockItem.arel_table[Arel.star], distance.as("distance"))
+          .limit(5)
+          .to_a
+end
+
 def format_context(items)
   return "No products found." if items.empty?
 
@@ -82,20 +97,10 @@ if $PROGRAM_NAME == __FILE__
     puts "Question: #{query}"
     puts "=" * 60
 
-    terms = tokenize(query)
-    items = if terms.empty?
-              []
-            else
-              MockItem.search(:description)
-                      .match_any(terms.join(" "))
-                      .with_score
-                      .order(search_score: :desc)
-                      .limit(5)
-                      .to_a
-            end
+    items = retrieve(query)
 
     puts "\nRetrieved #{items.length} products:"
-    puts(items.map { |item| "  - #{item.description} (score: #{item.search_score.round(2)})" })
+    puts(items.map { |item| "  - #{item.description} (distance: #{item.distance.round(3)})" })
 
     context = format_context(items)
     puts "\nAnswer:"

@@ -1,3 +1,4 @@
+#!/usr/bin/env ruby
 # frozen_string_literal: true
 
 require "logger"
@@ -5,25 +6,21 @@ require "rails"
 require "active_record"
 require_relative "../../lib/parade_db"
 
-class RagExampleApp < Rails::Application
+class VectorSearchExampleApp < Rails::Application
   config.root = File.expand_path("../..", __dir__)
   config.eager_load = false
   config.logger = Logger.new(nil)
   config.secret_key_base = "paradedb_examples_secret_key_base"
 end
 
-RagExampleApp.initialize!
+VectorSearchExampleApp.initialize!
 
 require_relative "model"
 
-module RagSetup
+module VectorSearchSetup
   module_function
 
-  QUERY_SEED_TEXT = {
-    "What running shoes do you have?" => "Sleek running shoes",
-    "I need comfortable shoes for everyday use" => "Sleek running shoes",
-    "Do you have any wireless audio products?" => "Innovative wireless earbuds"
-  }.freeze
+  QUERY_SEED_TEXT = "Sleek running shoes"
 
   def database_url
     return ENV["DATABASE_URL"] if ENV["DATABASE_URL"]
@@ -44,7 +41,7 @@ module RagSetup
     ActiveRecord::Base.logger = nil
   end
 
-  def setup_mock_items!
+  def setup!
     connect!
 
     conn = ActiveRecord::Base.connection
@@ -59,19 +56,27 @@ module RagSetup
     MockItem.count
   end
 
-  def query_embedding_for(query)
-    seed_text = QUERY_SEED_TEXT[query.to_s.strip]
-    raise "No query embedding seed configured for '#{query}'" unless seed_text
-
+  def query_embedding
     connect!
+
     embedding = MockItem.where.not(embedding: nil)
                         .search(:description)
-                        .match_all(seed_text)
+                        .match_all(QUERY_SEED_TEXT)
                         .order(id: :asc)
                         .limit(1)
                         .pick(:embedding)
-    raise "No embedding found for seed '#{seed_text}'" if embedding.nil?
+    raise "No embedding found for seed '#{QUERY_SEED_TEXT}'" if embedding.nil?
 
     embedding
   end
+end
+
+if $PROGRAM_NAME == __FILE__
+  puts "=" * 60
+  puts "Vector Search Setup - Loading mock_items Table"
+  puts "=" * 60
+
+  count = VectorSearchSetup.setup!
+  puts "+ Loaded #{count} mock items with pre-populated vector(8) embeddings"
+  puts "\nSetup complete! Run: BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/vector_search/vector_search.rb"
 end
