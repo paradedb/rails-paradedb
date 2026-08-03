@@ -158,7 +158,7 @@ module ParadeDB
           next if paradedb_catalog_index_valid?(definition)
 
           all_valid = false
-          message = "ParadeDB index drift detected for #{name}: expected #{definition.index_name} on #{definition.table_name} with bm25."
+          message = "ParadeDB index drift detected for #{name}: expected #{definition.index_name} on #{definition.table_name} with a ParadeDB access method."
           case ParadeDB.index_validation_mode
           when :warn
             paradedb_log_warn(message)
@@ -263,7 +263,7 @@ module ParadeDB
           WHERE c.relname = #{connection.quote(definition.index_name.to_s)}
             AND t.relname = #{connection.quote(definition.table_name.to_s)}
             AND n.nspname = current_schema()
-            AND am.amname = 'bm25'
+            AND am.amname IN ('paradedb', 'bm25')
           LIMIT 1
         SQL
 

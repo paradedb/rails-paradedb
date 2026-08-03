@@ -8,13 +8,13 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
     ParadeDB.index_validation_mode = :off
 
     conn = ActiveRecord::Base.connection
-    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search;")
-    conn.remove_bm25_index(:products, if_exists: true) if conn.respond_to?(:remove_bm25_index)
+    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search CASCADE;")
+    conn.remove_paradedb_index(:products, if_exists: true) if conn.respond_to?(:remove_paradedb_index)
   end
 
   after do
     ParadeDB.index_validation_mode = @previous_mode
-    ActiveRecord::Base.connection.remove_bm25_index(:products, if_exists: true) rescue nil
+    ActiveRecord::Base.connection.remove_paradedb_index(:products, if_exists: true) rescue nil
     cleanup_constants("RuntimeProduct", "RuntimeProductIndex", "CustomRuntimeIndex", "ExplicitRuntimeProduct", "DriftProduct", "DriftProductIndex")
   end
 
@@ -295,7 +295,7 @@ RSpec.describe "IndexRuntimeFeaturesUnitTest" do
     Object.const_set("DriftProductIndex", Class.new(ParadeDB::Index) do
       self.table_name = :products
       self.key_field = :id
-      self.index_name = :products_missing_bm25_idx
+      self.index_name = :products_missing_search_idx
       self.fields = { id: {}, description: {} }
     end)
 

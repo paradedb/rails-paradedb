@@ -741,11 +741,11 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
     return if self.class.instance_variable_get(:@paradedb_setup_done)
 
     conn = ActiveRecord::Base.connection
-    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search;")
-    conn.execute("DROP INDEX IF EXISTS products_bm25_idx;")
+    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search CASCADE;")
+    conn.execute("DROP INDEX IF EXISTS products_search_idx;")
     conn.execute(<<~SQL)
-      CREATE INDEX products_bm25_idx ON products
-      USING bm25 (id, description, category, rating, in_stock, price)
+      CREATE INDEX products_search_idx ON products
+      USING paradedb (id, description, category, rating, in_stock, price)
       WITH (key_field='id');
     SQL
 
@@ -766,16 +766,16 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       t.column :weight_range, "int4range"
     end
 
-    conn.execute("DROP INDEX IF EXISTS orders_bm25_idx;")
+    conn.execute("DROP INDEX IF EXISTS orders_search_idx;")
     conn.execute(<<~SQL)
-      CREATE INDEX orders_bm25_idx ON orders
-      USING bm25 (order_id, product_id, customer_name)
+      CREATE INDEX orders_search_idx ON orders
+      USING paradedb (order_id, product_id, customer_name)
       WITH (key_field='order_id');
     SQL
-    conn.execute("DROP INDEX IF EXISTS range_items_bm25_idx;")
+    conn.execute("DROP INDEX IF EXISTS range_items_search_idx;")
     conn.execute(<<~SQL)
-      CREATE INDEX range_items_bm25_idx ON range_items
-      USING bm25 (id, weight_range)
+      CREATE INDEX range_items_search_idx ON range_items
+      USING paradedb (id, weight_range)
       WITH (key_field='id');
     SQL
 

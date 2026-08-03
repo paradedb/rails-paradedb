@@ -20,20 +20,6 @@ require_relative "model"
 module AutocompleteSetup
   module_function
 
-  def drop_bm25_indexes!(conn, table_name)
-    indexes = conn.select_values(<<~SQL)
-      SELECT indexname
-      FROM pg_indexes
-      WHERE schemaname = 'public'
-        AND tablename = #{conn.quote(table_name.to_s)}
-        AND indexdef LIKE '%USING bm25%'
-    SQL
-
-    indexes.each do |index_name|
-      conn.execute("DROP INDEX IF EXISTS #{conn.quote_table_name(index_name)}")
-    end
-  end
-
   def database_url
     return ENV["DATABASE_URL"] if ENV["DATABASE_URL"]
 
@@ -57,12 +43,12 @@ module AutocompleteSetup
     connect!
 
     conn = ActiveRecord::Base.connection
-    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search;")
+    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search CASCADE;")
     conn.execute(
       "CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');"
     )
-    drop_bm25_indexes!(conn, :mock_items)
-    conn.create_paradedb_index(MockItemIndex, if_not_exists: true)
+    conn.remove_paradedb_index(:mock_items, name: :search_idx, if_exists: true)
+    conn.create_paradedb_index(MockItemIndex)
 
     MockItem.reset_column_information
     MockItem.count
@@ -96,11 +82,10 @@ module AutocompleteSetup
     count = conn.select_value("SELECT COUNT(*) FROM autocomplete_items").to_i
     puts "  + Copied #{count} products from #{MockItem.table_name}"
 
-    puts "\nCreating autocomplete-optimized BM25 index..."
-    conn.remove_bm25_index(:autocomplete_items, name: :autocomplete_items_idx, if_exists: true)
-    conn.create_paradedb_index(AutocompleteItemIndex, if_not_exists: true)
+    puts "\nCreating autocomplete-optimized search index..."
+    conn.create_paradedb_index(AutocompleteItemIndex)
 
-    puts "  + Created BM25 index with:"
+    puts "  + Created search index with:"
     puts "    - description (standard tokenizer)"
     puts "    - description_ngram (ngram 3-8 for substring matching)"
     puts "    - category (literal for exact matching)"

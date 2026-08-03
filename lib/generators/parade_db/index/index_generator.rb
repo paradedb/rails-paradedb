@@ -15,7 +15,7 @@ module ParadeDB
       class_option :concurrent, type: :boolean, default: false,
                                 desc: "Add disable_ddl_transaction! to the migration (required for concurrent index creation)"
 
-      desc "Creates a ParadeDB::Index class and a BM25 index migration for MODEL."
+      desc "Creates a ParadeDB::Index class and a ParadeDB index migration for MODEL."
 
       def self.next_migration_number(dirname)
         ActiveRecord::Generators::Base.next_migration_number(dirname)
@@ -26,17 +26,17 @@ module ParadeDB
       end
 
       def create_migration_file
-        migration_template "migration.rb.tt", "db/migrate/create_#{table_name}_bm25_index.rb"
+        migration_template "migration.rb.tt", "db/migrate/create_#{table_name}_search_index.rb"
       end
 
       private
 
       def index_name
-        "#{table_name}_bm25_idx"
+        "#{table_name}_search_idx"
       end
 
       def migration_class_name
-        "Create#{class_name}Bm25Index"
+        "Create#{class_name}SearchIndex"
       end
     end
   end

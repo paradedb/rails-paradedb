@@ -41,8 +41,8 @@ RSpec.describe "IndexDslUnitTest" do
     assert_equal "archived_at IS NULL", compiled.where
     sql = ActiveRecord::Base.connection.send(:build_create_sql, compiled, if_not_exists: false)
     assert_sql_equal <<~SQL, sql
-      CREATE INDEX products_bm25_idx ON products
-      USING bm25 (id, (description::pdb.simple))
+      CREATE INDEX products_search_idx ON products
+      USING paradedb (id, (description::pdb.simple))
       WITH (key_field='id')
       WHERE archived_at IS NULL
     SQL
@@ -60,8 +60,8 @@ RSpec.describe "IndexDslUnitTest" do
 
     sql = ActiveRecord::Base.connection.send(:build_create_sql, klass.compiled_definition, if_not_exists: true, concurrently: true)
     assert_sql_equal <<~SQL, sql
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS products_bm25_idx ON products
-      USING bm25 (id, (description::pdb.simple))
+      CREATE INDEX CONCURRENTLY IF NOT EXISTS products_search_idx ON products
+      USING paradedb (id, (description::pdb.simple))
       WITH (key_field='id')
     SQL
   end
@@ -113,7 +113,7 @@ RSpec.describe "IndexDslUnitTest" do
 
     assert_equal :products, compiled.table_name
     assert_equal :id, compiled.key_field
-    assert_equal "products_bm25_idx", compiled.index_name
+    assert_equal "products_search_idx", compiled.index_name
     assert_operator compiled.entries.length, :>=, 4
   end
 
@@ -180,8 +180,8 @@ RSpec.describe "IndexDslUnitTest" do
 
     sql = ActiveRecord::Base.connection.send(:build_create_sql, klass.compiled_definition, if_not_exists: false)
     assert_sql_equal <<~SQL, sql
-      CREATE INDEX products_bm25_idx ON products
-      USING bm25 (id, (description::pdb.ngram(2, 5)))
+      CREATE INDEX products_search_idx ON products
+      USING paradedb (id, (description::pdb.ngram(2, 5)))
       WITH (key_field='id')
     SQL
   end
@@ -213,8 +213,8 @@ RSpec.describe "IndexDslUnitTest" do
 
     sql = ActiveRecord::Base.connection.send(:build_create_sql, klass.compiled_definition, if_not_exists: false)
     assert_sql_equal <<~SQL, sql
-      CREATE INDEX products_bm25_idx ON products
-      USING bm25 (id, (description::pdb::xyz), ((metadata->>'title')::pdb::abc(12, 'fafda')))
+      CREATE INDEX products_search_idx ON products
+      USING paradedb (id, (description::pdb::xyz), ((metadata->>'title')::pdb::abc(12, 'fafda')))
       WITH (key_field='id')
     SQL
   end
@@ -235,7 +235,7 @@ RSpec.describe "IndexDslUnitTest" do
     compiled = klass.compiled_definition
     indexdef = conn.send(:build_create_sql, compiled, if_not_exists: false)
     ruby_stmt = conn.send(
-      :bm25_index_to_ruby,
+      :paradedb_index_to_ruby,
       {
         "indexdef" => indexdef,
         "table_name" => compiled.table_name.to_s,
@@ -246,7 +246,7 @@ RSpec.describe "IndexDslUnitTest" do
     recorder = Class.new do
       attr_reader :captured
 
-      def add_bm25_index(table, fields:, key_field:, name:, index_options: nil, if_not_exists: false)
+      def add_paradedb_index(table, fields:, key_field:, name:, index_options: nil, if_not_exists: false)
         @captured = {
           table: table,
           fields: fields,
@@ -274,18 +274,65 @@ RSpec.describe "IndexDslUnitTest" do
     assert_equal original_entries, reloaded_entries
   end
 
+  it "dumps schema ruby as add_paradedb_index" do
+    conn = ActiveRecord::Base.connection
+    indexdef = <<~SQL.squish
+      CREATE INDEX products_search_idx ON public.products
+      USING paradedb (id, description)
+      WITH (key_field=id)
+    SQL
+
+    ruby_stmt = conn.send(
+      :paradedb_index_to_ruby,
+      {
+        "indexdef" => indexdef,
+        "table_name" => "products",
+        "index_name" => "products_search_idx"
+      }
+    )
+
+    assert_equal(
+      %(add_paradedb_index :products, fields: { id: {}, description: {} }, key_field: :id, name: "products_search_idx"),
+      ruby_stmt
+    )
+  end
+
   it "parses nested parentheses in WITH clauses before trailing SQL" do
     conn = ActiveRecord::Base.connection
     indexdef = <<~SQL.squish
-      CREATE INDEX products_bm25_idx ON public.products
+      CREATE INDEX products_search_idx ON public.products
       USING bm25 (id, description)
       WITH (key_field=id, target_segment_count=((17)))
       WHERE ((archived_at IS NULL))
     SQL
 
-    with_sql, trailing_sql = conn.send(:extract_bm25_with_components, indexdef)
+    with_sql, trailing_sql = conn.send(:extract_paradedb_with_components, indexdef)
 
     assert_equal "key_field=id, target_segment_count=((17))", with_sql
     assert_equal "WHERE ((archived_at IS NULL))", trailing_sql
+  end
+
+  it "exposes the paradedb migration helpers" do
+    conn = ActiveRecord::Base.connection
+
+    %i[add_paradedb_index remove_paradedb_index reindex_paradedb_index].each do |helper|
+      assert conn.respond_to?(helper)
+      assert ParadeDB::MigrationDSL.method_defined?(helper)
+    end
+  end
+
+  it "inverts index helpers to paradedb-named commands in the command recorder" do
+    recorder = ActiveRecord::Migration::CommandRecorder.new(ActiveRecord::Base.connection)
+
+    method, args = recorder.inverse_of(:add_paradedb_index, [:products, { key_field: :id, name: :products_alias_idx }])
+    assert_equal :remove_paradedb_index, method
+    assert_equal :products, args.first
+    assert_equal({ if_exists: true, name: :products_alias_idx }, args.last)
+
+    %i[remove_paradedb_index reindex_paradedb_index].each do |command|
+      assert_raises(ActiveRecord::IrreversibleMigration) do
+        recorder.inverse_of(command, [:products])
+      end
+    end
   end
 end

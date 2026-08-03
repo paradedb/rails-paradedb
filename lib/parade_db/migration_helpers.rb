@@ -20,12 +20,12 @@ module ParadeDB
       ensure_postgresql_adapter!
       resolved = resolve_index_klass(index_klass)
       compiled = resolved.compiled_definition
-      remove_bm25_index(compiled.table_name, name: compiled.index_name, if_exists: true)
+      remove_paradedb_index(compiled.table_name, name: compiled.index_name, if_exists: true)
       execute(build_create_sql(compiled, if_not_exists: false))
       remember_schema_index_reference(resolved)
     end
 
-    def add_bm25_index(table, fields:, key_field:, name: nil, index_options: nil, where: nil, if_not_exists: false, concurrently: false)
+    def add_paradedb_index(table, fields:, key_field:, name: nil, index_options: nil, where: nil, if_not_exists: false, concurrently: false)
       ensure_postgresql_adapter!
       anonymous = Class.new(ParadeDB::Index)
       anonymous.table_name = table
@@ -38,31 +38,31 @@ module ParadeDB
       create_paradedb_index(anonymous, if_not_exists: if_not_exists, concurrently: concurrently)
     end
 
-    def remove_bm25_index(table, name: nil, if_exists: false)
+    def remove_paradedb_index(table, name: nil, if_exists: false)
       ensure_postgresql_adapter!
-      index_name = (name || "#{table}_bm25_idx").to_s
+      index_name = (name || "#{table}_search_idx").to_s
       prefix = if_exists ? "IF EXISTS " : ""
       execute("DROP INDEX #{prefix}#{quote_table_name(index_name)}")
     end
 
-    def reindex_bm25(table, name: nil, concurrently: false)
+    def reindex_paradedb_index(table, name: nil, concurrently: false)
       ensure_postgresql_adapter!
       if concurrently && transaction_open_for_paradedb?
-        raise ArgumentError, "reindex_bm25 concurrently: true cannot run inside a transaction"
+        raise ArgumentError, "reindex_paradedb_index concurrently: true cannot run inside a transaction"
       end
 
-      index_name = (name || "#{table}_bm25_idx").to_s
+      index_name = (name || "#{table}_search_idx").to_s
       modifier = concurrently ? " CONCURRENTLY" : ""
       execute("REINDEX INDEX#{modifier} #{quote_table_name(index_name)}")
     end
 
     def dump_paradedb_indexes(stream)
-      rows = paradedb_bm25_index_rows
+      rows = paradedb_index_rows
       return if rows.empty?
 
       stream.puts
       rows.each do |row|
-        ruby_stmt = bm25_index_to_ruby(row)
+        ruby_stmt = paradedb_index_to_ruby(row)
         stream.puts "  #{ruby_stmt}"
       end
     end
@@ -71,8 +71,8 @@ module ParadeDB
       (@paradedb_schema_index_references || []).uniq.sort
     end
 
-    def paradedb_bm25_index_names
-      paradedb_bm25_index_rows.map { |r| r["index_name"] }
+    def paradedb_index_names
+      paradedb_index_rows.map { |r| r["index_name"] }
     end
 
     private
@@ -84,18 +84,18 @@ module ParadeDB
     def build_create_sql(compiled, if_not_exists:, concurrently: false)
       modifier = concurrently ? " CONCURRENTLY" : ""
       prefix = if_not_exists ? "IF NOT EXISTS " : ""
-      fields_sql = compiled.entries.map { |entry| bm25_entry_sql(entry) }.join(", ")
-      with_options_sql = bm25_with_options_sql(compiled)
+      fields_sql = compiled.entries.map { |entry| paradedb_entry_sql(entry) }.join(", ")
+      with_options_sql = paradedb_with_options_sql(compiled)
       where_sql = compiled.where ? "\nWHERE #{compiled.where}" : ""
 
       <<~SQL.strip.gsub(/\s+/, " ")
         CREATE INDEX#{modifier} #{prefix}#{quote_table_name(compiled.index_name)} ON #{quote_table_name(compiled.table_name)}
-        USING bm25 (#{fields_sql})
+        USING paradedb (#{fields_sql})
         WITH (#{with_options_sql})#{where_sql}
       SQL
     end
 
-    def bm25_with_options_sql(compiled)
+    def paradedb_with_options_sql(compiled)
       options = []
       options << "key_field=#{quote(compiled.key_field.to_s)}"
 
@@ -108,14 +108,14 @@ module ParadeDB
         end
       end
 
-      bm25_field_option_groups(compiled).each do |param_name, value_hash|
+      paradedb_field_option_groups(compiled).each do |param_name, value_hash|
         options << "#{param_name}=#{quote(JSON.generate(value_hash))}"
       end
 
       options.join(", ")
     end
 
-    def bm25_field_option_groups(compiled)
+    def paradedb_field_option_groups(compiled)
       field_options = compiled.field_options || {}
       return {} if field_options.empty?
 
@@ -128,7 +128,7 @@ module ParadeDB
         column = columns_by_name[source.to_s]
         next unless column
 
-        param_name = bm25_field_option_param_for_column(column)
+        param_name = paradedb_field_option_param_for_column(column)
         next if param_name.nil?
 
         normalized = normalize_field_options_for_param(opts, param_name)
@@ -141,7 +141,7 @@ module ParadeDB
       grouped
     end
 
-    def bm25_field_option_param_for_column(column)
+    def paradedb_field_option_param_for_column(column)
       sql_type = column.sql_type.to_s.downcase
       return "range_fields" if sql_type.include?("range")
 
@@ -182,8 +182,8 @@ module ParadeDB
       end
     end
 
-    def bm25_entry_sql(entry)
-      source_sql = bm25_source_sql(entry)
+    def paradedb_entry_sql(entry)
+      source_sql = paradedb_source_sql(entry)
 
       if entry.tokenizer.nil? && entry.query_key != entry.source
         return "(#{source_sql}::pdb.alias(#{quote(entry.query_key)}))"
@@ -194,7 +194,7 @@ module ParadeDB
       "(#{source_sql}::#{tokenizer_sql(entry.tokenizer, entry.options)})"
     end
 
-    def bm25_source_sql(entry)
+    def paradedb_source_sql(entry)
       if entry.expression
         "(#{entry.source})"
       else
@@ -289,7 +289,7 @@ module ParadeDB
       false
     end
 
-    def paradedb_bm25_index_rows
+    def paradedb_index_rows
       sql = <<~SQL
         SELECT
           c.relname  AS index_name,
@@ -302,28 +302,28 @@ module ParadeDB
         JOIN pg_class t ON t.oid = i.indrelid
         JOIN pg_am am ON am.oid = c.relam
         WHERE n.nspname = current_schema()
-          AND am.amname = 'bm25'
+          AND am.amname IN ('paradedb', 'bm25')
         ORDER BY t.relname, c.relname
       SQL
       select_all(sql).to_a
     rescue => e
-      Kernel.warn("ParadeDB: unable to query bm25 indexes from catalog: #{e.message}")
+      Kernel.warn("ParadeDB: unable to query paradedb indexes from catalog: #{e.message}")
       []
     end
 
-    def bm25_index_to_ruby(row)
+    def paradedb_index_to_ruby(row)
       indexdef = row["indexdef"]
       table = row["table_name"]
       name = row["index_name"]
 
-      key_field = extract_bm25_key_field(indexdef)
-      index_options = extract_bm25_index_options(indexdef)
-      fields_sql = extract_bm25_fields_sql(indexdef)
-      where = normalize_bm25_where_clause(row["where_clause"])
+      key_field = extract_paradedb_key_field(indexdef)
+      index_options = extract_paradedb_index_options(indexdef)
+      fields_sql = extract_paradedb_fields_sql(indexdef)
+      where = normalize_paradedb_where_clause(row["where_clause"])
 
       if key_field && fields_sql
-        field_sqls = split_bm25_top_level(fields_sql).map(&:strip)
-        parsed = field_sqls.map { |f| bm25_parse_column_entry(f) }
+        field_sqls = split_paradedb_top_level(fields_sql).map(&:strip)
+        parsed = field_sqls.map { |f| paradedb_parse_column_entry(f) }
 
         grouped = {}
         parsed.each { |e| (grouped[e[:source]] ||= []) << e }
@@ -334,14 +334,14 @@ module ParadeDB
           if entries.all? { |e| e[:tokenizer].nil? }
             "#{source_ruby} {}"
           elsif entries.length == 1
-            "#{source_ruby} #{bm25_tokenizer_config_ruby(entries.first)}"
+            "#{source_ruby} #{paradedb_tokenizer_config_ruby(entries.first)}"
           else
-            configs = entries.map { |e| bm25_tokenizer_ruby_from_entry(e) }
+            configs = entries.map { |e| paradedb_tokenizer_ruby_from_entry(e) }
             "#{source_ruby} { tokenizers: [#{configs.join(', ')}] }"
           end
         end
 
-        statement = "add_bm25_index #{table.to_sym.inspect}, " \
+        statement = "add_paradedb_index #{table.to_sym.inspect}, " \
           "fields: { #{fields_pairs.join(', ')} }, " \
           "key_field: #{key_field.to_sym.inspect}, " \
           "name: #{name.inspect}"
@@ -355,7 +355,7 @@ module ParadeDB
       end
     end
 
-    def extract_bm25_key_field(indexdef)
+    def extract_paradedb_key_field(indexdef)
       quoted = indexdef.match(/WITH\s*\([^)]*key_field\s*=\s*'((?:[^']|'')*)'/i)
       return quoted[1].gsub("''", "'") if quoted
 
@@ -365,8 +365,8 @@ module ParadeDB
       nil
     end
 
-    def extract_bm25_index_options(indexdef)
-      with_sql, = extract_bm25_with_components(indexdef)
+    def extract_paradedb_index_options(indexdef)
+      with_sql, = extract_paradedb_with_components(indexdef)
       options = {}
       split_sql_arguments(with_sql).each do |argument|
         key, value_sql = split_assignment(argument)
@@ -388,8 +388,8 @@ module ParadeDB
       {}
     end
 
-    def extract_bm25_fields_sql(indexdef)
-      match = indexdef.match(/USING\s+bm25\s*\(/im)
+    def extract_paradedb_fields_sql(indexdef)
+      match = indexdef.match(/USING\s+(?:paradedb|bm25)\s*\(/im)
 
       start = match.end(0)
       depth = 1
@@ -406,7 +406,7 @@ module ParadeDB
       indexdef[start..pos - 2]
     end
 
-    def extract_bm25_with_components(indexdef)
+    def extract_paradedb_with_components(indexdef)
       match = indexdef.match(/WITH\s*\(/im)
       start = match.end(0)
       depth = 1
@@ -427,20 +427,20 @@ module ParadeDB
       [with_sql, trailing_sql]
     end
 
-    def normalize_bm25_where_clause(where)
+    def normalize_paradedb_where_clause(where)
       return nil if where.nil?
 
       normalized = where.to_s.strip
       return nil if normalized.empty?
 
-      while bm25_wrapped_in_parentheses?(normalized)
+      while paradedb_wrapped_in_parentheses?(normalized)
         normalized = normalized[1...-1].strip
       end
 
       normalized.empty? ? nil : normalized
     end
 
-    def bm25_wrapped_in_parentheses?(sql)
+    def paradedb_wrapped_in_parentheses?(sql)
       return false unless sql.start_with?("(") && sql.end_with?(")")
 
       depth = 0
@@ -456,7 +456,7 @@ module ParadeDB
       depth.zero?
     end
 
-    def split_bm25_top_level(str)
+    def split_paradedb_top_level(str)
       parts = []
       current = +""
       depth = 0
@@ -479,7 +479,7 @@ module ParadeDB
       parts
     end
 
-    def bm25_parse_column_entry(field_sql)
+    def paradedb_parse_column_entry(field_sql)
       stripped = field_sql.strip
 
       if stripped.start_with?("(") && stripped.end_with?(")")
@@ -488,7 +488,7 @@ module ParadeDB
         if (source_sql, tok_sql = split_tokenized_cast(inner))
           normalized = unwrap_surrounding_groupings(source_sql)
           source_name = identifier_sql?(normalized) ? unquote_identifier(normalized) : normalized
-          bm25_parse_tokenizer(tok_sql).merge(source: source_name)
+          paradedb_parse_tokenizer(tok_sql).merge(source: source_name)
         else
           { source: inner, tokenizer: nil, options: {} }
         end
@@ -638,7 +638,7 @@ module ParadeDB
       sql.match?(/\A[a-zA-Z_][a-zA-Z0-9_]*\z/) || sql.match?(/\A"(?:[^"]|"")+"\z/)
     end
 
-    def bm25_parse_tokenizer(tokenizer_sql_str)
+    def paradedb_parse_tokenizer(tokenizer_sql_str)
       match = tokenizer_sql_str.strip.match(/\A([a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*)(?:\((.*)\))?\z/m)
       return { tokenizer: tokenizer_sql_str, options: {} } unless match
 
@@ -677,11 +677,11 @@ module ParadeDB
       { tokenizer: normalized_name, options: options }
     end
 
-    def bm25_tokenizer_config_ruby(entry)
-      "{ tokenizer: #{bm25_tokenizer_ruby_from_entry(entry)} }"
+    def paradedb_tokenizer_config_ruby(entry)
+      "{ tokenizer: #{paradedb_tokenizer_ruby_from_entry(entry)} }"
     end
 
-    def bm25_tokenizer_ruby_from_entry(entry)
+    def paradedb_tokenizer_ruby_from_entry(entry)
       opts = entry[:options].dup
       positional_args = Array(opts.delete(:__positional))
       alias_val = opts.delete(:alias)
@@ -691,10 +691,10 @@ module ParadeDB
 
       opts[:alias] = alias_val if alias_val
 
-      bm25_tokenizer_ruby(entry[:tokenizer], positional_args, opts)
+      paradedb_tokenizer_ruby(entry[:tokenizer], positional_args, opts)
     end
 
-    def bm25_tokenizer_ruby(name, positional_args, options)
+    def paradedb_tokenizer_ruby(name, positional_args, options)
       if name.match?(/\A[a-z_][a-z0-9_]*\z/) && ParadeDB::Tokenizer.respond_to?(name)
         args = positional_args.map { |arg| ruby_literal(arg) }
         args << "options: #{ruby_hash_literal(options)}" unless options.empty?
@@ -866,8 +866,8 @@ if defined?(ActiveRecord::Migration)
         connection.replace_paradedb_index(index_klass)
       end
 
-      def add_bm25_index(table, fields:, key_field:, name: nil, index_options: nil, where: nil, if_not_exists: false, concurrently: false)
-        connection.add_bm25_index(
+      def add_paradedb_index(table, fields:, key_field:, name: nil, index_options: nil, where: nil, if_not_exists: false, concurrently: false)
+        connection.add_paradedb_index(
           table,
           fields: fields,
           key_field: key_field,
@@ -879,12 +879,12 @@ if defined?(ActiveRecord::Migration)
         )
       end
 
-      def remove_bm25_index(table, name: nil, if_exists: false)
-        connection.remove_bm25_index(table, name: name, if_exists: if_exists)
+      def remove_paradedb_index(table, name: nil, if_exists: false)
+        connection.remove_paradedb_index(table, name: name, if_exists: if_exists)
       end
 
-      def reindex_bm25(table, name: nil, concurrently: false)
-        connection.reindex_bm25(table, name: name, concurrently: concurrently)
+      def reindex_paradedb_index(table, name: nil, concurrently: false)
+        connection.reindex_paradedb_index(table, name: name, concurrently: concurrently)
       end
     end
   end
@@ -905,11 +905,11 @@ if defined?(ActiveRecord::SchemaDumper)
       def indexes_in_create(table, stream)
         conn = paradedb_connection
         if conn
-          bm25_names = conn.paradedb_bm25_index_names
+          paradedb_names = conn.paradedb_index_names
           original_indexes = conn.method(:indexes)
 
           conn.define_singleton_method(:indexes) do |tbl|
-            original_indexes.call(tbl).reject { |idx| bm25_names.include?(idx.name) }
+            original_indexes.call(tbl).reject { |idx| paradedb_names.include?(idx.name) }
           end
 
           begin
@@ -940,10 +940,10 @@ if defined?(ActiveRecord::Migration::CommandRecorder)
     module CommandRecorderPatch
       %i[
         create_paradedb_index
-        add_bm25_index
-        remove_bm25_index
+        add_paradedb_index
+        remove_paradedb_index
         replace_paradedb_index
-        reindex_bm25
+        reindex_paradedb_index
       ].each do |method_name|
         define_method(method_name) do |*args, &block|
           record(method_name, args, &block)
@@ -958,10 +958,10 @@ if defined?(ActiveRecord::Migration::CommandRecorder)
         compiled = resolve_paradedb_index_klass(index_klass).compiled_definition
         remove_options = Hash.ruby2_keywords_hash(name: compiled.index_name, if_exists: true)
 
-        [:remove_bm25_index, [compiled.table_name, remove_options]]
+        [:remove_paradedb_index, [compiled.table_name, remove_options]]
       end
 
-      def invert_add_bm25_index(args)
+      def invert_add_paradedb_index(args)
         table, options = args
         options = symbolize_options_hash(options)
 
@@ -969,12 +969,12 @@ if defined?(ActiveRecord::Migration::CommandRecorder)
         remove_options[:name] = options[:name] if options[:name]
         remove_options = Hash.ruby2_keywords_hash(remove_options)
 
-        [:remove_bm25_index, [table, remove_options]]
+        [:remove_paradedb_index, [table, remove_options]]
       end
 
-      def invert_remove_bm25_index(_args)
+      def invert_remove_paradedb_index(_args)
         raise ActiveRecord::IrreversibleMigration,
-              "remove_bm25_index is not automatically reversible. Use #up/#down or #reversible."
+              "remove_paradedb_index is not automatically reversible. Use #up/#down or #reversible."
       end
 
       def invert_replace_paradedb_index(_args)
@@ -982,9 +982,9 @@ if defined?(ActiveRecord::Migration::CommandRecorder)
               "replace_paradedb_index is not automatically reversible. Use #up/#down or #reversible."
       end
 
-      def invert_reindex_bm25(_args)
+      def invert_reindex_paradedb_index(_args)
         raise ActiveRecord::IrreversibleMigration,
-              "reindex_bm25 is not automatically reversible. Use #up/#down or #reversible."
+              "reindex_paradedb_index is not automatically reversible. Use #up/#down or #reversible."
       end
 
       def resolve_paradedb_index_klass(index_klass)

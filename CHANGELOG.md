@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING**: Renamed the `bm25`-named migration helpers to `paradedb`: `add_bm25_index` is now `add_paradedb_index`, `remove_bm25_index` is now `remove_paradedb_index`, and `reindex_bm25` is now `reindex_paradedb_index`. The old names were removed; update migrations and `schema.rb` files to the new names.
+- **BREAKING**: Index creation always emits `USING paradedb`, which requires pg_search 0.25.0+. There is no option to select the legacy `bm25` access method.
+- **BREAKING**: The default index name is now `<table>_search_idx` (previously `<table>_bm25_idx`), and the index generator emits `Create<Model>SearchIndex` migrations named `create_<table>_search_index.rb`.
+
 [0.9.0] - 2026-07-14
 
 ### Added

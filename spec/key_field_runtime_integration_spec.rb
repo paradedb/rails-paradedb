@@ -32,8 +32,8 @@ RSpec.describe "KeyFieldRuntimeIntegrationTest" do
     end
 
     conn = ActiveRecord::Base.connection
-    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search;")
-    conn.remove_bm25_index(:runtime_key_docs, name: :runtime_key_docs_bm25_idx, if_exists: true)
+    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search CASCADE;")
+    conn.remove_paradedb_index(:runtime_key_docs, name: :runtime_key_docs_search_idx, if_exists: true)
     conn.create_paradedb_index(RuntimeKeyDocIndex)
 
     RuntimeKeyDoc.connection.execute("TRUNCATE TABLE runtime_key_docs RESTART IDENTITY;")
@@ -46,7 +46,7 @@ RSpec.describe "KeyFieldRuntimeIntegrationTest" do
     next unless postgresql?
 
     conn = ActiveRecord::Base.connection
-    conn.remove_bm25_index(:runtime_key_docs, name: :runtime_key_docs_bm25_idx, if_exists: true) rescue nil
+    conn.remove_paradedb_index(:runtime_key_docs, name: :runtime_key_docs_search_idx, if_exists: true) rescue nil
     conn.drop_table(:runtime_key_docs, if_exists: true) rescue nil
   end
 
