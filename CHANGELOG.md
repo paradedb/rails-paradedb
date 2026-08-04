@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+[0.10.0] - 2026-08-04
+
 ### Added
 
 - Native pgvector `vector(n)` column support: ActiveRecord attribute type, `t.vector` / `add_column :table, :col, :vector, limit: n` migration DSL, and `schema.rb` dumping — no `neighbor` gem required.
@@ -168,7 +170,8 @@ All notable changes to this project will be documented in this file. The format 
 - Schema dump/load round-trip for tokenizer configuration and index options
   (including `target_segment_count`)
 
-[Unreleased]: https://github.com/paradedb/rails-paradedb/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/paradedb/rails-paradedb/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.10.0
 [0.9.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.9.0
 [0.8.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.8.0
 [0.7.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.7.0
