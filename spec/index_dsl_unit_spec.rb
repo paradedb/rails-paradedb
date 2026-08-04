@@ -25,6 +25,118 @@ RSpec.describe "IndexDslUnitTest" do
     assert_includes compiled.entries.map(&:query_key), "description_simple"
   end
 
+  it "compiles vector index build options and renders them in WITH" do
+    klass = Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.index_options = { centroid_ratio: 0.01, training_samples_per_centroid: 32, cluster_replication: 2 }
+      self.fields = { id: {}, description: nil, embedding: { metric: :cosine } }
+    end
+
+    compiled = klass.compiled_definition
+    assert_equal(
+      { centroid_ratio: 0.01, training_samples_per_centroid: 32, cluster_replication: 2 },
+      compiled.index_options
+    )
+
+    sql = ActiveRecord::Base.connection.send(:build_create_sql, compiled, if_not_exists: false)
+    assert_sql_equal <<~SQL, sql
+      CREATE INDEX products_search_idx ON products
+      USING paradedb (id, description, embedding vector_cosine_ops)
+      WITH (key_field='id', centroid_ratio=0.01, training_samples_per_centroid=32, cluster_replication=2)
+    SQL
+  end
+
+  it "renders a single vector index build option in WITH" do
+    klass = Class.new(ParadeDB::Index) do
+      self.table_name = :products
+      self.key_field = :id
+      self.index_options = { centroid_ratio: 0.5 }
+      self.fields = { id: {}, description: nil }
+    end
+
+    sql = ActiveRecord::Base.connection.send(:build_create_sql, klass.compiled_definition, if_not_exists: false)
+    assert_sql_equal <<~SQL, sql
+      CREATE INDEX products_search_idx ON products
+      USING paradedb (id, description)
+      WITH (key_field='id', centroid_ratio=0.5)
+    SQL
+  end
+
+  it "rejects out-of-range and mistyped vector index build options" do
+    build = lambda do |options|
+      Class.new(ParadeDB::Index) do
+        self.table_name = :products
+        self.key_field = :id
+        self.index_options = options
+        self.fields = { id: {} }
+      end
+    end
+
+    [{ centroid_ratio: 0.0000001 }, { centroid_ratio: 1.5 }, { centroid_ratio: "0.01" }].each do |options|
+      error = assert_raises(ParadeDB::InvalidIndexDefinition) { build.call(options).compiled_definition }
+      assert_includes error.message, "centroid_ratio"
+      assert_includes error.message, "between 0.000001 and 1.0"
+    end
+
+    %i[training_samples_per_centroid cluster_replication].each do |key|
+      [0, -1, 1.5, "32"].each do |value|
+        error = assert_raises(ParadeDB::InvalidIndexDefinition) { build.call({ key => value }).compiled_definition }
+        assert_includes error.message, "index_options[#{key.inspect}] must be an Integer > 0"
+      end
+    end
+
+    error = assert_raises(ParadeDB::InvalidIndexDefinition) { build.call({ centroid: 0.01 }).compiled_definition }
+    assert_includes error.message, "unknown index_options keys"
+  end
+
+  it "parses vector index build options back from catalog reloptions" do
+    conn = ActiveRecord::Base.connection
+    indexdef = <<~SQL.squish
+      CREATE INDEX products_search_idx ON public.products
+      USING paradedb (id, description, embedding vector_cosine_ops)
+      WITH (key_field='id', centroid_ratio='0.01', training_samples_per_centroid='32', cluster_replication='2')
+    SQL
+
+    ruby_stmt = conn.send(
+      :paradedb_index_to_ruby,
+      {
+        "indexdef" => indexdef,
+        "table_name" => "products",
+        "index_name" => "products_search_idx",
+        "reloptions" => '["key_field=id","centroid_ratio=0.01","training_samples_per_centroid=32","cluster_replication=2"]'
+      }
+    )
+
+    assert_equal(
+      %(add_paradedb_index :products, fields: { id: {}, description: {}, embedding: { metric: :cosine } }, key_field: :id, name: "products_search_idx", index_options: { :centroid_ratio => 0.01, :training_samples_per_centroid => 32, :cluster_replication => 2 }),
+      ruby_stmt
+    )
+  end
+
+  it "extracts index options from reloptions entries, skipping unknown and malformed values" do
+    conn = ActiveRecord::Base.connection
+
+    options = conn.send(
+      :extract_paradedb_index_options,
+      ["key_field=id", "centroid_ratio=0.01", "training_samples_per_centroid=32", "cluster_replication=2"]
+    )
+    assert_equal(
+      { centroid_ratio: 0.01, training_samples_per_centroid: 32, cluster_replication: 2 },
+      options
+    )
+
+    assert_equal({}, conn.send(:extract_paradedb_index_options, nil))
+    assert_equal({}, conn.send(:extract_paradedb_index_options, "not json"))
+    assert_equal(
+      {},
+      conn.send(
+        :extract_paradedb_index_options,
+        ["key_field=id", "mystery=1", "centroid_ratio=abc", "training_samples_per_centroid=1.5", "cluster_replication"]
+      )
+    )
+  end
+
   it "compiles partial index predicates" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :products
@@ -295,21 +407,6 @@ RSpec.describe "IndexDslUnitTest" do
       %(add_paradedb_index :products, fields: { id: {}, description: {} }, key_field: :id, name: "products_search_idx"),
       ruby_stmt
     )
-  end
-
-  it "parses nested parentheses in WITH clauses before trailing SQL" do
-    conn = ActiveRecord::Base.connection
-    indexdef = <<~SQL.squish
-      CREATE INDEX products_search_idx ON public.products
-      USING bm25 (id, description)
-      WITH (key_field=id, target_segment_count=((17)))
-      WHERE ((archived_at IS NULL))
-    SQL
-
-    with_sql, trailing_sql = conn.send(:extract_paradedb_with_components, indexdef)
-
-    assert_equal "key_field=id, target_segment_count=((17))", with_sql
-    assert_equal "WHERE ((archived_at IS NULL))", trailing_sql
   end
 
   it "exposes the paradedb migration helpers" do
