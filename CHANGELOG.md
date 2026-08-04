@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Added
+
+- Vector index build options `centroid_ratio`, `training_samples_per_centroid`, and `cluster_replication` in `ParadeDB::Index` `index_options` and `add_paradedb_index` (pg_search 0.25.0+). They are emitted in the `WITH (...)` clause and round-tripped through the schema dumper.
+
 [0.10.0] - 2026-08-04
 
 ### Added

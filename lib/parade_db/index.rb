@@ -83,6 +83,8 @@ module ParadeDB
     # Consumed by migration helpers; validates and normalizes the DSL class
     class DefinitionCompiler
       FIELD_OPTION_KEYS = %i[fast record normalizer expand_dots].freeze
+      INDEX_OPTION_KEYS = %i[target_segment_count centroid_ratio training_samples_per_centroid cluster_replication].freeze
+      POSITIVE_INTEGER_INDEX_OPTION_KEYS = %i[target_segment_count training_samples_per_centroid cluster_replication].freeze
 
       class Compiled
         attr_reader :table_name, :key_field, :index_name, :entries, :index_options, :field_options, :where
@@ -238,16 +240,26 @@ module ParadeDB
             memo[key.to_sym] = value
           end
 
-          unknown = normalized.keys - [:target_segment_count]
+          unknown = normalized.keys - INDEX_OPTION_KEYS
           unless unknown.empty?
             raise InvalidIndexDefinition,
                   "unknown index_options keys: #{unknown.map(&:inspect).join(', ')}"
           end
 
-          if normalized.key?(:target_segment_count)
-            target = normalized[:target_segment_count]
-            unless target.is_a?(Integer) && target.positive?
-              raise InvalidIndexDefinition, "index_options[:target_segment_count] must be an Integer > 0"
+          POSITIVE_INTEGER_INDEX_OPTION_KEYS.each do |key|
+            next unless normalized.key?(key)
+
+            value = normalized[key]
+            unless value.is_a?(Integer) && value.positive?
+              raise InvalidIndexDefinition, "index_options[#{key.inspect}] must be an Integer > 0"
+            end
+          end
+
+          if normalized.key?(:centroid_ratio)
+            ratio = normalized[:centroid_ratio]
+            unless ratio.is_a?(Numeric) && ratio >= 0.000001 && ratio <= 1.0
+              raise InvalidIndexDefinition,
+                    "index_options[:centroid_ratio] must be a Numeric between 0.000001 and 1.0"
             end
           end
 

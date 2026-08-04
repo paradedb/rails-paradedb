@@ -100,9 +100,12 @@ module ParadeDB
       options << "key_field=#{quote(compiled.key_field.to_s)}"
 
       compiled.index_options.each do |key, value|
-        case key.to_sym
-        when :target_segment_count
-          options << "target_segment_count=#{Integer(value)}"
+        name = key.to_sym
+        case name
+        when :target_segment_count, :training_samples_per_centroid, :cluster_replication
+          options << "#{name}=#{Integer(value)}"
+        when :centroid_ratio
+          options << "centroid_ratio=#{Float(value)}"
         else
           raise ParadeDB::InvalidIndexDefinition, "unsupported index option #{key.inspect}"
         end
@@ -297,6 +300,7 @@ module ParadeDB
           c.relname  AS index_name,
           t.relname  AS table_name,
           pg_get_indexdef(c.oid) AS indexdef,
+          array_to_json(c.reloptions)::text AS reloptions,
           pg_get_expr(i.indpred, i.indrelid) AS where_clause
         FROM pg_class c
         JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -319,7 +323,7 @@ module ParadeDB
       name = row["index_name"]
 
       key_field = extract_paradedb_key_field(indexdef)
-      index_options = extract_paradedb_index_options(indexdef)
+      index_options = extract_paradedb_index_options(row["reloptions"])
       fields_sql = extract_paradedb_fields_sql(indexdef)
       where = normalize_paradedb_where_clause(row["where_clause"])
 
@@ -369,27 +373,30 @@ module ParadeDB
       nil
     end
 
-    def extract_paradedb_index_options(indexdef)
-      with_sql, = extract_paradedb_with_components(indexdef)
-      options = {}
-      split_sql_arguments(with_sql).each do |argument|
-        key, value_sql = split_assignment(argument)
-        next if key.nil?
-        next if key == "key_field"
+    def extract_paradedb_index_options(reloptions)
+      paradedb_reloption_entries(reloptions).each_with_object({}) do |entry, options|
+        key, separator, value = entry.to_s.partition("=")
+        next if separator.empty?
 
         case key
-        when "target_segment_count"
-          parsed = parse_sql_literal(value_sql)
-          if parsed.is_a?(Integer)
-            options[:target_segment_count] = parsed
-          elsif parsed.is_a?(String) && parsed.match?(/\A\d+\z/)
-            options[:target_segment_count] = parsed.to_i
-          end
+        when "target_segment_count", "training_samples_per_centroid", "cluster_replication"
+          parsed = Integer(value, 10, exception: false)
+          options[key.to_sym] = parsed if parsed
+        when "centroid_ratio"
+          parsed = Float(value, exception: false)
+          options[:centroid_ratio] = parsed if parsed
         end
       end
-      options
-    rescue
-      {}
+    end
+
+    def paradedb_reloption_entries(reloptions)
+      case reloptions
+      when Array then reloptions
+      when String then Array(JSON.parse(reloptions))
+      else []
+      end
+    rescue JSON::ParserError
+      []
     end
 
     def extract_paradedb_fields_sql(indexdef)
@@ -408,27 +415,6 @@ module ParadeDB
       raise "Found invalid index definition `#{indexdef}`" if depth != 0
 
       indexdef[start..pos - 2]
-    end
-
-    def extract_paradedb_with_components(indexdef)
-      match = indexdef.match(/WITH\s*\(/im)
-      start = match.end(0)
-      depth = 1
-      pos = start
-      while pos < indexdef.length && depth > 0
-        case indexdef[pos]
-        when "(" then depth += 1
-        when ")" then depth -= 1
-        end
-        pos += 1
-      end
-      raise "Found invalid index definition `#{indexdef}`" if depth != 0
-
-      with_sql = indexdef[start..pos - 2]
-      trailing_sql = indexdef[pos..]&.strip
-      trailing_sql = nil if trailing_sql == ""
-
-      [with_sql, trailing_sql]
     end
 
     def normalize_paradedb_where_clause(where)

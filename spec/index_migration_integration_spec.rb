@@ -678,6 +678,32 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     drop_mock_items!
   end
 
+  it "round-trips vector index build options through the schema dumper" do
+    create_mock_items!
+
+    conn = ActiveRecord::Base.connection
+    conn.add_paradedb_index(
+      :mock_items,
+      fields: { id: {}, description: {}, embedding: { metric: :cosine } },
+      key_field: :id,
+      index_options: { centroid_ratio: 0.01, training_samples_per_centroid: 32, cluster_replication: 1 }
+    )
+
+    add_stmt = dump_schema.each_line.find do |line|
+      line.include?("add_paradedb_index :mock_items")
+    end
+
+    assert_equal <<~RUBY.strip, add_stmt.to_s.strip
+      add_paradedb_index :mock_items, fields: { id: {}, description: {}, embedding: { metric: :cosine } }, key_field: :id, name: "mock_items_search_idx", index_options: { :centroid_ratio => 0.01, :training_samples_per_centroid => 32, :cluster_replication => 1 }
+    RUBY
+
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+    expect { conn.instance_eval(add_stmt.strip) }.not_to raise_error
+    assert index_exists?("mock_items_search_idx")
+  ensure
+    drop_mock_items!
+  end
+
   private
 
   def postgresql?
