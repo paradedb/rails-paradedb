@@ -36,17 +36,17 @@
 
 ## ParadeDB for Rails
 
-The official [ActiveRecord](https://guides.rubyonrails.org/active_record_basics.html) integration for [ParadeDB](https://paradedb.com) (powered by the [`pg_search`](https://github.com/paradedb/paradedb) Postgres extension), including first-class support for managing ParadeDB indexes and running queries using the full ParadeDB API. The integration covers both full-text search and [vector search](https://docs.paradedb.com/documentation/vector/overview) over pgvector `vector` types. Follow the [getting started guide](https://docs.paradedb.com/documentation/getting-started/environment#rails) to begin.
+The official [ActiveRecord](https://guides.rubyonrails.org/active_record_basics.html) integration for [ParadeDB](https://paradedb.com) (powered by the [`pg_search`](https://github.com/paradedb/paradedb) Postgres extension), including first-class support for managing ParadeDB indexes and running queries using the full ParadeDB API. The integration covers both [full-text search](https://docs.paradedb.com/documentation/full-text/overview) and [vector search](https://docs.paradedb.com/documentation/vector/overview) over pgvector `vector` types. Follow the [getting started guide](https://docs.paradedb.com/documentation/getting-started/environment#rails) to begin.
 
 ## Requirements & Compatibility
 
-| Component  | Supported                                                         |
-| ---------- | ----------------------------------------------------------------- |
-| Ruby       | 3.2+                                                              |
-| Rails      | 7.2+                                                              |
-| ParadeDB   | 0.25.0+                                                           |
-| PostgreSQL | 15+ (with ParadeDB extension)                                     |
-| pgvector   | Required for vector search; included in the ParadeDB Docker image |
+| Component  | Supported                                                          |
+| ---------- | ------------------------------------------------------------------ |
+| Ruby       | 3.2+                                                               |
+| Rails      | 7.2+                                                               |
+| ParadeDB   | 0.25.0+                                                            |
+| PostgreSQL | 15+ (with ParadeDB extension)                                      |
+| pgvector   | Required for vector search (included in the ParadeDB Docker image) |
 
 ## Examples
 
