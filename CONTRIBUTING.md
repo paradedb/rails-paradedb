@@ -56,7 +56,7 @@ To run a subset of tests, pass a spec file:
 bash scripts/run_unit_tests.sh spec/user_api_unit_spec.rb
 ```
 
-The integration script starts a ParadeDB container via Docker and sets `DATABASE_URL` automatically. The default container is `rails-paradedb` on port `5432`. Each ParadeDB ORM integration uses its own container name, so a container from another repo is never reused by mistake. They all bind port `5432`, so stop one before starting another.
+The integration script starts a ParadeDB container via Docker and sets `DATABASE_URL` automatically.
 
 Some integration tests require newer pg_search versions and are skipped automatically if the feature is not available.
 
