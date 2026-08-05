@@ -2,8 +2,9 @@
 #
 # run_examples.sh
 #
-# Runs every example against a local ParadeDB instance. Starts the container via
-# scripts/run_paradedb.sh unless DATABASE_URL is already set.
+# Runs every example against a local ParadeDB instance and asserts that each one
+# produced its expected output. Starts the container via scripts/run_paradedb.sh
+# unless DATABASE_URL is already set.
 
 set -euo pipefail
 
@@ -17,29 +18,34 @@ fi
 
 export BUNDLE_GEMFILE="${ROOT}/examples/Gemfile"
 
+# Each entry is "<script>|<string the output must contain>". The assertion keeps
+# a silently broken example from passing just because it exited 0.
 examples=(
-  "quickstart/quickstart.rb"
-  "vector_search/setup.rb"
-  "vector_search/vector_search.rb"
-  "faceted_search/faceted_search.rb"
-  "hybrid_rrf/setup.rb"
-  "hybrid_rrf/hybrid_rrf.rb"
+  "examples/quickstart/quickstart.rb|rails-paradedb Quickstart Example"
+  "examples/vector_search/setup.rb|Vector Search Setup - Loading mock_items Table"
+  "examples/vector_search/vector_search.rb|rails-paradedb Vector Search Example"
+  "examples/faceted_search/faceted_search.rb|rails-paradedb Faceted Search Example"
+  "examples/hybrid_rrf/setup.rb|Hybrid Search Setup"
+  "examples/hybrid_rrf/hybrid_rrf.rb|Hybrid Search with Reciprocal Rank Fusion (single SQL query)"
+  # The RAG example runs without OPENROUTER_API_KEY: retrieval still executes
+  # and only the generation step is skipped, so the retrieval path stays covered.
+  "examples/rag/rag.rb|RAG with rails-paradedb"
+  "examples/autocomplete/setup.rb|Autocomplete Setup - Creating Dedicated Table"
+  "examples/autocomplete/autocomplete.rb|rails-paradedb Autocomplete Example"
+  "examples/more_like_this/more_like_this.rb|rails-paradedb MoreLikeThis Example"
 )
 
-if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
-  examples+=("rag/rag.rb")
-else
-  echo "OPENROUTER_API_KEY is not set, skipping the RAG example." >&2
-fi
+for entry in "${examples[@]}"; do
+  script="${entry%%|*}"
+  expected="${entry##*|}"
 
-examples+=(
-  "autocomplete/setup.rb"
-  "autocomplete/autocomplete.rb"
-  "more_like_this/more_like_this.rb"
-)
-
-for example in "${examples[@]}"; do
   echo
-  echo "==> Running ${example}"
-  bundle exec ruby "examples/${example}"
+  echo "==> Running ${script}"
+  output="$(bundle exec ruby "${script}")"
+  echo "${output}"
+
+  if ! printf '%s' "${output}" | grep -F "${expected}" >/dev/null; then
+    echo "Expected output not found in ${script}: ${expected}" >&2
+    exit 1
+  fi
 done

@@ -66,7 +66,7 @@ BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/hybrid_rrf/hybrid_rrf.
 
 A small question-answering flow. Retrieves products by combining full-text search with `nearest` vector retrieval, then sends the context to an LLM so answers are grounded in your own data.
 
-Requires an [OpenRouter](https://openrouter.ai/) API key:
+Retrieval runs without any configuration. Set an [OpenRouter](https://openrouter.ai/) API key to enable the generation step:
 
 ```bash
 export OPENROUTER_API_KEY=sk-...

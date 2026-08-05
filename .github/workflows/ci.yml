@@ -150,26 +150,8 @@ jobs:
         if: matrix.ruby-version == '3.3' && matrix.rails-version == '8.1'
         env:
           DATABASE_URL: ${{ env.PARADEDB_TEST_DSN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           set -euo pipefail
           BUNDLE_GEMFILE=examples/Gemfile bundle install --jobs 4 --retry 3
-
-          run_example() {
-            local script="$1"
-            local expected="$2"
-
-            echo "Running ${script}"
-            output="$(BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby "${script}")"
-            echo "${output}"
-            echo "${output}" | grep -F "${expected}" >/dev/null
-          }
-
-          run_example examples/quickstart/quickstart.rb "rails-paradedb Quickstart Example"
-          run_example examples/vector_search/setup.rb "Vector Search Setup - Loading mock_items Table"
-          run_example examples/vector_search/vector_search.rb "rails-paradedb Vector Search Example"
-          run_example examples/autocomplete/setup.rb "Autocomplete Setup - Creating Dedicated Table"
-          run_example examples/autocomplete/autocomplete.rb "rails-paradedb Autocomplete Example"
-          run_example examples/more_like_this/more_like_this.rb "rails-paradedb MoreLikeThis Example"
-          run_example examples/faceted_search/faceted_search.rb "rails-paradedb Faceted Search Example"
-          run_example examples/hybrid_rrf/setup.rb "Hybrid Search Setup"
-          run_example examples/hybrid_rrf/hybrid_rrf.rb "Hybrid Search with Reciprocal Rank Fusion (single SQL query)"
+          scripts/run_examples.sh
