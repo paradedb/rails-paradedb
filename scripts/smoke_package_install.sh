@@ -43,5 +43,5 @@ unless node.is_a?(Arel::Nodes::InfixOperation) && node.operator.to_s == "&&&"
   abort("Generated node is not a ParadeDB match infix operation")
 end
 
-puts "✅ Gem smoke install passed for rails-paradedb #{ParadeDB::VERSION}"
+puts "✅ Package smoke install passed for rails-paradedb #{ParadeDB::VERSION}"
 RUBY
