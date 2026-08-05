@@ -49,9 +49,9 @@ jobs:
           ruby-version: .ruby-version
           bundler-cache: true
 
-      - name: Validate version and release state
+      - name: Validate version
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
@@ -81,7 +81,7 @@ jobs:
           echo "VERSION=${VERSION}" >> "${GITHUB_ENV}"
           echo "Version validation passed for ${VERSION}"
 
-      - name: Build gem
+      - name: Build package
         run: |
           set -euo pipefail
           gem build rails-paradedb.gemspec
@@ -107,16 +107,29 @@ jobs:
 
           gem push "rails-paradedb-${VERSION}.gem"
 
-      - name: Create GitHub tag and release
+      - name: Determine if latest
+        id: latest
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          LATEST=$(gh release list --jq '.[] | select(.isLatest == true) | .name' --json=name,isLatest | sed 's/^v//' || echo "0.0.0")
+          if npx --yes semver -r ">${LATEST:-0.0.0}" "${VERSION}"; then
+            echo "is_latest=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_latest=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ env.VERSION }}
           target_commitish: ${{ github.sha }}
           prerelease: ${{ github.event.inputs.beta }}
+          make_latest: ${{ steps.latest.outputs.is_latest }}
           generate_release_notes: true
           files: rails-paradedb-${{ env.VERSION }}.gem
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Summary
         run: |
