@@ -25,9 +25,6 @@ end
 
 def semantic_ranked_cte(query_embedding, top_k:)
   distance = MockItem.paradedb_arel.cosine_distance(:embedding, query_embedding)
-  # nearest() orders by the index metric and adds `key_field @@@ pdb.all()`.
-  # That predicate is required: without a @@@ predicate the index cannot serve
-  # the query and Postgres falls back to a sequential scan.
   semantic_source = MockItem.nearest(:embedding, query_embedding)
                             .select(MockItem.arel_table[:id], distance.as("neighbor_distance"))
                             .limit(top_k)
