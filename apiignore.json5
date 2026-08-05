@@ -2,7 +2,6 @@
   "_comment": "Symbols present in the pg_search schema that rails-paradedb intentionally does not wrap. Remove an entry here when you add it to api.json. Sections can be either a flat list or grouped object of lists.",
 
   "operators": [
-    "##>"
   ],
 
   "functions": [
@@ -254,11 +253,7 @@
     "pdb.proximity_in_order",
 
     "pdb.term",
-    "pdb.regex_phrase",
-    "pdb.range_term",
     "pdb.proximity",
-    "pdb.prox_regex",
-    "pdb.prox_array",
     "pdb.empty",
     "pdb.fuzzy_term",
     "pdb.parse_with_field",
