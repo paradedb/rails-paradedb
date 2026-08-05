@@ -27,8 +27,6 @@ examples=(
   "examples/faceted_search/faceted_search.rb|rails-paradedb Faceted Search Example"
   "examples/hybrid_rrf/setup.rb|Hybrid Search Setup"
   "examples/hybrid_rrf/hybrid_rrf.rb|Hybrid Search with Reciprocal Rank Fusion (single SQL query)"
-  # The RAG example runs without OPENROUTER_API_KEY: retrieval still executes
-  # and only the generation step is skipped, so the retrieval path stays covered.
   "examples/rag/rag.rb|RAG with rails-paradedb"
   "examples/autocomplete/setup.rb|Autocomplete Setup - Creating Dedicated Table"
   "examples/autocomplete/autocomplete.rb|rails-paradedb Autocomplete Example"
