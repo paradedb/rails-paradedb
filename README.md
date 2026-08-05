@@ -45,7 +45,7 @@ The official [ActiveRecord](https://guides.rubyonrails.org/active_record_basics.
 | Ruby       | 3.2+                                                               |
 | Rails      | 7.2+                                                               |
 | ParadeDB   | 0.25.0+                                                            |
-| PostgreSQL | 15+ (with ParadeDB extension)                                      |
+| PostgreSQL | 15+ (with the ParadeDB pg_search extension)                        |
 | pgvector   | Required for vector search (included in the ParadeDB Docker image) |
 
 ## Examples
@@ -54,7 +54,7 @@ The official [ActiveRecord](https://guides.rubyonrails.org/active_record_basics.
 - [Vector Search](examples/vector_search/vector_search.rb)
 - [Faceted Search](examples/faceted_search/faceted_search.rb)
 - [Hybrid Search (RRF)](examples/hybrid_rrf/hybrid_rrf.rb)
-- [RAG](examples/rag/rag.rb)
+- [Retrieval-Augmented Generation (RAG)](examples/rag/rag.rb)
 - [Autocomplete](examples/autocomplete/autocomplete.rb)
 - [More Like This](examples/more_like_this/more_like_this.rb)
 
