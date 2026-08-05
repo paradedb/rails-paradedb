@@ -15,6 +15,9 @@ repos:
       - id: check-symlinks
       - id: check-yaml
       - id: check-json
+      - id: check-ast
+      - id: check-docstring-first
+      - id: debug-statements
       - id: check-executables-have-shebangs
       - id: check-shebang-scripts-are-executable
       - id: check-vcs-permalinks
@@ -34,6 +37,7 @@ repos:
     hooks:
       - id: codespell
         args: ["--config", ".codespellrc", "--check-filenames"]
+        exclude: ^(Gemfile\.lock|gemfiles/)
 
   - repo: local
     hooks:

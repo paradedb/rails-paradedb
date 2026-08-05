@@ -51,3 +51,13 @@
 /rdoc
 /.yardoc
 /_yardoc
+
+# Editors
+.vscode/
+*.swo
+
+# OS
+Thumbs.db
+
+# Agent tooling
+.claude/
