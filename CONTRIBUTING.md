@@ -35,7 +35,7 @@ cd rails-paradedb
 bundle install
 
 # Install prek hooks
-prek install -f
+uvx prek install
 ```
 
 ### Running Tests
@@ -56,7 +56,7 @@ To run a subset of tests, pass a spec file:
 bash scripts/run_unit_tests.sh spec/user_api_unit_spec.rb
 ```
 
-The integration script starts a ParadeDB container via Docker and sets `DATABASE_URL` automatically.
+The integration script starts a ParadeDB container via Docker and sets `DATABASE_URL` automatically. The default container is `rails-paradedb` on port `5432`.
 
 Some integration tests require newer pg_search versions and are skipped automatically if the feature is not available.
 
@@ -67,8 +67,8 @@ Some integration tests require newer pg_search versions and are skipped automati
 bundle exec rubocop --lint
 
 # Pre-commit hooks (markdownlint, codespell, etc.)
-prek install -f
-prek run --all-files
+uvx prek install
+uvx prek run --all-files
 ```
 
 If you change Ruby code, keep style consistent with existing files and tests.
@@ -89,7 +89,7 @@ All changes to rails-paradedb happen through GitHub Pull Requests. Here is the r
 1. Before working on a change, please check if there is already a GitHub issue open for it.
 2. If there is not, please open an issue first. This gives the community visibility into your work and allows others to make suggestions and leave comments.
 3. Fork the rails-paradedb repo and branch out from the `main` branch.
-4. Install [prek](https://prek.j178.dev/quickstart/#already-using-pre-commit) hooks within your fork with `prek install -f` to ensure code quality and consistency with upstream.
+4. Install [prek](https://prek.j178.dev/quickstart/#already-using-pre-commit) hooks within your fork with `uvx prek install` to ensure code quality and consistency with upstream.
 5. Make your changes. If you've added new functionality, please add tests. We will not merge a feature without appropriate tests.
 6. Open a pull request towards the `main` branch. Ensure that all tests and checks pass. Note that the rails-paradedb repository has pull request title linting in place and follows the [Conventional Commits spec](https://www.conventionalcommits.org/).
 7. Congratulations! Our team will review your pull request.
