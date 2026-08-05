@@ -53,10 +53,10 @@ The official [ActiveRecord](https://guides.rubyonrails.org/active_record_basics.
 - [Quickstart](examples/quickstart/quickstart.rb)
 - [Vector Search](examples/vector_search/vector_search.rb)
 - [Faceted Search](examples/faceted_search/faceted_search.rb)
-- [Autocomplete](examples/autocomplete/autocomplete.rb)
-- [More Like This](examples/more_like_this/more_like_this.rb)
 - [Hybrid Search (RRF)](examples/hybrid_rrf/hybrid_rrf.rb)
 - [RAG](examples/rag/rag.rb)
+- [Autocomplete](examples/autocomplete/autocomplete.rb)
+- [More Like This](examples/more_like_this/more_like_this.rb)
 
 See [examples/README.md](examples/README.md) for setup instructions and a description of each example.
 

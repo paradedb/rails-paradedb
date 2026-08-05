@@ -22,9 +22,6 @@ examples=(
   "vector_search/setup.rb"
   "vector_search/vector_search.rb"
   "faceted_search/faceted_search.rb"
-  "autocomplete/setup.rb"
-  "autocomplete/autocomplete.rb"
-  "more_like_this/more_like_this.rb"
   "hybrid_rrf/setup.rb"
   "hybrid_rrf/hybrid_rrf.rb"
 )
@@ -34,6 +31,12 @@ if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
 else
   echo "OPENROUTER_API_KEY is not set, skipping the RAG example." >&2
 fi
+
+examples+=(
+  "autocomplete/setup.rb"
+  "autocomplete/autocomplete.rb"
+  "more_like_this/more_like_this.rb"
+)
 
 for example in "${examples[@]}"; do
   echo

@@ -51,23 +51,6 @@ Builds an e-commerce-style filter sidebar. Computes the top K rows and facet buc
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/faceted_search/faceted_search.rb
 ```
 
-## Autocomplete (`autocomplete/autocomplete.rb`)
-
-As-you-type suggestions using n-gram tokenization, which matches substrings in the middle of words — typing `wir` matches `wireless`.
-
-```bash
-BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/autocomplete/setup.rb
-BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/autocomplete/autocomplete.rb
-```
-
-## More Like This (`more_like_this/more_like_this.rb`)
-
-"Related content" recommendations. Finds documents with similar keywords using TF-IDF logic, without requiring vector embeddings.
-
-```bash
-BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/more_like_this/more_like_this.rb
-```
-
 ## Hybrid Search (RRF) (`hybrid_rrf/hybrid_rrf.rb`)
 
 Combines BM25 keyword search (good for exact matches like part numbers) with vector similarity (good for meaning) using Reciprocal Rank Fusion. Composes a ParadeDB BM25 relation with a semantic relation via CTEs, using the native vector distance helpers.
@@ -88,4 +71,21 @@ Requires an [OpenRouter](https://openrouter.ai/) API key:
 ```bash
 export OPENROUTER_API_KEY=sk-...
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/rag/rag.rb
+```
+
+## Autocomplete (`autocomplete/autocomplete.rb`)
+
+As-you-type suggestions using n-gram tokenization, which matches substrings in the middle of words — typing `wir` matches `wireless`.
+
+```bash
+BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/autocomplete/setup.rb
+BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/autocomplete/autocomplete.rb
+```
+
+## More Like This (`more_like_this/more_like_this.rb`)
+
+"Related content" recommendations. Finds documents with similar keywords using TF-IDF logic, without requiring vector embeddings.
+
+```bash
+BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/more_like_this/more_like_this.rb
 ```
