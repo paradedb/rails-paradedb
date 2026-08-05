@@ -25,9 +25,8 @@ end
 
 def semantic_ranked_cte(query_embedding, top_k:)
   distance = MockItem.paradedb_arel.cosine_distance(:embedding, query_embedding)
-  semantic_source = MockItem.where.not(embedding: nil)
+  semantic_source = MockItem.nearest(:embedding, query_embedding)
                             .select(MockItem.arel_table[:id], distance.as("neighbor_distance"))
-                            .order(distance.asc)
                             .limit(top_k)
 
   MockItem.from(semantic_source, :semantic_source)
