@@ -16,6 +16,7 @@
     "FN_MORE_LIKE_THIS":   "pdb.more_like_this",
     "FN_EXISTS":           "pdb.exists",
     "FN_RANGE":            "pdb.range",
+    "FN_RANGE_TERM":       "pdb.range_term",
     "FN_TERM_SET":         "pdb.term_set",
 
     "FN_SCORE":            "pdb.score",
@@ -50,6 +51,6 @@
     "PDB_TYPE_TOKENIZER_UNICODE_WORDS":      "pdb.unicode_words",
     "PDB_TYPE_TOKENIZER_WHITESPACE":         "pdb.whitespace",
     "PDB_TYPE_TOKENIZER_ICU":                "pdb.icu",
-    "PDB_TYPE_TOKENIZER_EDGE_NGRAM":         "pdb.edge_ngram",
+    "PDB_TYPE_TOKENIZER_EDGE_NGRAM":         "pdb.edge_ngram"
   }
 }

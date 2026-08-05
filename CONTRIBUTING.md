@@ -1,105 +1,110 @@
 # Contributing to rails-paradedb
 
-Thanks for your interest in contributing to `rails-paradedb`.
+Welcome! We're excited that you're interested in contributing to rails-paradedb and want to make the process as smooth as possible.
 
 ## Technical Info
 
-Before opening a PR, please read this guide for workflow and quality expectations.
-If anything is unclear, ask in the ParadeDB Slack community.
+Before submitting a pull request, please review this document, which outlines what conventions to follow when submitting changes. If you have any questions not covered in this document, please reach out to us in the [ParadeDB Community Slack](https://paradedb.com/slack) or via [email](mailto:support@paradedb.com).
 
-### Selecting Issues
+### Selecting GitHub Issues
 
-External contributions should be linked to a GitHub issue.
-If no issue exists for your bug/feature, please open one first.
+All external contributions should be associated with a GitHub issue. If there is no open issue for the bug or feature that you'd like to work on, please open one first. When selecting an issue to work on, we recommend focusing on issues labeled `good first issue`.
 
-Good starter issues are usually labeled `good first issue`.
-Ideal issues for external contributors are well-scoped changes that are less
-likely to conflict with core roadmap work. We welcome small documentation
-contributions that accompany a feature, correct wrong information, or fix
-typos, but we do not accept generic "documentation improvement" PRs.
+Ideal issues for external contributors include well-scoped, individual features as those are less likely to conflict with our general development process. We welcome documentation contributions that accompany a feature, correct wrong information, improve clarity, or fix typos.
 
-### Claiming Issues
+### Claiming GitHub Issues
 
-This repository supports self-assignment:
+This repository has a workflow to assign issues to new contributors automatically. This ensures that you don't need approval from a maintainer to pick an issue.
 
-1. Confirm the issue is unassigned and not already being worked on.
-2. Comment `/take` to assign it to yourself.
+1. Before claiming an issue, ensure that:
+   - It's not already assigned to someone else.
+   - There are no comments indicating ongoing work.
 
-If you can no longer work on it, remove yourself from assignees.
+2. To claim an unassigned issue, comment `/take` on the issue. This will automatically assign the issue to you.
+
+If you find yourself unable to make progress, don't hesitate to seek help in the issue comments or the [ParadeDB Community Slack](https://paradedb.com/slack). If you no longer wish to work on the issue(s) you self-assigned, please remove yourself from the Assignees list in the sidebar to release it.
 
 ### Development Setup
+
+rails-paradedb is a Ruby gem that provides ActiveRecord integration for ParadeDB. Development is done with `bundler`, which keeps Ruby dependencies aligned between local work and CI.
 
 ```bash
 git clone https://github.com/paradedb/rails-paradedb.git
 cd rails-paradedb
 
 bundle install
+
+# Install prek hooks
 prek install -f
 ```
 
 ### Running Tests
 
-Unit tests:
+Run the tests to verify every change:
 
 ```bash
+# Unit tests (no database required)
 bash scripts/run_unit_tests.sh
-```
 
-Integration tests (starts ParadeDB via Docker):
-
-```bash
+# Integration tests (requires Docker)
 bash scripts/run_integration_tests.sh
 ```
 
-You can also run one spec file:
+To run a subset of tests, pass a spec file:
 
 ```bash
 bash scripts/run_unit_tests.sh spec/user_api_unit_spec.rb
 ```
 
+The integration script starts a ParadeDB container via Docker and sets `DATABASE_URL` automatically.
+
+Some integration tests require newer pg_search versions and are skipped automatically if the feature is not available.
+
 ### Linting and Formatting
 
-This repository enforces markdown/style checks via `prek` and
-`.pre-commit-config.yaml`.
-Common commands:
-
 ```bash
-prek run --all-files
-prek install -f
+# Ruby linting
 bundle exec rubocop --lint
+
+# Pre-commit hooks (markdownlint, codespell, etc.)
+prek install -f
+prek run --all-files
 ```
 
 If you change Ruby code, keep style consistent with existing files and tests.
-The local `prek` hooks run syntax, typo, markdown, and RuboCop lint checks before commit.
 
 ### API and Packaging Consistency Checks
 
-Run these checks before opening a PR when you change API wrappers or packaging:
+Run these before opening a PR if your change touches SQL wrappers, API constants, packaging, or release metadata:
 
 ```bash
-ruby scripts/check_api_coverage.rb
+uv run --with json5 scripts/check_api_coverage.py
 bash scripts/smoke_gem_install.sh
 ```
 
 ### Pull Request Workflow
 
-1. Ensure your change has an issue.
-2. Branch from `main`.
-3. Add or update tests for behavior changes.
-4. Update docs/examples when public API changes.
-5. Open a PR to `main`.
-6. Ensure CI passes.
+All changes to rails-paradedb happen through GitHub Pull Requests. Here is the recommended flow for making a change:
 
-The repository enforces PR title linting and follows Conventional Commits.
-We will not merge a feature without appropriate tests.
+1. Before working on a change, please check if there is already a GitHub issue open for it.
+2. If there is not, please open an issue first. This gives the community visibility into your work and allows others to make suggestions and leave comments.
+3. Fork the rails-paradedb repo and branch out from the `main` branch.
+4. Install [prek](https://prek.j178.dev/quickstart/#already-using-pre-commit) hooks within your fork with `prek install -f` to ensure code quality and consistency with upstream.
+5. Make your changes. If you've added new functionality, please add tests. We will not merge a feature without appropriate tests.
+6. Open a pull request towards the `main` branch. Ensure that all tests and checks pass. Note that the rails-paradedb repository has pull request title linting in place and follows the [Conventional Commits spec](https://www.conventionalcommits.org/).
+7. Congratulations! Our team will review your pull request.
+
+### Changelog
+
+When you make a change that a user of this project would care about, record it in the `Unreleased` section of [CHANGELOG.md](CHANGELOG.md). If the change is breaking, make sure to denote that.
 
 ### Documentation
 
-If you add a user-facing feature, include docs updates in the same PR:
+If you are adding a new feature that requires new documentation, please add the documentation as part of your pull request. Documentation can be added to:
 
-- `README.md` for public API behavior
-- `examples/` for practical usage
-- inline comments/docstrings when needed for maintainability
+- The main README.md for user-facing features
+- Inline comments for API documentation
+- The `examples/` directory for usage examples
 
 We will not merge a feature without appropriate documentation.
 
@@ -107,24 +112,12 @@ We will not merge a feature without appropriate documentation.
 
 ### Contributor License Agreement
 
-In order for us, ParadeDB, Inc., to accept patches and other contributions
-from you, you need to adopt our ParadeDB Contributor License Agreement (the
-"**CLA**"). The current version of the CLA can be found on the
-[CLA Assistant website](https://cla-assistant.io/paradedb/paradedb).
+In order for us, ParadeDB, Inc., to accept patches and other contributions from you, you need to adopt our ParadeDB Contributor License Agreement (the "**CLA**"). The current version of the CLA can be found on the [CLA Assistant website](https://cla-assistant.io/paradedb/rails-paradedb).
 
-ParadeDB uses a tool called CLA Assistant to help us track contributors' CLA
-status. CLA Assistant will automatically post a comment to your pull request
-indicating whether you have signed the CLA. If you have not signed the CLA, you
-must do so before we can accept your contribution. Signing the CLA is a one-time
-process for this repository, is valid for all future contributions to
-rails-paradedb, and can be done in under a minute by signing in with your
-GitHub account.
+ParadeDB uses a tool called CLA Assistant to help us track contributors' CLA status. CLA Assistant will automatically post a comment to your pull request indicating whether you have signed the CLA. If you have not signed the CLA, you must do so before we can accept your contribution. Signing the CLA is a one-time process for this repository, is valid for all future contributions to rails-paradedb, and can be done in under a minute by signing in with your GitHub account.
 
-If you have any questions about the CLA, please reach out to us in the
-[ParadeDB Community Slack](https://paradedb.com/slack)
-or via email at [legal@paradedb.com](mailto:legal@paradedb.com).
+If you have any questions about the CLA, please reach out to us in the [ParadeDB Community Slack](https://paradedb.com/slack) or via email at [legal@paradedb.com](mailto:legal@paradedb.com).
 
 ### License
 
-By contributing to rails-paradedb, you agree that your contributions will be
-licensed under the [MIT License](LICENSE).
+By contributing to rails-paradedb, you agree that your contributions will be licensed under the [MIT License](LICENSE).

@@ -36,47 +36,45 @@
 
 ## ParadeDB for Rails
 
-The official ActiveRecord integration for [ParadeDB](https://paradedb.com) (powered by the [`pg_search`](https://github.com/paradedb/paradedb) Postgres extension), including first-class support for managing ParadeDB indexes and running queries using the full ParadeDB API. Follow the [getting started guide](https://docs.paradedb.com/documentation/getting-started/environment#rails) to begin.
+The official [ActiveRecord](https://guides.rubyonrails.org/active_record_basics.html) integration for [ParadeDB](https://paradedb.com) (powered by the [`pg_search`](https://github.com/paradedb/paradedb) Postgres extension), including first-class support for managing ParadeDB indexes and running queries using the full ParadeDB API. The integration covers both [full-text search](https://docs.paradedb.com/documentation/full-text/overview) and [vector search](https://docs.paradedb.com/documentation/vector/overview) over pgvector `vector` types. Follow the [getting started guide](https://docs.paradedb.com/documentation/getting-started/environment#rails) to begin.
 
 ## Requirements & Compatibility
 
-| Component  | Supported                                                         |
-| ---------- | ----------------------------------------------------------------- |
-| Ruby       | 3.2+                                                              |
-| Rails      | 7.2+                                                              |
-| ParadeDB   | 0.25.0+                                                           |
-| PostgreSQL | 15+ (PostgreSQL adapter with ParadeDB extension)                  |
-| pgvector   | Required for vector search; included in the ParadeDB Docker image |
-
-## Vector Search
-
-rails-paradedb supports full-text search and vector search over pgvector `vector(n)` columns. See the [vector search documentation](https://docs.paradedb.com/documentation/vector/overview) for details.
+| Component  | Supported                                                          |
+| ---------- | ------------------------------------------------------------------ |
+| Ruby       | 3.2+                                                               |
+| Rails      | 7.2+                                                               |
+| ParadeDB   | 0.25.0+                                                            |
+| PostgreSQL | 15+ (with ParadeDB extension)                                      |
+| pgvector   | Required for vector search (included in the ParadeDB Docker image) |
 
 ## Examples
 
 - [Quickstart](examples/quickstart/quickstart.rb)
 - [Vector Search](examples/vector_search/vector_search.rb)
 - [Faceted Search](examples/faceted_search/faceted_search.rb)
-- [Autocomplete](examples/autocomplete/autocomplete.rb)
-- [More Like This](examples/more_like_this/more_like_this.rb)
 - [Hybrid Search (RRF)](examples/hybrid_rrf/hybrid_rrf.rb)
 - [RAG](examples/rag/rag.rb)
+- [Autocomplete](examples/autocomplete/autocomplete.rb)
+- [More Like This](examples/more_like_this/more_like_this.rb)
+
+See [examples/README.md](examples/README.md) for setup instructions and a description of each example.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, test commands, linting, and PR workflow.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, running tests, linting, and the PR workflow.
 
 ## Support
 
-If you're missing a feature or have found a bug, open a
+If you're missing a feature or have found a bug, please open a
 [GitHub Issue](https://github.com/paradedb/rails-paradedb/issues/new/choose).
 
-For community support:
+To get community support, you can:
 
-- Join the [ParadeDB Slack Community](https://paradedb.com/slack)
-- Ask in [ParadeDB Discussions](https://github.com/paradedb/paradedb/discussions)
+- Post a question in the [ParadeDB Slack Community](https://paradedb.com/slack)
+- Ask for help on our [GitHub Discussions](https://github.com/paradedb/paradedb/discussions)
 
-For commercial support, contact [sales@paradedb.com](mailto:sales@paradedb.com).
+If you need commercial support, please [contact the ParadeDB team](mailto:sales@paradedb.com).
 
 ## Acknowledgments
 
