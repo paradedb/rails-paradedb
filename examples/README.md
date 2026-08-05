@@ -62,7 +62,7 @@ BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/hybrid_rrf/setup.rb
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/hybrid_rrf/hybrid_rrf.rb
 ```
 
-## RAG (`rag/rag.rb`)
+## Retrieval-Augmented Generation (RAG) (`rag/rag.rb`)
 
 A small question-answering flow. Retrieves products by combining full-text search with `nearest` vector retrieval, then sends the context to an LLM so answers are grounded in your own data.
 
