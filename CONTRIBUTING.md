@@ -43,7 +43,10 @@ uvx prek install
 Run the tests to verify every change:
 
 ```bash
-# Unit tests (no database required)
+# Everything
+bash scripts/run_tests.sh
+
+# Unit tests only (no database required)
 bash scripts/run_unit_tests.sh
 
 # Integration tests (requires Docker)
