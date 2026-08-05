@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.11.0] - 2026-08-04
 
 ### Added
 
@@ -174,7 +174,7 @@ All notable changes to this project will be documented in this file. The format 
 - Schema dump/load round-trip for tokenizer configuration and index options
   (including `target_segment_count`)
 
-[Unreleased]: https://github.com/paradedb/rails-paradedb/compare/v0.10.0...HEAD
+[0.11.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.11.0
 [0.10.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.10.0
 [0.9.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.9.0
 [0.8.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.8.0
