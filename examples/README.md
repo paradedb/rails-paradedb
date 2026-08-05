@@ -1,14 +1,8 @@
-# ParadeDB for Rails: Examples & Cookbook
+# Examples
 
-Welcome to the **ParadeDB for Rails** examples. This directory contains
-self-contained scripts that show how to integrate ParadeDB search features into
-your Ruby on Rails / ActiveRecord application.
+Self-contained scripts that show how to use ParadeDB from ActiveRecord. Run them all with `scripts/run_examples.sh`, or follow the setup below and run them one at a time.
 
-Each example folder uses a Rails-like layout:
-
-- `model.rb` for ActiveRecord model definitions
-- `setup.rb` for connection/bootstrap and table/index setup
-- a main script for the demo flow
+Each example folder uses a Rails-like layout: `model.rb` for the ActiveRecord model, `setup.rb` for the connection and table/index setup, and a main script for the demo flow.
 
 ## Getting Started
 
@@ -24,129 +18,74 @@ BUNDLE_GEMFILE=examples/Gemfile bundle install
 source scripts/run_paradedb.sh
 ```
 
-This starts the local ParadeDB Docker container and exports `DATABASE_URL`.
+This starts a ParadeDB container via Docker and exports `DATABASE_URL`. If you already have a Postgres instance with ParadeDB installed, set `DATABASE_URL` yourself instead:
 
-### 3. Run examples
+```bash
+export DATABASE_URL=postgresql://user:password@localhost:5432/dbname
+```
+
+## Quickstart (`quickstart/quickstart.rb`)
+
+The "Hello World" of ParadeDB. Covers keyword search, score ordering, phrase matching, snippets and highlighting, and combining search with ActiveRecord filters.
 
 ```bash
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/quickstart/quickstart.rb
 ```
 
-Structure:
+## Vector Search (`vector_search/vector_search.rb`)
 
-- `examples/quickstart/model.rb`
-- `examples/quickstart/setup.rb`
-- `examples/quickstart/quickstart.rb`
+Top-K nearest-neighbor retrieval over pgvector `vector(n)` columns, using metric opclasses and `nearest` queries. ParadeDB indexes the vector column inside its search index, so one index serves both keyword and vector queries.
 
-## Examples
-
-### Essentials
-
-1. Quickstart (`quickstart/quickstart.rb`)
-
-Core search operations:
-
-- keyword search
-- score ordering
-- phrase matching
-- snippets/highlighting
-- search + ActiveRecord filters
-
-```bash
-BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/quickstart/quickstart.rb
-```
-
-1. Vector Search (`vector_search/`)
-
-Top-K vector search inside the ParadeDB index: `vector(n)` columns, metric
-opclasses, and `nearest` queries. Requires pg_search 0.25.0+.
+Requires the `pgvector` extension, which is included in the ParadeDB Docker image.
 
 ```bash
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/vector_search/setup.rb
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/vector_search/vector_search.rb
 ```
 
-Structure:
+## Faceted Search (`faceted_search/faceted_search.rb`)
 
-- `examples/vector_search/model.rb`
-- `examples/vector_search/setup.rb`
-- `examples/vector_search/vector_search.rb`
-
-1. Faceted Search (`faceted_search/faceted_search.rb`)
-
-Top K rows plus facet buckets in one flow.
+Builds an e-commerce-style filter sidebar. Computes the top K rows and facet buckets together in a single flow.
 
 ```bash
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/faceted_search/faceted_search.rb
 ```
 
-Structure:
+## Autocomplete (`autocomplete/autocomplete.rb`)
 
-- `examples/faceted_search/model.rb`
-- `examples/faceted_search/setup.rb`
-- `examples/faceted_search/faceted_search.rb`
-
-### Smart Features
-
-1. Autocomplete (`autocomplete/`)
-
-Creates an ngram index and runs as-you-type queries.
+As-you-type suggestions using n-gram tokenization, which matches substrings in the middle of words — typing `wir` matches `wireless`.
 
 ```bash
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/autocomplete/setup.rb
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/autocomplete/autocomplete.rb
 ```
 
-Structure:
+## More Like This (`more_like_this/more_like_this.rb`)
 
-- `examples/autocomplete/model.rb`
-- `examples/autocomplete/setup.rb`
-- `examples/autocomplete/autocomplete.rb`
-
-1. More Like This (`more_like_this/more_like_this.rb`)
-
-Recommendation-style search based on document similarity.
+"Related content" recommendations. Finds documents with similar keywords using TF-IDF logic, without requiring vector embeddings.
 
 ```bash
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/more_like_this/more_like_this.rb
 ```
 
-Structure:
+## Hybrid Search (RRF) (`hybrid_rrf/hybrid_rrf.rb`)
 
-- `examples/more_like_this/model.rb`
-- `examples/more_like_this/setup.rb`
-- `examples/more_like_this/more_like_this.rb`
+Combines BM25 keyword search (good for exact matches like part numbers) with vector similarity (good for meaning) using Reciprocal Rank Fusion. Composes a ParadeDB BM25 relation with a semantic relation via CTEs, using the native vector distance helpers.
 
-### Advanced Recipes
-
-1. Hybrid Search with RRF (`hybrid_rrf/`)
-
-Demonstrates Reciprocal Rank Fusion (RRF) by composing a ParadeDB BM25 relation
-with a semantic relation (using the native vector distance helpers) via CTEs.
+Requires the `pgvector` extension, which is included in the ParadeDB Docker image.
 
 ```bash
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/hybrid_rrf/setup.rb
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/hybrid_rrf/hybrid_rrf.rb
 ```
 
-Structure:
+## RAG (`rag/rag.rb`)
 
-- `examples/hybrid_rrf/model.rb`
-- `examples/hybrid_rrf/setup.rb`
-- `examples/hybrid_rrf/hybrid_rrf.rb`
+A small question-answering flow. Retrieves products by combining full-text search with `nearest` vector retrieval, then sends the context to an LLM so answers are grounded in your own data.
 
-1. RAG (`rag/rag.rb`)
-
-Retrieves products by combining full-text search with `nearest` vector
-retrieval, then sends the context to OpenRouter.
+Requires an [OpenRouter](https://openrouter.ai/) API key:
 
 ```bash
 export OPENROUTER_API_KEY=sk-...
 BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/rag/rag.rb
 ```
-
-Structure:
-
-- `examples/rag/model.rb`
-- `examples/rag/setup.rb`
-- `examples/rag/rag.rb`

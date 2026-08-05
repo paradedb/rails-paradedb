@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file. The format 
 
 - Vector index build options `centroid_ratio`, `training_samples_per_centroid`, and `cluster_replication` in `ParadeDB::Index` `index_options` and `add_paradedb_index` (pg_search 0.25.0+). They are emitted in the `WITH (...)` clause and round-tripped through the schema dumper.
 
-[0.10.0] - 2026-08-04
+## [0.10.0] - 2026-08-04
 
 ### Added
 
@@ -24,7 +24,7 @@ All notable changes to this project will be documented in this file. The format 
 - **BREAKING**: Index creation always emits `USING paradedb`, which requires pg_search 0.25.0+. There is no option to select the legacy `bm25` access method.
 - **BREAKING**: The default index name is now `<table>_search_idx` (previously `<table>_bm25_idx`), and the index generator emits `Create<Model>SearchIndex` migrations named `create_<table>_search_index.rb`.
 
-[0.9.0] - 2026-07-14
+## [0.9.0] - 2026-07-14
 
 ### Added
 
