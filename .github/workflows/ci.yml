@@ -61,8 +61,8 @@ jobs:
       - name: Check API coverage
         run: uv run --with json5 scripts/check_api_coverage.py
 
-      - name: Gem install smoke test
-        run: bash scripts/smoke_gem_install.sh
+      - name: Package install smoke test
+        run: bash scripts/smoke_package_install.sh
 
   matrix-tests:
     name: Ruby ${{ matrix.ruby-version }} / Rails ${{ matrix.rails-version }}

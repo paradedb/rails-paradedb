@@ -79,7 +79,7 @@ Run these before opening a PR if your change touches SQL wrappers, API constants
 
 ```bash
 uv run --with json5 scripts/check_api_coverage.py
-bash scripts/smoke_gem_install.sh
+bash scripts/smoke_package_install.sh
 ```
 
 ### Pull Request Workflow
