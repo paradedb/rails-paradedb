@@ -43,12 +43,6 @@ RSpec.describe "PostgreSQLGuardUnitTest" do
     error = assert_raises(ParadeDB::UnsupportedAdapterError) { GuardProduct.search(:description) }
     assert_includes error.message, "PostgreSQL"
   end
-  it "model paradedb arel rejects non postgresql" do
-    GuardProduct._mock_adapter_name = "SQLite"
-
-    error = assert_raises(ParadeDB::UnsupportedAdapterError) { GuardProduct.paradedb_arel }
-    assert_includes error.message, "PostgreSQL"
-  end
   it "relation search methods reject non postgresql" do
     GuardProduct._mock_adapter_name = "SQLite"
 

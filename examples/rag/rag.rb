@@ -18,7 +18,7 @@ def retrieve(query)
   return [] if terms.empty?
 
   query_embedding = RagSetup.query_embedding_for(query)
-  distance = MockItem.paradedb_arel.l2_distance(:embedding, query_embedding)
+  distance = MockItem.l2_distance(:embedding, query_embedding)
 
   MockItem.search(:description)
           .match_any(terms.join(" "))

@@ -83,11 +83,11 @@ RSpec.describe "GuardsUnitTest" do
   end
 
   # ──────────────────────────────────────────────
-  # 2. Numeric parameter validation (Builder)
+  # 2. Numeric parameter validation
   # ──────────────────────────────────────────────
 
   def builder
-    @builder ||= ParadeDB::Arel::Builder.new(:products)
+    @builder ||= GuardTestProduct.search(:description).send(:builder)
   end
   it "match boost rejects non numeric" do
     error = assert_raises(ArgumentError) { ParadeDB.boost("shoes", "high") }

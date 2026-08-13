@@ -89,7 +89,7 @@ module ParadeDB
     def builder
       @_paradedb_builder ||= begin
         ensure_paradedb_runtime!
-        ParadeDB::Arel::Builder.new(table_name)
+        QueryBuilder.new(table_name)
       end
     end
 
@@ -459,7 +459,7 @@ module ParadeDB
       return nil unless column
 
       sql_type = column.sql_type.to_s
-      return sql_type if ParadeDB::Arel::Builder::RANGE_TYPES.include?(sql_type)
+      return sql_type if QueryBuilder::RANGE_TYPES.include?(sql_type)
 
       case column.type
       when :integer
@@ -480,7 +480,7 @@ module ParadeDB
       return nil unless column
 
       sql_type = column.sql_type.to_s
-      sql_type if ParadeDB::Arel::Builder::RANGE_TYPES.include?(sql_type)
+      sql_type if QueryBuilder::RANGE_TYPES.include?(sql_type)
     end
 
     def more_like_this_key_value(key, runtime_key_field)
@@ -498,7 +498,6 @@ module ParadeDB
 
     def ensure_paradedb_runtime!
       ParadeDB.ensure_postgresql_adapter!(connection, context: "ParadeDB search")
-      ParadeDB::Arel::Visitor.install!
     end
 
     def grouped(node)
@@ -986,7 +985,7 @@ module ParadeDB
 
         source_alias = "paradedb_agg_source"
         source = predicate_scope.arel.as(source_alias)
-        projection_builder = ParadeDB::Arel::Builder.new(source_alias)
+        projection_builder = QueryBuilder.new(source_alias)
         projections = agg_specs.map do |alias_name, agg_spec|
           agg_node = relation.send(
             :render_aggregation_node,

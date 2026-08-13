@@ -1181,4 +1181,12 @@ RSpec.describe "UserApiUnitTest" do
 
     assert_sql_equal expected, sql
   end
+  it "builds metric-specific vector distance expressions" do
+    assert_includes Product.select(Product.l2_distance(:embedding, [1, 2, 3]).as("distance")).to_sql,
+                    %("products"."embedding" <-> '[1.0,2.0,3.0]'::vector AS distance)
+    assert_includes Product.select(Product.cosine_distance(:embedding, [1, 2, 3]).as("distance")).to_sql,
+                    %("products"."embedding" <=> '[1.0,2.0,3.0]'::vector AS distance)
+    assert_includes Product.select(Product.inner_product(:embedding, [1, 2, 3]).as("distance")).to_sql,
+                    %("products"."embedding" <#> '[1.0,2.0,3.0]'::vector AS distance)
+  end
 end

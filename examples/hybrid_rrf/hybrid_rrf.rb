@@ -24,7 +24,7 @@ def fulltext_ranked_cte(query, top_k:)
 end
 
 def semantic_ranked_cte(query_embedding, top_k:)
-  distance = MockItem.paradedb_arel.cosine_distance(:embedding, query_embedding)
+  distance = MockItem.cosine_distance(:embedding, query_embedding)
   semantic_source = MockItem.nearest(:embedding, query_embedding)
                             .select(MockItem.arel_table[:id], distance.as("neighbor_distance"))
                             .limit(top_k)

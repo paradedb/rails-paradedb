@@ -12,7 +12,7 @@ class ArelBehaviorCategory < ActiveRecord::Base
   self.table_name = :categories
 end
 
-# Integration tests that exercise Arel builder nodes against a real ParadeDB
+# Integration tests that exercise search behavior against a real ParadeDB
 # backend and verify actual row results from the seeded data.
 #
 # Seed data (6 rows):
@@ -22,9 +22,9 @@ end
 #   4 | "budget wired earbuds"       | audio    | 3 | false |  20
 #   5 | "hiking boots waterproof"    | footwear | 4 | true  | 110
 #   6 | "running socks breathable"   | apparel  | 2 | true  |  15
-RSpec.describe "ArelBehaviorIntegrationTest" do
+RSpec.describe "SearchBehaviorIntegrationTest" do
   before do
-    skip "Arel behavior integration tests require PostgreSQL" unless postgresql?
+    skip "search behavior integration tests require PostgreSQL" unless postgresql?
 
     ensure_paradedb_setup!
     seed_products!
@@ -369,88 +369,6 @@ RSpec.describe "ArelBehaviorIntegrationTest" do
 
     error = assert_raises(ParadeDB::FacetQueryError) { rel.to_a }
     assert_includes error.message, "ORDER BY and LIMIT"
-  end
-
-  # ---- Arel builder executed via where(Arel.sql(...)) ----
-  it "arel builder match via where" do
-    builder = ParadeDB::Arel::Builder.new(:products)
-    predicate = builder.match(:description, "running shoes")
-    predicate_sql = ParadeDB::Arel.to_sql(predicate, ArelBehaviorProduct.connection)
-
-    ids = ArelBehaviorProduct.where(Arel.sql(predicate_sql)).order(:id).pluck(:id)
-    assert_equal [1, 2], ids
-  end
-  it "arel builder regex via where" do
-    builder = ParadeDB::Arel::Builder.new(:products)
-    predicate = builder.regex(:description, "run.*")
-    predicate_sql = ParadeDB::Arel.to_sql(predicate, ArelBehaviorProduct.connection)
-
-    ids = ArelBehaviorProduct.where(Arel.sql(predicate_sql)).order(:id).pluck(:id)
-    assert_equal [1, 2, 6], ids
-  end
-  it "arel builder term_set via where" do
-    builder = ParadeDB::Arel::Builder.new(:products)
-    predicate = builder.term_set(:category, %w[audio footwear])
-    predicate_sql = ParadeDB::Arel.to_sql(predicate, ArelBehaviorProduct.connection)
-
-    ids = ArelBehaviorProduct.where(Arel.sql(predicate_sql)).order(:id).pluck(:id)
-    assert_equal [1, 2, 3, 4, 5], ids
-  end
-  it "arel builder boolean composition via where" do
-    builder = ParadeDB::Arel::Builder.new(:products)
-    shoes = builder.match(:description, "shoes")
-    cheap = builder.match(:description, "budget")
-    predicate = shoes.and(cheap.not)
-    predicate_sql = ParadeDB::Arel.to_sql(predicate, ArelBehaviorProduct.connection)
-
-    ids = ArelBehaviorProduct.where(Arel.sql(predicate_sql)).order(:id).pluck(:id)
-    assert_equal [1, 2], ids
-  end
-  it "arel builder or composition via where" do
-    builder = ParadeDB::Arel::Builder.new(:products)
-    wireless = builder.match(:description, "wireless")
-    hiking = builder.match(:description, "hiking")
-    predicate = wireless.or(hiking)
-    predicate_sql = ParadeDB::Arel.to_sql(predicate, ArelBehaviorProduct.connection)
-
-    ids = ArelBehaviorProduct.where(Arel.sql(predicate_sql)).order(:id).pluck(:id)
-    assert_equal [3, 5], ids
-  end
-  it "arel builder more like this with stopwords options via where" do
-    builder = ParadeDB::Arel::Builder.new(:products)
-    predicate = builder.more_like_this(
-      :id,
-      @earbuds_id,
-      fields: [:description],
-      options: { stopwords: %w[wireless earbuds] }
-    )
-    predicate_sql = ParadeDB::Arel.to_sql(predicate, ArelBehaviorProduct.connection)
-
-    ids = ArelBehaviorProduct.where(Arel.sql(predicate_sql)).order(:id).pluck(:id)
-    assert_kind_of Array, ids
-  end
-  it "arel predications more like this with stopwords options via where" do
-    table = ::Arel::Table.new(:products)
-    predicate = table[:id].pdb_more_like_this(
-      @earbuds_id,
-      fields: [:description],
-      options: { stopwords: %w[wireless earbuds] }
-    )
-    predicate_sql = ParadeDB::Arel.to_sql(predicate, ArelBehaviorProduct.connection)
-
-    ids = ArelBehaviorProduct.where(Arel.sql(predicate_sql)).order(:id).pluck(:id)
-    assert_kind_of Array, ids
-  end
-  it "arel builder results match search api" do
-    # Verify Arel builder produces identical results to the high-level API
-    api_ids = search(:description).match_all("running shoes").order(:id).pluck(:id)
-
-    builder = ParadeDB::Arel::Builder.new(:products)
-    predicate = builder.match(:description, "running shoes")
-    predicate_sql = ParadeDB::Arel.to_sql(predicate, ArelBehaviorProduct.connection)
-    arel_ids = ArelBehaviorProduct.where(Arel.sql(predicate_sql)).order(:id).pluck(:id)
-
-    assert_equal api_ids, arel_ids
   end
 
   # ---- Complex real-world patterns ----

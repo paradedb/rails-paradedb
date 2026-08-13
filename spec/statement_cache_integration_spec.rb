@@ -12,7 +12,7 @@ RSpec.describe "StatementCacheIntegrationTest" do
     ensure_paradedb_setup!
   end
   it "arel node identity in ast" do
-    # Verifies that ParadeDB nodes allow Arel ASTs to be compared for equality,
+    # Verifies that ParadeDB query expressions allow relation ASTs to be compared for equality,
     # which is a prerequisite for effective ActiveRecord statement caching.
     rel1 = StatementCacheProduct.search(:description).match_all(ParadeDB.boost("shoes", 2.0))
     rel2 = StatementCacheProduct.search(:description).match_all(ParadeDB.boost("shoes", 2.0))

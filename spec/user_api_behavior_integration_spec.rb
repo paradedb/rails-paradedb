@@ -450,9 +450,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       LIMIT 3
     SQL
 
-    builder = ParadeDB::Arel::Builder.new(:products)
-    predicate_sql = ParadeDB::Arel.to_sql(builder.full_text(:id, "pdb.all()"), BehaviorProduct.connection)
-    relation = BehaviorProduct.where(Arel.sql(predicate_sql)).order(:id).limit(3)
+    relation = BehaviorProduct.where(Arel.sql(%("products"."id" @@@ pdb.all()))).order(:id).limit(3)
 
     assert_ids_match_sql(raw_sql, relation)
   end
@@ -759,9 +757,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
           LIMIT 5
         SQL
 
-        ids = BehaviorMockItem.order(
-          BehaviorMockItem.paradedb_arel.vector_distance(:embedding, query_row.embedding, metric: metric).asc
-        ).limit(5).pluck(:id)
+        ids = BehaviorMockItem.nearest(:embedding, query_row.embedding, metric: metric).limit(5).pluck(:id)
 
         assert_equal ids_from_sql(raw_sql), ids, "metric #{metric}"
         assert_equal query_row.id, ids.first, "metric #{metric}" unless metric == :ip
