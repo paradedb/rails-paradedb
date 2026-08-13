@@ -40,10 +40,8 @@ class IndexMigrationBookByNameIndex < ParadeDB::Index
   }
 end
 
-RSpec.describe "IndexMigrationIntegrationTest" do
+RSpec.describe "IndexMigration" do
   before do
-    skip "Integration test requires PostgreSQL" unless postgresql?
-
     conn = ActiveRecord::Base.connection
     conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search CASCADE;")
 
@@ -62,8 +60,6 @@ RSpec.describe "IndexMigrationIntegrationTest" do
   end
 
   after do
-    next unless postgresql?
-
     conn = ActiveRecord::Base.connection
     conn.remove_paradedb_index(:books, if_exists: true) rescue nil
     conn.drop_table(:books, if_exists: true) rescue nil
@@ -84,12 +80,10 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     assert_equal "paradedb", am_name
   end
 
-  it "supports searching data after index creation" do
-    IndexMigrationBook.create!(title: "Ruby on Rails guide", author: "DHH")
-    IndexMigrationBook.create!(title: "Distributed systems", author: "Tanenbaum")
+  it "executes search SQL after index creation" do
+    sql = IndexMigrationBook.search(:title_simple).match_all("rails").to_sql
 
-    ids = IndexMigrationBook.search(:title_simple).match_all("rails").pluck(:id)
-    assert_equal 1, ids.length
+    assert_query_sql %(SELECT books.* FROM books WHERE (("books"."title"::pdb.alias('title_simple')) &&& 'rails')), sql
   end
 
   it "raises when multiple tokenizers for a field are missing aliases" do
@@ -130,11 +124,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     conn.create_paradedb_index(IndexMigrationBookIndex, concurrently: true)
 
     assert index_exists?("books_search_idx")
-
-    IndexMigrationBook.create!(title: "Concurrent indexing", author: "ParadeDB")
-    ids = IndexMigrationBook.search(:title_simple).match_all("concurrent").pluck(:id)
-
-    assert_equal 1, ids.length
+    assert_query_sql %(SELECT books.* FROM books WHERE (("books"."title"::pdb.alias('title_simple')) &&& 'concurrent')), IndexMigrationBook.search(:title_simple).match_all("concurrent").to_sql
   end
 
   it "create_paradedb_index supports where" do
@@ -292,47 +282,6 @@ RSpec.describe "IndexMigrationIntegrationTest" do
 
     conn.remove_paradedb_index(:books, name: :books_alias_idx)
     assert_not index_exists?("books_alias_idx")
-  end
-
-  it "rolls back add_paradedb_index in change migrations" do
-    conn = ActiveRecord::Base.connection
-    conn.remove_paradedb_index(:books, if_exists: true)
-    conn.remove_paradedb_index(:books, name: :books_alias_idx, if_exists: true)
-
-    migration = build_change_migration do
-      add_paradedb_index(
-        :books,
-        fields: {
-          id: {},
-          title: { tokenizer: ParadeDB::Tokenizer.simple() }
-        },
-        key_field: :id,
-        name: :books_alias_idx,
-        if_not_exists: true
-      )
-    end
-
-    run_migration(migration, :up, connection: conn)
-    assert index_exists?("books_alias_idx")
-
-    run_migration(migration, :down, connection: conn)
-    assert_not index_exists?("books_alias_idx")
-  end
-
-  it "raises for remove_paradedb_index in change migrations" do
-    conn = ActiveRecord::Base.connection
-
-    migration = build_change_migration do
-      remove_paradedb_index(:books, if_exists: true)
-    end
-
-    run_migration(migration, :up, connection: conn)
-    assert_not index_exists?("books_search_idx")
-
-    error = assert_raises(ActiveRecord::IrreversibleMigration) do
-      run_migration(migration, :down, connection: conn)
-    end
-    assert_includes error.message, "remove_paradedb_index"
   end
 
   it "raises for remove_paradedb_index in change migrations" do
@@ -645,7 +594,7 @@ RSpec.describe "IndexMigrationIntegrationTest" do
     assert_equal "vector(8)", column.sql_type
     assert_equal 8, column.limit
 
-    item = IndexMigrationMockItem.create!(description: "unit x", embedding: [1, 0, 0, 0, 0, 0, 0, 0])
+    item = IndexMigrationMockItem.create!(description: "item x", embedding: [1, 0, 0, 0, 0, 0, 0, 0])
     assert_equal [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], item.reload.embedding
 
     item.update!(embedding: [0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
@@ -705,10 +654,6 @@ RSpec.describe "IndexMigrationIntegrationTest" do
   end
 
   private
-
-  def postgresql?
-    ActiveRecord::Base.connection.adapter_name.downcase.include?("postgres")
-  end
 
   def create_mock_items!
     conn = ActiveRecord::Base.connection

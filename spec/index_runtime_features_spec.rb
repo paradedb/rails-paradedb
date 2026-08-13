@@ -2,7 +2,7 @@
 
 require "spec_helper"
 
-RSpec.describe "IndexRuntimeFeaturesUnitTest" do
+RSpec.describe "IndexRuntimeFeatures" do
   before do
     @previous_mode = ParadeDB.index_validation_mode
     ParadeDB.index_validation_mode = :off

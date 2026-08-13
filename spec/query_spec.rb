@@ -2,7 +2,7 @@
 
 require "spec_helper"
 
-RSpec.describe "QueryUnitTest" do
+RSpec.describe "Query" do
   it "builds regex query json" do
     query = ParadeDB::Query.regex("key.*")
 

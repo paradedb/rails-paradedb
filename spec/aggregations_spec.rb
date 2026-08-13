@@ -2,7 +2,7 @@
 
 require "spec_helper"
 
-RSpec.describe "AggregationsUnitTest" do
+RSpec.describe "Aggregations" do
   it "builds named payload with helper specs" do
     payload = ParadeDB::Aggregations.build_named_payload(
       docs: ParadeDB::Aggregations.value_count(:id),

@@ -17,7 +17,7 @@ class GuardProduct < ActiveRecord::Base
   end
 end
 
-RSpec.describe "PostgreSQLGuardUnitTest" do
+RSpec.describe "PostgreSQLGuard" do
   def teardown
     GuardProduct._mock_adapter_name = nil
   end

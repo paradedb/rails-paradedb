@@ -7,9 +7,9 @@ class StatementCacheProduct < ActiveRecord::Base
   self.table_name = :products
 end
 
-RSpec.describe "StatementCacheIntegrationTest" do
-  before do
-    ensure_paradedb_setup!
+RSpec.describe "StatementCache" do
+  before(:context) do
+    setup_test_index
   end
   it "arel node identity in ast" do
     # Verifies that ParadeDB query expressions allow relation ASTs to be compared for equality,
@@ -32,22 +32,5 @@ RSpec.describe "StatementCacheIntegrationTest" do
 
     results = cache.execute([], StatementCacheProduct.connection)
     refute_nil results
-  end
-
-  private
-
-  def ensure_paradedb_setup!
-    return if self.class.instance_variable_get(:@paradedb_setup_done)
-
-    conn = ActiveRecord::Base.connection
-    conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search CASCADE;")
-    conn.execute("DROP INDEX IF EXISTS products_search_idx;")
-    conn.execute(<<~SQL)
-      CREATE INDEX products_search_idx ON products
-      USING paradedb (id, description, category, rating, in_stock, price)
-      WITH (key_field='id');
-    SQL
-
-    self.class.instance_variable_set(:@paradedb_setup_done, true)
   end
 end

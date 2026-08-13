@@ -2,7 +2,7 @@
 
 require "spec_helper"
 
-RSpec.describe "MethodCollisionUnitTest" do
+RSpec.describe "MethodCollision" do
   it "including model does not override an existing search method" do
     klass = Class.new(ActiveRecord::Base) do
       self.table_name = :products

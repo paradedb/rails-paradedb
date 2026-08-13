@@ -134,23 +134,44 @@ end
 def setup_test_schema
   return if defined?($paradedb_schema_loaded) && $paradedb_schema_loaded
 
+  ActiveRecord::Base.connection.execute("CREATE EXTENSION IF NOT EXISTS pg_search CASCADE;")
+
   ActiveRecord::Schema.define do
     suppress_messages do
       create_table :products, force: true do |t|
         t.text :description
         t.text :category
+        t.text :brand
+        t.text :sku
         t.integer :rating
         t.boolean :in_stock
         t.integer :price
+        t.integer :category_id
+        t.datetime :created_at
+        t.datetime :discontinued_at
+        t.int4range :weight_range
+        t.vector :embedding, limit: 3
       end
 
       create_table :categories, force: true do |t|
         t.text :name
+        t.boolean :active
       end
     end
   end
 
+  setup_test_index
+
   $paradedb_schema_loaded = true
+end
+
+def setup_test_index
+  ActiveRecord::Base.connection.execute("DROP INDEX IF EXISTS products_search_idx;")
+  ActiveRecord::Base.connection.execute(<<~SQL)
+    CREATE INDEX products_search_idx ON products
+    USING paradedb (id, description, category, brand, rating, in_stock, price, weight_range, embedding vector_l2_ops)
+    WITH (key_field='id');
+  SQL
 end
 
 establish_test_connection
@@ -167,4 +188,9 @@ end
 
 def assert_sql_equal(expected, actual)
   assert_equal normalize_sql(expected), normalize_sql(actual)
+end
+
+def assert_query_sql(expected, actual)
+  assert_sql_equal expected, actual
+  ActiveRecord::Base.connection.execute(actual)
 end

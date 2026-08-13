@@ -2,7 +2,7 @@
 
 require "spec_helper"
 
-RSpec.describe "IndexDslUnitTest" do
+RSpec.describe "IndexDsl" do
   it "compiles structured hash fields with index_options" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :products
