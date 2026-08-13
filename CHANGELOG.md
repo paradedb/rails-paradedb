@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-08-13
+
 ### Changed
 
 - **BREAKING**: Search modifiers are now composable functions: `ParadeDB.boost`, `ParadeDB.constant`, `ParadeDB.fuzzy`, `ParadeDB.slop`, and `ParadeDB.tokenize`. Pass the wrapped value to search methods instead of using modifier keyword arguments.
@@ -181,6 +183,7 @@ All notable changes to this project will be documented in this file. The format 
 - Schema dump/load round-trip for tokenizer configuration and index options
   (including `target_segment_count`)
 
+[0.12.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.12.0
 [0.11.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.11.0
 [0.10.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.10.0
 [0.9.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.9.0
