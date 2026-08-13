@@ -50,7 +50,7 @@ bash scripts/run_tests.sh
 To run a subset of tests, pass a spec file:
 
 ```bash
-bash scripts/run_tests.sh spec/user_api_spec.rb
+bash scripts/run_tests.sh spec/query_spec.rb
 ```
 
 The test script starts a ParadeDB container via Docker and sets `DATABASE_URL` automatically. The default container is `rails-paradedb` on port `5432`.
