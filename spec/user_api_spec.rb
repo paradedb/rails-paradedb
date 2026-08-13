@@ -101,6 +101,10 @@ RSpec.describe "UserApi" do
     sql = MockItem.search(:description).match_all(term).to_sql
     assert_query_sql %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" &&& lower('SHOES'))), sql
   end
+  it "matching with an arel attribute" do
+    sql = MockItem.search(MockItem.arel_table[:description]).match_all("shoes").to_sql
+    assert_query_sql %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" &&& 'shoes')), sql
+  end
   it "excluding terms" do
     sql = MockItem.search(:description)
                  .match_all("shoes")
@@ -202,6 +206,15 @@ RSpec.describe "UserApi" do
     sql = MockItem.search(:description).near(ParadeDB.constant(ParadeDB.proximity("sleek").within(1, "shoes"), 1.0)).to_sql
     assert_query_sql %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" @@@ ('sleek' ## 1 ## 'shoes')::pdb.const(1.0))), sql
   end
+  it "supports composed constant score modifiers" do
+    {
+      %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" ||| 'running shoes'::pdb.whitespace::pdb.const(1.0))) => MockItem.search(:description).match_any(ParadeDB.constant(ParadeDB.tokenize("running shoes", ParadeDB::Tokenizer.whitespace()), 1.0)),
+      %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" === 'shose'::pdb.fuzzy(2)::pdb.query::pdb.const(1.0))) => MockItem.search(:description).term(ParadeDB.constant(ParadeDB.fuzzy("shose", 2), 1.0)),
+      %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" ### 'running shoes'::pdb.slop(2)::pdb.query::pdb.const(1.0))) => MockItem.search(:description).phrase(ParadeDB.constant(ParadeDB.slop("running shoes", 2), 1.0))
+    }.each do |expected, relation|
+      assert_query_sql expected, relation.to_sql
+    end
+  end
   it "phrase prefix" do
     sql = MockItem.search(:description).phrase_prefix("run", "sh").to_sql
     assert_query_sql %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" @@@ pdb.phrase_prefix(ARRAY['run', 'sh']))), sql
@@ -243,8 +256,10 @@ RSpec.describe "UserApi" do
     assert_query_sql %q{SELECT mock_items.* FROM mock_items WHERE ("mock_items"."rating" @@@ pdb.range(int8range(3, 5, '[)')))}, sql
   end
   it "range term relation" do
-    sql = MockItem.search(:weight_range).range_term("(10, 12]", relation: "Intersects", range_type: "int4range").to_sql
-    assert_query_sql %q{SELECT mock_items.* FROM mock_items WHERE ("mock_items"."weight_range" @@@ pdb.range_term('(10, 12]'::int4range, 'Intersects'))}, sql
+    %w[Intersects Contains Within].each do |relation|
+      sql = MockItem.search(:weight_range).range_term("(10, 12]", relation: relation, range_type: "int4range").to_sql
+      assert_query_sql %Q{SELECT mock_items.* FROM mock_items WHERE ("mock_items"."weight_range" @@@ pdb.range_term('(10, 12]'::int4range, '#{relation}'))}, sql
+    end
   end
   it "range term scalar value" do
     sql = MockItem.search(:weight_range).range_term(1).to_sql
@@ -425,17 +440,13 @@ RSpec.describe "UserApi" do
     assert_query_sql expected, sql
   end
   it "facets with custom agg without fields still projects aggregate" do
-    facet_sql = MockItem.search(:description).match_all("shoes")
-                           .build_facet_query(
-                             fields: [],
-                             size: 99,
-                             order: :count_asc,
-                             missing: "(missing)",
-                             agg: { "value_count" => { "field" => "id" } }
-                           )
-                           .sql
+    [{ "value_count" => { "field" => "id" } }, '{"value_count":{"field":"id"}}'].each do |agg|
+      facet_sql = MockItem.search(:description).match_all("shoes")
+                             .build_facet_query(fields: [], size: 99, order: :count_asc, missing: "(missing)", agg: agg)
+                             .sql
 
-    assert_query_sql %(SELECT pdb.agg('{"value_count":{"field":"id"}}') AS agg_facet FROM (SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" &&& 'shoes')) paradedb_facet_source), facet_sql
+      assert_query_sql %(SELECT pdb.agg('{"value_count":{"field":"id"}}') AS agg_facet FROM (SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" &&& 'shoes')) paradedb_facet_source), facet_sql
+    end
   end
   it "facets without paradedb predicates" do
     facet_sql = MockItem.where(in_stock: true)

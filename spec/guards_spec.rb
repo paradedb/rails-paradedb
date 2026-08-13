@@ -49,7 +49,8 @@ RSpec.describe "Guards" do
       [-> { builder.range(:rating, nil, lte: 5, lt: 4) }, "lte and lt"],
       [-> { builder.range(:rating, 1..2, type: :bad) }, "Unknown range type"],
       [-> { builder.range_term(:weight_range, "(10, 12]", relation: "Intersects") }, "relation requires range_type"],
-      [-> { builder.range_term(:weight_range, "(10, 12]", relation: "Overlap", range_type: "int4range") }, "Unknown range relation"]
+      [-> { builder.range_term(:weight_range, "(10, 12]", relation: "Overlap", range_type: "int4range") }, "Unknown range relation"],
+      [-> { builder.phrase_prefix(:description, "run", max_expansion: "100") }, "max_expansion must be an integer"]
     ].each do |call, message|
       assert_includes assert_raises(ArgumentError, &call).message, message
     end
