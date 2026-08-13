@@ -7,14 +7,7 @@ module ParadeDB
       # Backward-compatible reader for code that accessed `filtered_spec.filter`.
       alias filter agg_filter
     end
-    FieldTermFilter = Struct.new(
-      :field,
-      :term,
-      :distance,
-      :prefix,
-      :transposition_cost_one,
-      keyword_init: true
-    )
+    FieldTermFilter = Struct.new(:field, :term, keyword_init: true)
 
     TERMS_ORDER = {
       count_desc: { "_count" => "desc" },
@@ -154,16 +147,9 @@ module ParadeDB
       { "top_hits" => payload }
     end
 
-    def filtered(spec, filter: nil, field: nil, term: nil, distance: nil, prefix: nil, transposition_cost_one: nil)
+    def filtered(spec, filter: nil, field: nil, term: nil)
       normalized_spec = normalize_spec(spec)
-      normalized_filter = normalize_filter(
-        filter: filter,
-        field: field,
-        term: term,
-        distance: distance,
-        prefix: prefix,
-        transposition_cost_one: transposition_cost_one
-      )
+      normalized_filter = normalize_filter(filter: filter, field: field, term: term)
       FilteredSpec.new(spec: normalized_spec, agg_filter: normalized_filter)
     end
 
@@ -211,7 +197,7 @@ module ParadeDB
     end
     private_class_method :normalize_spec
 
-    def normalize_filter(filter:, field:, term:, distance:, prefix:, transposition_cost_one:)
+    def normalize_filter(filter:, field:, term:)
       if filter
         if !field.nil? || !term.nil?
           raise ArgumentError, "filtered aggregation accepts either filter: or field/term arguments, not both"
@@ -223,17 +209,7 @@ module ParadeDB
         raise ArgumentError, "filtered aggregation requires filter: or both field: and term:"
       end
 
-      normalized_distance = distance.nil? ? nil : normalize_non_negative_integer(distance, "distance")
-      normalized_prefix = normalize_boolean_option(prefix, "prefix")
-      normalized_transposition = normalize_boolean_option(transposition_cost_one, "transposition_cost_one")
-
-      FieldTermFilter.new(
-        field: normalize_field(field),
-        term: term,
-        distance: normalized_distance,
-        prefix: normalized_prefix,
-        transposition_cost_one: normalized_transposition
-      )
+      FieldTermFilter.new(field: normalize_field(field), term: term)
     end
     private_class_method :normalize_filter
 
@@ -317,14 +293,6 @@ module ParadeDB
       raise ArgumentError, "sort direction must be 'asc' or 'desc'"
     end
     private_class_method :normalize_sort_direction
-
-    def normalize_boolean_option(value, name)
-      return nil if value.nil?
-      return value if value == true || value == false
-
-      raise ArgumentError, "#{name} must be true, false, or nil"
-    end
-    private_class_method :normalize_boolean_option
 
     def deep_stringify(value)
       case value

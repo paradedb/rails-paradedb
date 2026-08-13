@@ -26,7 +26,7 @@ RSpec.describe "EdgeCasesIntegrationTest" do
   end
   it "null description invisible to phrase and fuzzy" do
     phrase_ids = search(:description).phrase("alpha beta").order(:id).pluck(:id)
-    fuzzy_ids  = search(:description).match_any("alph", distance: 1, prefix: true).order(:id).pluck(:id)
+    fuzzy_ids  = search(:description).match_any(ParadeDB.fuzzy("alph", 1, prefix: true)).order(:id).pluck(:id)
     regex_ids  = search(:description).regex("alpha.*").order(:id).pluck(:id)
 
     [phrase_ids, fuzzy_ids, regex_ids].each do |ids|
@@ -86,7 +86,7 @@ RSpec.describe "EdgeCasesIntegrationTest" do
     assert_includes ids, @p_long.id
   end
   it "long text fuzzy finds misspelled needle" do
-    ids = search(:description).match_any("needlephras", distance: 2).order(:id).pluck(:id)
+    ids = search(:description).match_any(ParadeDB.fuzzy("needlephras", 2)).order(:id).pluck(:id)
     assert_includes ids, @p_long.id
   end
   it "long text near finds needle terms" do

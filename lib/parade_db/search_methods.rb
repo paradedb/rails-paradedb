@@ -115,56 +115,22 @@ module ParadeDB
       extending(SearchMethods).tap { |rel| rel._paradedb_current_field = search_column }
     end
 
-    def match_all(
-      term = nil,
-      tokenizer: nil,
-      distance: nil,
-      prefix: nil,
-      transposition_cost_one: nil,
-      boost: nil,
-      constant_score: nil
-    )
+    def match_all(term = nil)
       require_search_field!
 
       node =
-        if term.nil? && tokenizer.nil? && distance.nil? && prefix.nil? && transposition_cost_one.nil?
-          builder.match_all(_paradedb_current_field, boost: boost, constant_score: constant_score)
+        if term.nil?
+          builder.match_all(_paradedb_current_field)
         else
-          builder.match(
-            _paradedb_current_field,
-            term,
-            tokenizer: tokenizer,
-            distance: distance,
-            prefix: prefix,
-            transposition_cost_one: transposition_cost_one,
-            boost: boost,
-            constant_score: constant_score
-          )
+          builder.match(_paradedb_current_field, term)
         end
       where(grouped(node))
     end
 
-    def match_any(
-      term,
-      tokenizer: nil,
-      distance: nil,
-      prefix: nil,
-      transposition_cost_one: nil,
-      boost: nil,
-      constant_score: nil
-    )
+    def match_any(term)
       require_search_field!
 
-      node = builder.match_any(
-        _paradedb_current_field,
-        term,
-        tokenizer: tokenizer,
-        distance: distance,
-        prefix: prefix,
-        transposition_cost_one: transposition_cost_one,
-        boost: boost,
-        constant_score: constant_score
-      )
+      node = builder.match_any(_paradedb_current_field, term)
       where(grouped(node))
     end
 
@@ -175,125 +141,97 @@ module ParadeDB
       where(grouped(neg.not))
     end
 
-    def phrase(text, slop: nil, tokenizer: nil, boost: nil, constant_score: nil)
+    def phrase(text)
       require_search_field!
 
-      node = builder.phrase(
-        _paradedb_current_field,
-        text,
-        slop: slop,
-        tokenizer: tokenizer,
-        boost: boost,
-        constant_score: constant_score
-      )
+      node = builder.phrase(_paradedb_current_field, text)
       where(grouped(node))
     end
 
-    def regex(pattern, boost: nil, constant_score: nil)
+    def regex(pattern)
       require_search_field!
 
-      node = builder.regex(_paradedb_current_field, pattern, boost: boost, constant_score: constant_score)
+      node = builder.regex(_paradedb_current_field, pattern)
       where(grouped(node))
     end
 
-    def regex_phrase(*patterns, slop: nil, max_expansions: nil, boost: nil, constant_score: nil)
+    def regex_phrase(*patterns, slop: nil, max_expansions: nil)
       require_search_field!
 
       node = builder.regex_phrase(
         _paradedb_current_field,
         *patterns,
         slop: slop,
-        max_expansions: max_expansions,
-        boost: boost,
-        constant_score: constant_score
+        max_expansions: max_expansions
       )
       where(grouped(node))
     end
 
-    def term(
-      value,
-      distance: nil,
-      prefix: nil,
-      transposition_cost_one: nil,
-      boost: nil,
-      constant_score: nil
-    )
+    def term(value)
       require_search_field!
 
-      node = builder.term(
-        _paradedb_current_field,
-        value,
-        distance: distance,
-        prefix: prefix,
-        transposition_cost_one: transposition_cost_one,
-        boost: boost,
-        constant_score: constant_score
-      )
+      node = builder.term(_paradedb_current_field, value)
       where(grouped(node))
     end
 
-    def term_set(*values, boost: nil, constant_score: nil)
+    def term_set(*values)
       require_search_field!
 
-      node = builder.term_set(_paradedb_current_field, *values, boost: boost, constant_score: constant_score)
+      node = builder.term_set(_paradedb_current_field, *values)
       where(grouped(node))
     end
 
-    def near(proximity, boost: nil, const: nil)
+    def near(proximity)
       require_search_field!
 
-      node = builder.near(_paradedb_current_field, proximity, boost: boost, const: const)
+      node = builder.near(_paradedb_current_field, proximity)
       where(grouped(node))
     end
 
-    def phrase_prefix(*terms, max_expansion: nil, boost: nil, constant_score: nil)
+    def phrase_prefix(*terms, max_expansion: nil)
       require_search_field!
 
       node = builder.phrase_prefix(
         _paradedb_current_field,
         *terms,
-        max_expansion: max_expansion,
-        boost: boost,
-        constant_score: constant_score
+        max_expansion: max_expansion
       )
       where(grouped(node))
     end
 
     # Parse query-string syntax into ParadeDB query AST (e.g. "running AND shoes").
-    def parse(query, lenient: nil, conjunction_mode: nil, boost: nil, constant_score: nil)
+    def parse(query, lenient: nil, conjunction_mode: nil)
       require_search_field!
       node = builder.parse(
         _paradedb_current_field,
         query,
         lenient: lenient,
-        conjunction_mode: conjunction_mode,
-        boost: boost,
-        constant_score: constant_score
+        conjunction_mode: conjunction_mode
       )
       where(grouped(node))
     end
 
     # Exists wrapper to match rows where the indexed field has a value.
     # Use with `.search(:id)` (or another exists-compatible indexed field).
-    def exists(boost: nil, constant_score: nil)
+    def exists
       require_search_field!
 
-      where(grouped(builder.exists(_paradedb_current_field, boost: boost, constant_score: constant_score)))
+      where(grouped(builder.exists(_paradedb_current_field)))
     end
 
     # Range wrapper for numeric/date/timestamp fields in ParadeDB query context.
     # Examples:
     #   Product.search(:rating).range(3..5)
     #   Product.search(:rating).range(gte: 3, lt: 5)
-    def range(value = nil, gte: nil, gt: nil, lte: nil, lt: nil, type: nil, boost: nil, constant_score: nil)
+    def range(value = nil, gte: nil, gt: nil, lte: nil, lt: nil, type: nil)
       require_search_field!
 
       inferred_type = type || default_range_type_for_field(_paradedb_current_field)
-      node = builder.range(_paradedb_current_field, value, gte: gte, gt: gt, lte: lte, lt: lt, type: inferred_type, boost: boost, constant_score: constant_score)
+      node = builder.range(_paradedb_current_field, value, gte: gte, gt: gt, lte: lte, lt: lt, type: inferred_type)
       where(grouped(node))
     end
 
-    def range_term(value, relation: nil, range_type: nil, boost: nil, constant_score: nil)
+    def range_term(value, relation: nil, range_type: nil)
       require_search_field!
 
       inferred_range_type = range_type || (relation && infer_range_type_for_field(_paradedb_current_field))
@@ -301,9 +239,7 @@ module ParadeDB
         _paradedb_current_field,
         value,
         relation: relation,
-        range_type: inferred_range_type,
-        boost: boost,
-        constant_score: constant_score
+        range_type: inferred_range_type
       )
       where(grouped(node))
     end
@@ -684,13 +620,7 @@ module ParadeDB
         filter
       when ParadeDB::Aggregations::FieldTermFilter
         resolved_field = resolve_search_field_node(filter.field, table_name: builder_override.table)
-        builder_override.term(
-          resolved_field,
-          filter.term,
-          distance: filter.distance,
-          prefix: filter.prefix,
-          transposition_cost_one: filter.transposition_cost_one
-        )
+        builder_override.term(resolved_field, filter.term)
       else
         raise ArgumentError,
               "filtered aggregation filter must be an Arel node or ParadeDB::Aggregations.filtered(...) descriptor"

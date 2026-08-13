@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 require "date"
-require_relative "../tokenizer_sql"
 require_relative "../vector"
 
 module ParadeDB
@@ -8,8 +7,6 @@ module ParadeDB
     class Builder
       RANGE_TYPES = %w[int4range int8range numrange daterange tsrange tstzrange].freeze
       RANGE_RELATIONS = %w[Intersects Contains Within].freeze
-      TOKENIZER_EXPRESSION = /\A[a-zA-Z_][a-zA-Z0-9_]*(?:(?:::|\.)[a-zA-Z_][a-zA-Z0-9_]*)*(?:\(\s*[a-zA-Z0-9_'".,=\s:-]*\s*\))?\z/.freeze
-
       attr_reader :table
 
       def initialize(table = nil)
@@ -20,62 +17,45 @@ module ParadeDB
         column_node(column)
       end
 
-      def match(
-        column,
-        term = nil,
-        tokenizer: nil,
-        distance: nil,
-        prefix: nil,
-        transposition_cost_one: nil,
-        boost: nil,
-        constant_score: nil
-      )
-        validate_tokenizer_fuzzy_compatibility!(
-          tokenizer: tokenizer,
-          distance: distance,
-          prefix: prefix,
-          transposition_cost_one: transposition_cost_one
-        )
-        rhs = term_query_node(term)
-        rhs = apply_fuzzy(
-          rhs,
-          distance: distance,
-          prefix: prefix,
-          transposition_cost_one: transposition_cost_one,
-          bridge_to_query: !constant_score.nil?
-        )
-        rhs = apply_tokenizer(rhs, tokenizer)
-        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
-        infix("&&&", column_node(column), rhs)
+      def boost(value, factor)
+        validate_numeric!(factor, :factor)
+        Nodes::BoostCast.new(search_value_node(value), quoted_value(factor))
       end
 
-      def match_any(
-        column,
-        term = nil,
-        tokenizer: nil,
-        distance: nil,
-        prefix: nil,
-        transposition_cost_one: nil,
-        boost: nil,
-        constant_score: nil
-      )
-        validate_tokenizer_fuzzy_compatibility!(
-          tokenizer: tokenizer,
-          distance: distance,
+      def constant(value, score)
+        validate_numeric!(score, :score)
+        node = search_value_node(value)
+        node = Nodes::QueryCast.new(node) if node.is_a?(Nodes::FuzzyCast) || node.is_a?(Nodes::SlopCast)
+        Nodes::ConstCast.new(node, quoted_value(score))
+      end
+
+      def fuzzy(value, distance, prefix: nil, transposition_cost_one: nil)
+        validate_fuzzy_distance!(distance)
+        Nodes::FuzzyCast.new(
+          search_value_node(value),
+          quoted_value(distance),
           prefix: prefix,
           transposition_cost_one: transposition_cost_one
         )
-        rhs = term_query_node(term)
-        rhs = apply_fuzzy(
-          rhs,
-          distance: distance,
-          prefix: prefix,
-          transposition_cost_one: transposition_cost_one,
-          bridge_to_query: !constant_score.nil?
-        )
-        rhs = apply_tokenizer(rhs, tokenizer)
-        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
-        infix("|||", column_node(column), rhs)
+      end
+
+      def slop(value, distance)
+        validate_numeric!(distance, :distance)
+        Nodes::SlopCast.new(search_value_node(value), quoted_value(distance))
+      end
+
+      def tokenize(value, tokenizer)
+        raise ArgumentError, "tokenizer must be a Tokenizer" unless tokenizer.is_a?(ParadeDB::Tokenizer)
+
+        Nodes::TokenizerCast.new(search_value_node(value), tokenizer.render())
+      end
+
+      def match(column, term = nil)
+        infix("&&&", column_node(column), term_query_node(term))
+      end
+
+      def match_any(column, term = nil)
+        infix("|||", column_node(column), term_query_node(term))
       end
 
       def full_text(column, expression)
@@ -83,59 +63,35 @@ module ParadeDB
         infix("@@@", column_node(column), rhs)
       end
 
-      def phrase(column, text, slop: nil, tokenizer: nil, boost: nil, constant_score: nil)
+      def phrase(column, text)
         rhs =
           if text.is_a?(::Array)
-            raise ArgumentError, "tokenizer is not supported for pretokenized phrase arrays" unless tokenizer.nil?
-
             Nodes::ArrayLiteral.new(normalize_phrase_terms(text).map { |term| quoted_value(term) })
+          elsif arel_expression?(text)
+            text
           else
-            apply_tokenizer(quoted_value(text), tokenizer)
+            quoted_value(text)
           end
-
-        rhs = apply_slop(rhs, slop)
-        # ParadeDB cannot cast pdb.slop directly to pdb.const. Bridge through pdb.query.
-        rhs = Nodes::QueryCast.new(rhs) if !constant_score.nil? && !slop.nil?
-        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("###", column_node(column), rhs)
       end
 
-      def term(
-        column,
-        term,
-        distance: nil,
-        prefix: nil,
-        transposition_cost_one: nil,
-        boost: nil,
-        constant_score: nil
-      )
-        rhs = quoted_value(term)
-        rhs = apply_fuzzy(
-          rhs,
-          distance: distance,
-          prefix: prefix,
-          transposition_cost_one: transposition_cost_one,
-          bridge_to_query: !constant_score.nil?
-        )
-        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
-        infix("===", column_node(column), rhs)
+      def term(column, term)
+        infix("===", column_node(column), arel_expression?(term) ? term : quoted_value(term))
       end
 
-      def term_set(column, *terms, boost: nil, constant_score: nil)
+      def term_set(column, *terms)
         normalized_terms = normalize_term_set_terms(terms)
         array = Nodes::ArrayLiteral.new(normalized_terms.map { |term| quoted_value(term) })
         rhs = ::Arel::Nodes::NamedFunction.new("pdb.term_set", [array])
-        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("@@@", column_node(column), rhs)
       end
 
-      def regex(column, pattern, boost: nil, constant_score: nil)
+      def regex(column, pattern)
         rhs = ::Arel::Nodes::NamedFunction.new("pdb.regex", [quoted_value(pattern)])
-        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("@@@", column_node(column), rhs)
       end
 
-      def regex_phrase(column, *patterns, slop: nil, max_expansions: nil, boost: nil, constant_score: nil)
+      def regex_phrase(column, *patterns, slop: nil, max_expansions: nil)
         normalized_patterns = normalize_regex_patterns(patterns)
         args = [Nodes::ArrayLiteral.new(normalized_patterns.map { |pattern| quoted_value(pattern) })]
         unless slop.nil?
@@ -147,16 +103,15 @@ module ParadeDB
           args << keyword_arg_node("max_expansions", max_expansions)
         end
         rhs = ::Arel::Nodes::NamedFunction.new("pdb.regex_phrase", args)
-        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("@@@", column_node(column), rhs)
       end
 
-      def near(column, proximity, boost: nil, const: nil)
-        rhs = proximity_query_node(proximity, boost: boost, const: const)
+      def near(column, proximity)
+        rhs = arel_expression?(proximity) ? proximity : proximity_query_node(proximity)
         infix("@@@", column_node(column), rhs)
       end
 
-      def phrase_prefix(column, *terms, max_expansion: nil, boost: nil, constant_score: nil)
+      def phrase_prefix(column, *terms, max_expansion: nil)
         flat = terms.flatten.compact
         raise ArgumentError, "phrase_prefix requires at least one term" if flat.empty?
         array = Nodes::ArrayLiteral.new(flat.map { |term| quoted_value(term) })
@@ -166,46 +121,40 @@ module ParadeDB
           args << quoted_value(max_expansion)
         end
         rhs = ::Arel::Nodes::NamedFunction.new("pdb.phrase_prefix", args)
-        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("@@@", column_node(column), rhs)
       end
 
-      def parse(column, query, lenient: nil, conjunction_mode: nil, boost: nil, constant_score: nil)
+      def parse(column, query, lenient: nil, conjunction_mode: nil)
         rhs = Nodes::ParseNode.new(
           quoted_value(query),
           lenient: lenient,
           conjunction_mode: conjunction_mode
         )
-        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("@@@", column_node(column), rhs)
       end
 
-      def match_all(column, boost: nil, constant_score: nil)
+      def match_all(column)
         rhs = ::Arel::Nodes::NamedFunction.new("pdb.all", [])
-        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("@@@", column_node(column), rhs)
       end
 
-      def exists(column, boost: nil, constant_score: nil)
+      def exists(column)
         rhs = ::Arel::Nodes::NamedFunction.new("pdb.exists", [])
-        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("@@@", column_node(column), rhs)
       end
 
-      def range(column, value = nil, gte: nil, gt: nil, lte: nil, lt: nil, type: nil, boost: nil, constant_score: nil)
+      def range(column, value = nil, gte: nil, gt: nil, lte: nil, lt: nil, type: nil)
         range_node = build_range_node(value, gte: gte, gt: gt, lte: lte, lt: lt, type: type)
         rhs = ::Arel::Nodes::NamedFunction.new("pdb.range", [range_node])
-        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("@@@", column_node(column), rhs)
       end
 
-      def range_term(column, value, relation: nil, range_type: nil, boost: nil, constant_score: nil)
+      def range_term(column, value, relation: nil, range_type: nil)
         rhs = build_range_term_node(value, relation: relation, range_type: range_type)
-        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("@@@", column_node(column), rhs)
       end
 
-      def more_like_this(column, key, fields: nil, options: {}, boost: nil, constant_score: nil)
+      def more_like_this(column, key, fields: nil, options: {})
         args = [quoted_value(key)]
         unless fields.nil?
           field_values = Array(fields).map { |field| quoted_value(field.to_s) }
@@ -217,7 +166,6 @@ module ParadeDB
         end
 
         rhs = ::Arel::Nodes::NamedFunction.new("pdb.more_like_this", args)
-        rhs = apply_score_modifier(rhs, boost: boost, constant_score: constant_score)
         infix("@@@", column_node(column), rhs)
       end
 
@@ -282,57 +230,6 @@ module ParadeDB
 
       private
 
-      def apply_score_modifier(node, boost:, constant_score:)
-        if boost && constant_score
-          raise ArgumentError, "boost and constant_score are mutually exclusive"
-        end
-        if boost
-          validate_numeric!(boost, :boost)
-          return Nodes::BoostCast.new(node, quoted_value(boost))
-        end
-        if constant_score
-          validate_numeric!(constant_score, :constant_score)
-          return Nodes::ConstCast.new(node, quoted_value(constant_score))
-        end
-        node
-      end
-
-      def apply_fuzzy(node, distance:, prefix:, transposition_cost_one:, bridge_to_query: false)
-        fuzzy_enabled = !distance.nil? || prefix || transposition_cost_one
-        return node unless fuzzy_enabled
-
-        normalized_distance = distance.nil? ? 1 : distance
-        validate_fuzzy_distance!(normalized_distance)
-
-        rhs = Nodes::FuzzyCast.new(
-          node,
-          quoted_value(normalized_distance),
-          prefix: prefix,
-          transposition_cost_one: transposition_cost_one
-        )
-
-        return rhs unless bridge_to_query
-
-        # ParadeDB cannot cast pdb.fuzzy directly to pdb.const. Bridge through pdb.query.
-        Nodes::QueryCast.new(rhs)
-      end
-
-      def apply_tokenizer(node, tokenizer)
-        return node if tokenizer.nil?
-
-        unless tokenizer.is_a?(ParadeDB::Tokenizer)
-          raise ArgumentError, "tokenizer must be a Tokenizer"
-        end
-
-        return Nodes::TokenizerCast.new(node, tokenizer.render())
-      end
-
-      def apply_slop(node, slop)
-        return node if slop.nil?
-        validate_numeric!(slop, :slop)
-        Nodes::SlopCast.new(node, quoted_value(slop))
-      end
-
       def infix(operator, left, right)
         ::Arel::Nodes::InfixOperation.new(operator, left, right)
       end
@@ -363,7 +260,7 @@ module ParadeDB
         Nodes::TypeCast.new(quoted_value(literal), "vector")
       end
 
-      def proximity_query_node(proximity, boost: nil, const: nil)
+      def proximity_query_node(proximity)
         unless proximity.is_a?(ParadeDB::Proximity::Clause)
           raise ArgumentError, "near requires a ParadeDB.proximity(...) clause"
         end
@@ -372,14 +269,7 @@ module ParadeDB
           raise ArgumentError, "near requires at least one within clause"
         end
 
-        if boost && !const.nil?
-          raise ArgumentError, "boost and const are mutually exclusive"
-        end
-
-        validate_numeric!(boost, :boost) if boost
-        validate_numeric!(const, :const) unless const.nil?
-
-        apply_score_modifier(compile_proximity_clause(proximity), boost: boost, constant_score: const)
+        compile_proximity_clause(proximity)
       end
 
       def compile_proximity_clause(clause)
@@ -575,6 +465,14 @@ module ParadeDB
         quoted_value(join_term(term))
       end
 
+      def search_value_node(value)
+        return value if arel_expression?(value)
+        return Nodes::ArrayLiteral.new(value.map { |item| quoted_value(item) }) if value.is_a?(::Array)
+        return proximity_query_node(value) if value.is_a?(ParadeDB::Proximity::Clause)
+
+        quoted_value(value)
+      end
+
       def arel_expression?(value)
         value.is_a?(::Arel::Nodes::Node) ||
           value.is_a?(::Arel::Attributes::Attribute) ||
@@ -607,7 +505,6 @@ module ParadeDB
       end
 
       def validate_numeric!(value, name)
-        return if value.nil?
         unless value.is_a?(Numeric)
           raise ArgumentError, "#{name} must be numeric, got #{value.class}"
         end
@@ -624,26 +521,6 @@ module ParadeDB
         unless value.is_a?(Integer)
           raise ArgumentError, "#{name} must be an integer"
         end
-      end
-
-      def normalize_tokenizer(tokenizer)
-        value = tokenizer.strip
-        if value.empty?
-          raise ArgumentError, "tokenizer cannot be blank"
-        end
-        unless TOKENIZER_EXPRESSION.match?(value)
-          raise ArgumentError, "invalid tokenizer expression: #{tokenizer.inspect}"
-        end
-
-        ParadeDB::TokenizerSQL.qualify(value)
-      end
-
-      def validate_tokenizer_fuzzy_compatibility!(tokenizer:, distance:, prefix:, transposition_cost_one:)
-        return if tokenizer.nil?
-        return if distance.nil? && !prefix && !transposition_cost_one
-
-        raise ArgumentError,
-              "tokenizer cannot be combined with fuzzy options (distance, prefix, transposition_cost_one)"
       end
 
       def arel_table

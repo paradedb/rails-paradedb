@@ -64,7 +64,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
   end
   it "matching with tokenizer override executes" do
     ids = BehaviorProduct.search(:description)
-                         .match_any("running shoes", tokenizer: ParadeDB::Tokenizer.whitespace())
+                         .match_any(ParadeDB.tokenize("running shoes", ParadeDB::Tokenizer.whitespace()))
                          .order(:id)
                          .pluck(:id)
 
@@ -89,7 +89,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       ["pdb.source_code", ParadeDB::Tokenizer.source_code()]
     ].each do |expected, tokenizer|
       relation = BehaviorProduct.search(:description)
-                                .match_all("running shoes", tokenizer: tokenizer)
+                                .match_all(ParadeDB.tokenize("running shoes", tokenizer))
                                 .order(:id)
 
       relation.load
@@ -101,23 +101,21 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       SQL
     end
   end
-  it "matching with tokenizer + fuzzy distance raises argument error" do
-    error = assert_raises(ArgumentError) do
-      BehaviorProduct.search(:description)
-                     .match_any("runing shose", tokenizer: ParadeDB::Tokenizer.whitespace(), distance: 1)
-                     .order(:id)
-                     .pluck(:id)
-    end
-    assert_includes error.message, "tokenizer cannot be combined with fuzzy options"
+  it "matching with tokenizer + boost executes" do
+    ids = BehaviorProduct.search(:description)
+                         .match_any(ParadeDB.boost(ParadeDB.tokenize("running shoes", ParadeDB::Tokenizer.whitespace()), 2))
+                         .order(:id)
+                         .pluck(:id)
+
+    assert_equal [1, 2, 6], ids
   end
-  it "matching with tokenizer + fuzzy constant score raises argument error" do
-    error = assert_raises(ArgumentError) do
-      BehaviorProduct.search(:description)
-                     .match_any("runing shose", tokenizer: ParadeDB::Tokenizer.whitespace(), distance: 1, constant_score: 1.0)
-                     .order(:id)
-                     .pluck(:id)
-    end
-    assert_includes error.message, "tokenizer cannot be combined with fuzzy options"
+  it "matching with tokenizer + constant score executes" do
+    ids = BehaviorProduct.search(:description)
+                         .match_any(ParadeDB.constant(ParadeDB.tokenize("running shoes", ParadeDB::Tokenizer.whitespace()), 1.0))
+                         .order(:id)
+                         .pluck(:id)
+
+    assert_equal [1, 2, 6], ids
   end
   it "phrase near and phrase prefix execute" do
     phrase_ids = BehaviorProduct.search(:description).phrase("running shoes").order(:id).pluck(:id)
@@ -163,7 +161,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
     term_ids = BehaviorProduct.search(:category).term("audio").order(:id).pluck(:id)
     term_set_ids = BehaviorProduct.search(:category).term_set(%w[audio footwear]).order(:id).pluck(:id)
     regex_ids = BehaviorProduct.search(:description).regex("run.*").order(:id).pluck(:id)
-    fuzzy_ids = BehaviorProduct.search(:description).term("shose", distance: 2).order(:id).pluck(:id)
+    fuzzy_ids = BehaviorProduct.search(:description).term(ParadeDB.fuzzy("shose", 2)).order(:id).pluck(:id)
 
     assert_equal [3, 4], term_ids
     assert_equal [1, 2, 3, 4, 5], term_set_ids
@@ -172,12 +170,12 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
   end
   it "fuzzy with constant score executes" do
     baseline_ids = BehaviorProduct.search(:description)
-                                  .term("shose", distance: 2)
+                                  .term(ParadeDB.fuzzy("shose", 2))
                                   .order(:id)
                                   .pluck(:id)
 
     const_ids = BehaviorProduct.search(:description)
-                               .term("shose", distance: 2, constant_score: 1.0)
+                               .term(ParadeDB.constant(ParadeDB.fuzzy("shose", 2), 1.0))
                                .order(:id)
                                .pluck(:id)
 
@@ -185,12 +183,12 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
   end
   it "phrase slop with constant score executes" do
     baseline_ids = BehaviorProduct.search(:description)
-                                  .phrase("running shoes", slop: 2)
+                                  .phrase(ParadeDB.slop("running shoes", 2))
                                   .order(:id)
                                   .pluck(:id)
 
     const_ids = BehaviorProduct.search(:description)
-                               .phrase("running shoes", slop: 2, constant_score: 1.0)
+                               .phrase(ParadeDB.constant(ParadeDB.slop("running shoes", 2), 1.0))
                                .order(:id)
                                .pluck(:id)
 
@@ -203,12 +201,12 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
                                   .pluck(:id)
 
     boost_ids = BehaviorProduct.search(:description)
-                               .near(ParadeDB.proximity("running").within(1, "shoes"), boost: 2.0)
+                               .near(ParadeDB.boost(ParadeDB.proximity("running").within(1, "shoes"), 2.0))
                                .order(:id)
                                .pluck(:id)
 
     const_ids = BehaviorProduct.search(:description)
-                               .near(ParadeDB.proximity("running").within(1, "shoes"), const: 1.0)
+                               .near(ParadeDB.constant(ParadeDB.proximity("running").within(1, "shoes"), 1.0))
                                .order(:id)
                                .pluck(:id)
 
@@ -491,7 +489,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       SQL
 
       relation = BehaviorProduct.search(:description)
-                                .phrase("running shoes", tokenizer: ParadeDB::Tokenizer.whitespace())
+                                .phrase(ParadeDB.tokenize("running shoes", ParadeDB::Tokenizer.whitespace()))
                                 .order(:id)
 
       expected_ids = [1, 5]
@@ -525,7 +523,7 @@ RSpec.describe "UserApiBehaviorIntegrationTest" do
       SQL
 
       relation = BehaviorProduct.search(:description)
-                                .phrase(%w[shoes running], slop: 2)
+                                .phrase(ParadeDB.slop(%w[shoes running], 2))
                                 .order(:id)
 
       expected_ids = [1, 3, 5]

@@ -26,11 +26,11 @@ RSpec.describe "ArelPredicationsUnitTest" do
     assert_equal %("products"."description" &&& lower('SHOES')), sql(node)
   end
   it "pdb_match with boost" do
-    node = @t[:description].pdb_match("shoes", boost: 2.5)
+    node = @t[:description].pdb_match(ParadeDB.boost("shoes", 2.5))
     assert_equal %("products"."description" &&& 'shoes'::pdb.boost(2.5)), sql(node)
   end
   it "pdb_match without boost" do
-    node = @t[:description].pdb_match("shoes", boost: nil)
+    node = @t[:description].pdb_match("shoes")
     assert_equal %("products"."description" &&& 'shoes'), sql(node)
   end
   it "pdb_match raises with no terms" do
@@ -52,11 +52,11 @@ RSpec.describe "ArelPredicationsUnitTest" do
     assert_equal %("products"."description" ||| trim(' shoes ')), sql(node)
   end
   it "pdb_match with tokenizer override" do
-    node = @t[:description].pdb_match("running shoes", tokenizer: "whitespace")
+    node = @t[:description].pdb_match(ParadeDB.tokenize("running shoes", ParadeDB::Tokenizer.whitespace()))
     assert_equal %("products"."description" &&& 'running shoes'::pdb.whitespace), sql(node)
   end
   it "pdb_match with tokenizer args" do
-    node = @t[:description].pdb_match("running shoes", tokenizer: "whitespace('lowercase=false')")
+    node = @t[:description].pdb_match(ParadeDB.tokenize("running shoes", ParadeDB::Tokenizer.whitespace(options: {lowercase: false})))
     assert_equal %("products"."description" &&& 'running shoes'::pdb.whitespace('lowercase=false')), sql(node)
   end
 
@@ -66,15 +66,15 @@ RSpec.describe "ArelPredicationsUnitTest" do
     assert_equal %("products"."description" ### 'running shoes'), sql(node)
   end
   it "pdb_phrase with slop zero" do
-    node = @t[:description].pdb_phrase("running shoes", slop: 0)
+    node = @t[:description].pdb_phrase(ParadeDB.slop("running shoes", 0))
     assert_equal %("products"."description" ### 'running shoes'::pdb.slop(0)), sql(node)
   end
   it "pdb_phrase with slop large" do
-    node = @t[:description].pdb_phrase("running shoes", slop: 10)
+    node = @t[:description].pdb_phrase(ParadeDB.slop("running shoes", 10))
     assert_equal %("products"."description" ### 'running shoes'::pdb.slop(10)), sql(node)
   end
   it "pdb_phrase with tokenizer" do
-    node = @t[:description].pdb_phrase("running shoes", tokenizer: ParadeDB::Tokenizer.whitespace())
+    node = @t[:description].pdb_phrase(ParadeDB.tokenize("running shoes", ParadeDB::Tokenizer.whitespace()))
     assert_equal %("products"."description" ### 'running shoes'::pdb.whitespace), sql(node)
   end
   it "pdb_phrase with pretokenized array" do
@@ -88,7 +88,7 @@ RSpec.describe "ArelPredicationsUnitTest" do
     assert_equal %("products"."category" === 'footwear'), sql(node)
   end
   it "pdb_term with float boost" do
-    node = @t[:category].pdb_term("footwear", boost: 1.5)
+    node = @t[:category].pdb_term(ParadeDB.boost("footwear", 1.5))
     assert_equal %("products"."category" === 'footwear'::pdb.boost(1.5)), sql(node)
   end
   it "pdb_term with boolean value" do
@@ -111,23 +111,23 @@ RSpec.describe "ArelPredicationsUnitTest" do
 
   # ---- fuzzy options on pdb_term ----
   it "pdb_term with distance" do
-    node = @t[:description].pdb_term("shose", distance: 2)
+    node = @t[:description].pdb_term(ParadeDB.fuzzy("shose", 2))
     assert_equal %("products"."description" === 'shose'::pdb.fuzzy(2)), sql(node)
   end
   it "pdb_term with prefix true" do
-    node = @t[:description].pdb_term("runn", distance: 1, prefix: true)
+    node = @t[:description].pdb_term(ParadeDB.fuzzy("runn", 1, prefix: true))
     assert_equal %("products"."description" === 'runn'::pdb.fuzzy(1, "true")), sql(node)
   end
   it "pdb_term with prefix false" do
-    node = @t[:description].pdb_term("shose", distance: 2, prefix: false)
+    node = @t[:description].pdb_term(ParadeDB.fuzzy("shose", 2, prefix: false))
     assert_equal %("products"."description" === 'shose'::pdb.fuzzy(2)), sql(node)
   end
   it "pdb_term with transposition cost one" do
-    node = @t[:description].pdb_term("shose", distance: 1, transposition_cost_one: true)
+    node = @t[:description].pdb_term(ParadeDB.fuzzy("shose", 1, transposition_cost_one: true))
     assert_equal %("products"."description" === 'shose'::pdb.fuzzy(1, "false", "true")), sql(node)
   end
   it "pdb_term with fuzzy boost" do
-    node = @t[:description].pdb_term("shose", distance: 2, boost: 1.5)
+    node = @t[:description].pdb_term(ParadeDB.boost(ParadeDB.fuzzy("shose", 2), 1.5))
     assert_equal %("products"."description" === 'shose'::pdb.fuzzy(2)::pdb.boost(1.5)), sql(node)
   end
 
@@ -175,7 +175,7 @@ RSpec.describe "ArelPredicationsUnitTest" do
     assert_equal %("products"."description" @@@ ('sleek' ## 1 ## pdb.prox_array('white', 'shoes'))), sql(node)
   end
   it "pdb_near with boost" do
-    node = @t[:description].pdb_near(ParadeDB.proximity("running").within(1, "shoes"), boost: 2.0)
+    node = @t[:description].pdb_near(ParadeDB.boost(ParadeDB.proximity("running").within(1, "shoes"), 2.0))
     assert_equal %("products"."description" @@@ ('running' ## 1 ## 'shoes')::pdb.boost(2.0)), sql(node)
   end
 
@@ -316,20 +316,20 @@ RSpec.describe "ArelPredicationsUnitTest" do
 
   # ---- Validation ----
   it "pdb_term raises on non-numeric distance" do
-    error = assert_raises(ArgumentError) { @t[:description].pdb_term("shoes", distance: "far") }
+    error = assert_raises(ArgumentError) { ParadeDB.fuzzy("shoes", "far") }
     assert_match(/distance must be numeric/, error.message)
   end
   it "pdb_term raises on out-of-range distance" do
-    error = assert_raises(ArgumentError) { @t[:description].pdb_term("shoes", distance: 5) }
+    error = assert_raises(ArgumentError) { ParadeDB.fuzzy("shoes", 5) }
     assert_match(/between 0 and 2/, error.message)
   end
   it "pdb_match raises on non-numeric boost" do
-    error = assert_raises(ArgumentError) { @t[:description].pdb_match("shoes", boost: "high") }
-    assert_match(/boost must be numeric/, error.message)
+    error = assert_raises(ArgumentError) { ParadeDB.boost("shoes", "high") }
+    assert_match(/factor must be numeric/, error.message)
   end
   it "pdb_match raises on invalid tokenizer" do
-    error = assert_raises(ArgumentError) { @t[:description].pdb_match("shoes", tokenizer: "bad;tokenizer") }
-    assert_match(/invalid tokenizer expression/, error.message)
+    error = assert_raises(ArgumentError) { ParadeDB.tokenize("shoes", "bad;tokenizer") }
+    assert_match(/tokenizer must be a Tokenizer/, error.message)
   end
 
   # ---- vector distance predications ----
