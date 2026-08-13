@@ -4,7 +4,7 @@ require "spec_helper"
 
 class GuardProduct < ActiveRecord::Base
   include ParadeDB::Model
-  self.table_name = :products
+  self.table_name = :mock_items
 
   class << self
     attr_accessor :_mock_adapter_name
@@ -17,7 +17,7 @@ class GuardProduct < ActiveRecord::Base
   end
 end
 
-RSpec.describe "PostgreSQLGuardUnitTest" do
+RSpec.describe "PostgreSQLGuard" do
   def teardown
     GuardProduct._mock_adapter_name = nil
   end
@@ -51,4 +51,32 @@ RSpec.describe "PostgreSQLGuardUnitTest" do
     assert_includes error.message, "PostgreSQL"
   end
 
+end
+
+
+RSpec.describe "MethodCollision" do
+  it "including model does not override an existing search method" do
+    klass = Class.new(ActiveRecord::Base) do
+      self.table_name = :mock_items
+
+      def self.search(_query)
+        :custom_search
+      end
+
+      include ParadeDB::Model
+    end
+
+    expect(klass.search("query")).to eq(:custom_search)
+    expect(klass).to respond_to(:paradedb_search)
+  end
+
+  it "including model does not raise without collision" do
+    klass = Class.new(ActiveRecord::Base) do
+      self.table_name = :mock_items
+      include ParadeDB::Model
+    end
+
+    expect(klass).to respond_to(:search)
+    expect(klass).to respond_to(:paradedb_search)
+  end
 end

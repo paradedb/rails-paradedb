@@ -43,25 +43,17 @@ uvx prek install
 Run the tests to verify every change:
 
 ```bash
-# Everything
+# Everything (requires Docker)
 bash scripts/run_tests.sh
-
-# Unit tests only (no database required)
-bash scripts/run_unit_tests.sh
-
-# Integration tests (requires Docker)
-bash scripts/run_integration_tests.sh
 ```
 
 To run a subset of tests, pass a spec file:
 
 ```bash
-bash scripts/run_unit_tests.sh spec/user_api_unit_spec.rb
+bash scripts/run_tests.sh spec/query_spec.rb
 ```
 
-The integration script starts a ParadeDB container via Docker and sets `DATABASE_URL` automatically. The default container is `rails-paradedb` on port `5432`.
-
-Some integration tests require newer pg_search versions and are skipped automatically if the feature is not available.
+The test script starts a ParadeDB container via Docker and sets `DATABASE_URL` automatically. The default container is `rails-paradedb` on port `5432`.
 
 ### Linting and Formatting
 

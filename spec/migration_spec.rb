@@ -1,0 +1,795 @@
+# frozen_string_literal: true
+
+require "spec_helper"
+require "stringio"
+
+class IndexMigrationMockItem < ActiveRecord::Base
+  include ParadeDB::Model
+  self.table_name = :mock_items
+end
+
+class IndexMigrationMockItemIndex < ParadeDB::Index
+  self.table_name = :mock_items
+  self.key_field = :id
+  self.index_options = { target_segment_count: 17 }
+  self.fields = {
+    id: {},
+    description: {
+      tokenizers: [
+        ParadeDB::Tokenizer.literal(),
+        ParadeDB::Tokenizer.simple(options: {alias: "description_simple", lowercase: true})
+      ]
+    },
+    category: { tokenizer: ParadeDB::Tokenizer.literal() },
+    metadata: { fast: true, expand_dots: false }
+  }
+end
+
+class IndexMigrationMockItemByNameIndex < ParadeDB::Index
+  self.table_name = :mock_items
+  self.key_field = :id
+  self.index_name = :mock_items_by_name_search_idx
+  self.fields = {
+    id: {},
+    description: { tokenizer: ParadeDB::Tokenizer.simple() }
+  }
+end
+
+RSpec.describe "IndexMigration" do
+  before do
+    remove_test_indexes
+    ActiveRecord::Base.connection.create_paradedb_index(IndexMigrationMockItemIndex)
+  end
+
+  after do
+    remove_test_indexes
+  end
+
+  it "creates a paradedb index through create_paradedb_index" do
+    sql = <<~SQL
+      SELECT am.amname
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      JOIN pg_index i ON i.indexrelid = c.oid
+      JOIN pg_am am ON am.oid = c.relam
+      WHERE c.relname = 'mock_items_search_idx' AND n.nspname = current_schema()
+      LIMIT 1
+    SQL
+
+    am_name = ActiveRecord::Base.connection.select_value(sql)
+    assert_equal "paradedb", am_name
+  end
+
+  it "executes search SQL after index creation" do
+    sql = IndexMigrationMockItem.search(:description_simple).match_all("rails").to_sql
+
+    assert_query_sql %(SELECT mock_items.* FROM mock_items WHERE (("mock_items"."description"::pdb.alias('description_simple')) &&& 'rails')), sql
+  end
+
+  it "raises when multiple tokenizers for a field are missing aliases" do
+    bad_index = Class.new(ParadeDB::Index) do
+      self.table_name = :mock_items
+      self.key_field = :id
+      self.fields = {
+        id: {},
+        description: {
+          tokenizers: [
+            ParadeDB::Tokenizer.literal(),
+            ParadeDB::Tokenizer.simple()
+          ]
+        }
+      }
+    end
+
+    error = assert_raises(ParadeDB::InvalidIndexDefinition) do
+      ActiveRecord::Base.connection.create_paradedb_index(bad_index)
+    end
+    assert_includes error.message, "alias"
+  end
+
+  it "supports create_paradedb_index with string class names" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+    conn.remove_paradedb_index(:mock_items, name: :mock_items_by_name_search_idx, if_exists: true)
+
+    conn.create_paradedb_index("IndexMigrationMockItemByNameIndex", if_not_exists: true)
+
+    assert index_exists?("mock_items_by_name_search_idx")
+  end
+
+  it "supports create_paradedb_index concurrently" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+
+    conn.create_paradedb_index(IndexMigrationMockItemIndex, concurrently: true)
+
+    assert index_exists?("mock_items_search_idx")
+    assert_query_sql %(SELECT mock_items.* FROM mock_items WHERE (("mock_items"."description"::pdb.alias('description_simple')) &&& 'concurrent')), IndexMigrationMockItem.search(:description_simple).match_all("concurrent").to_sql
+  end
+
+  it "create_paradedb_index supports where" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+    conn.remove_paradedb_index(:mock_items, name: :mock_items_filtered_search_idx, if_exists: true)
+
+    index_klass = Class.new(ParadeDB::Index) do
+      self.table_name = :mock_items
+      self.key_field = :id
+      self.index_name = :mock_items_filtered_search_idx
+      self.where = "category IS NOT NULL"
+      self.fields = {
+        id: {},
+        description: { tokenizer: ParadeDB::Tokenizer.simple() },
+        category: {}
+      }
+    end
+
+    conn.create_paradedb_index(index_klass)
+
+    assert_sql_equal <<~SQL, indexdef_for("mock_items_filtered_search_idx")
+      CREATE INDEX mock_items_filtered_search_idx ON public.mock_items
+      USING paradedb (id, ((description)::pdb.simple), category)
+      WITH (key_field=id)
+      WHERE (category IS NOT NULL)
+    SQL
+  end
+
+  it "supports add and remove paradedb index helpers" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+
+    conn.add_paradedb_index(
+      :mock_items,
+      fields: {
+        id: {},
+        description: { tokenizer: ParadeDB::Tokenizer.simple() }
+      },
+      key_field: :id,
+      name: :mock_items_custom_search_idx,
+      if_not_exists: true
+    )
+    assert index_exists?("mock_items_custom_search_idx")
+
+    conn.remove_paradedb_index(:mock_items, name: :mock_items_custom_search_idx, if_exists: true)
+    assert_not index_exists?("mock_items_custom_search_idx")
+  end
+
+  it "supports partial paradedb indexes with where clauses" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+
+    conn.add_paradedb_index(
+      :mock_items,
+      fields: {
+        id: {},
+        description: { tokenizer: ParadeDB::Tokenizer.simple() }
+      },
+      key_field: :id,
+      name: :mock_items_partial_search_idx,
+      where: "category IS NOT NULL",
+      if_not_exists: true
+    )
+
+    assert index_exists?("mock_items_partial_search_idx")
+    assert_sql_equal <<~SQL, indexdef_for("mock_items_partial_search_idx")
+      CREATE INDEX mock_items_partial_search_idx ON public.mock_items
+      USING paradedb (id, ((description)::pdb.simple))
+      WITH (key_field=id)
+      WHERE (category IS NOT NULL)
+    SQL
+
+    conn.remove_paradedb_index(:mock_items, name: :mock_items_partial_search_idx, if_exists: true)
+  end
+
+  it "supports add_paradedb_index concurrently" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_paradedb_index(:mock_items, name: :mock_items_concurrent_search_idx, if_exists: true)
+
+    conn.add_paradedb_index(
+      :mock_items,
+      fields: {
+        id: {},
+        description: { tokenizer: ParadeDB::Tokenizer.simple() }
+      },
+      key_field: :id,
+      name: :mock_items_concurrent_search_idx,
+      concurrently: true
+    )
+
+    assert index_exists?("mock_items_concurrent_search_idx")
+
+    conn.remove_paradedb_index(:mock_items, name: :mock_items_concurrent_search_idx, if_exists: true)
+  end
+
+  it "rolls back create_paradedb_index in change migrations" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+    conn.remove_paradedb_index(:mock_items, name: :mock_items_by_name_search_idx, if_exists: true)
+
+    migration = build_change_migration do
+      create_paradedb_index(IndexMigrationMockItemByNameIndex, if_not_exists: true)
+    end
+
+    run_migration(migration, :up, connection: conn)
+    assert index_exists?("mock_items_by_name_search_idx")
+
+    run_migration(migration, :down, connection: conn)
+    assert_not index_exists?("mock_items_by_name_search_idx")
+  end
+
+  it "rolls back add_paradedb_index in change migrations" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+    conn.remove_paradedb_index(:mock_items, name: :mock_items_custom_search_idx, if_exists: true)
+
+    migration = build_change_migration do
+      add_paradedb_index(
+        :mock_items,
+        fields: {
+          id: {},
+          description: { tokenizer: ParadeDB::Tokenizer.simple() }
+        },
+        key_field: :id,
+        name: :mock_items_custom_search_idx,
+        if_not_exists: true
+      )
+    end
+
+    run_migration(migration, :up, connection: conn)
+    assert index_exists?("mock_items_custom_search_idx")
+
+    run_migration(migration, :down, connection: conn)
+    assert_not index_exists?("mock_items_custom_search_idx")
+  end
+
+  it "supports the paradedb helpers end-to-end" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+    conn.remove_paradedb_index(:mock_items, name: :mock_items_alias_idx, if_exists: true)
+
+    conn.add_paradedb_index(
+      :mock_items,
+      fields: {
+        id: {},
+        description: { tokenizer: ParadeDB::Tokenizer.simple() }
+      },
+      key_field: :id,
+      name: :mock_items_alias_idx
+    )
+    assert index_exists?("mock_items_alias_idx")
+
+    conn.reindex_paradedb_index(:mock_items, name: :mock_items_alias_idx)
+
+    conn.remove_paradedb_index(:mock_items, name: :mock_items_alias_idx)
+    assert_not index_exists?("mock_items_alias_idx")
+  end
+
+  it "raises for remove_paradedb_index in change migrations" do
+    conn = ActiveRecord::Base.connection
+
+    migration = build_change_migration do
+      remove_paradedb_index(:mock_items, if_exists: true)
+    end
+
+    run_migration(migration, :up, connection: conn)
+    assert_not index_exists?("mock_items_search_idx")
+
+    error = assert_raises(ActiveRecord::IrreversibleMigration) do
+      run_migration(migration, :down, connection: conn)
+    end
+    assert_includes error.message, "remove_paradedb_index"
+  end
+
+  it "supports replace_paradedb_index helper" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+
+    v1 = Class.new(ParadeDB::Index) do
+      self.table_name = :mock_items
+      self.key_field = :id
+      self.fields = {
+        id: {},
+        description: { tokenizer: ParadeDB::Tokenizer.simple() }
+      }
+    end
+    v2 = Class.new(ParadeDB::Index) do
+      self.table_name = :mock_items
+      self.key_field = :id
+      self.fields = {
+        id: {},
+        description: { tokenizer: ParadeDB::Tokenizer.simple() },
+        category: { tokenizer: ParadeDB::Tokenizer.literal() }
+      }
+    end
+
+    conn.create_paradedb_index(v1)
+    before_indexdef = indexdef_for("mock_items_search_idx")
+
+    conn.replace_paradedb_index(v2)
+    after_indexdef = indexdef_for("mock_items_search_idx")
+
+    refute_equal before_indexdef, after_indexdef
+    assert_sql_equal <<~SQL, after_indexdef
+      CREATE INDEX mock_items_search_idx ON public.mock_items
+      USING paradedb (id, ((description)::pdb.simple), ((category)::pdb.literal))
+      WITH (key_field=id)
+    SQL
+  end
+
+  it "supports reindex_paradedb_index and guards concurrent reindex in a transaction" do
+    conn = ActiveRecord::Base.connection
+
+    conn.reindex_paradedb_index(:mock_items)
+
+    error = assert_raises(ArgumentError) do
+      conn.transaction do
+        conn.reindex_paradedb_index(:mock_items, concurrently: true)
+      end
+    end
+    assert_includes error.message, "cannot run inside a transaction"
+  end
+
+  it "guards concurrent create helpers in a transaction" do
+    conn = ActiveRecord::Base.connection
+
+    create_error = assert_raises(ArgumentError) do
+      conn.transaction do
+        conn.create_paradedb_index(IndexMigrationMockItemIndex, concurrently: true)
+      end
+    end
+    assert_includes create_error.message, "cannot run inside a transaction"
+
+    add_error = assert_raises(ArgumentError) do
+      conn.transaction do
+        conn.add_paradedb_index(
+          :mock_items,
+          fields: {
+            id: {},
+            description: { tokenizer: ParadeDB::Tokenizer.simple() }
+          },
+          key_field: :id,
+          name: :mock_items_concurrent_search_idx,
+          concurrently: true
+        )
+      end
+    end
+    assert_includes add_error.message, "cannot run inside a transaction"
+  end
+
+  it "makes create_paradedb_index idempotent with if_not_exists" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+
+    conn.create_paradedb_index(IndexMigrationMockItemIndex, if_not_exists: true)
+    conn.create_paradedb_index(IndexMigrationMockItemIndex, if_not_exists: true)
+
+    assert_equal 1, paradedb_index_count("mock_items_search_idx")
+  end
+
+  it "dumps paradedb indexes from catalog into schema output" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+    conn.add_paradedb_index(
+      :mock_items,
+      fields: {
+        id: {},
+        description: { tokenizer: ParadeDB::Tokenizer.simple(options: {alias: "description_simple"}) }
+      },
+      key_field: :id,
+      index_options: { target_segment_count: 17 },
+      if_not_exists: true
+    )
+    conn.instance_variable_set(:@paradedb_schema_index_references, [])
+
+    stream = StringIO.new
+    ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection_pool, stream)
+    schema = stream.string
+
+    add_stmt = schema.each_line.find do |line|
+      line.include?("add_paradedb_index :mock_items") &&
+        line.include?("description_simple") &&
+        line.include?("target_segment_count")
+    end
+
+    assert_equal <<~RUBY.strip, add_stmt.to_s.strip
+      add_paradedb_index :mock_items, fields: { id: {}, description: { tokenizer: ParadeDB::Tokenizer.simple(options: { :alias => "description_simple" }) } }, key_field: :id, name: "mock_items_search_idx", index_options: { :target_segment_count => 17 }
+    RUBY
+    expect(schema).not_to match(/add_index.*mock_items_search_idx/)
+    expect(schema).not_to match(/t\.index.*mock_items_search_idx/)
+  end
+
+  it "creates tokenized expression indexes and persists expression in catalog" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+
+    expression_index = Class.new(ParadeDB::Index) do
+      self.table_name = :mock_items
+      self.key_field = :id
+      self.fields = {
+        id: {},
+        "(metadata->>'description')::text": {
+          tokenizer: ParadeDB::Tokenizer.simple(options: {alias: "metadata_description"})
+        }
+      }
+    end
+
+    conn.create_paradedb_index(expression_index)
+    indexdef = indexdef_for("mock_items_search_idx")
+
+    assert_sql_equal <<~SQL, indexdef
+      CREATE INDEX mock_items_search_idx ON public.mock_items
+      USING paradedb (id, (((metadata ->> 'description'::text))::pdb.simple('alias=metadata_description')))
+      WITH (key_field=id)
+    SQL
+  end
+
+  it "allows aliased computed numeric expressions without requiring a tokenizer" do
+    conn = ActiveRecord::Base.connection
+
+    conn.execute("DROP INDEX IF EXISTS search_idx;")
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+
+    expect do
+      conn.add_paradedb_index(
+        :mock_items,
+        fields: {
+          id: {},
+          description: {},
+          "(rating + 1)" => { alias: "rating" }
+        },
+        key_field: :id,
+        name: :search_idx
+      )
+    end.not_to raise_error
+
+    assert_sql_equal <<~SQL, indexdef_for("search_idx")
+      CREATE INDEX search_idx ON public.mock_items USING paradedb
+      (id, description, (((rating + 1))::pdb.alias('alias=rating')))
+      WITH (key_field=id)
+    SQL
+    assert index_exists?("search_idx")
+  ensure
+    conn.execute("DROP INDEX IF EXISTS search_idx;") rescue nil
+  end
+
+  it "round-trips schema dump/load for structured multi-tokenizer fields" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+
+    conn.add_paradedb_index(
+      :mock_items,
+      fields: {
+        id: {},
+        description: {
+          tokenizers: [
+            ParadeDB::Tokenizer.literal(),
+            ParadeDB::Tokenizer.simple(options: {alias: "description_simple"})
+          ]
+        }
+      },
+      key_field: :id,
+      index_options: { target_segment_count: 17 },
+      if_not_exists: true
+    )
+
+    stream = StringIO.new
+    ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection_pool, stream)
+    schema = stream.string
+    add_stmt = schema.each_line.find do |line|
+      line.include?("add_paradedb_index :mock_items") &&
+        line.include?("description_simple") &&
+        line.include?("target_segment_count")
+    end
+
+    assert_equal <<~RUBY.strip, add_stmt.to_s.strip
+      add_paradedb_index :mock_items, fields: { id: {}, description: { tokenizers: [ParadeDB::Tokenizer.literal(), ParadeDB::Tokenizer.simple(options: { :alias => "description_simple" })] } }, key_field: :id, name: "mock_items_search_idx", index_options: { :target_segment_count => 17 }
+    RUBY
+
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+    expect { conn.instance_eval(add_stmt.strip) }.not_to raise_error
+    assert index_exists?("mock_items_search_idx")
+  end
+
+  it "round-trips schema dump/load for structured expression fields with casts" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+
+    conn.add_paradedb_index(
+      :mock_items,
+      fields: {
+        id: {},
+        "(metadata->>'description')::text": {
+          tokenizer: ParadeDB::Tokenizer.simple(options: {alias: "metadata_description_text", lowercase: true})
+        }
+      },
+      key_field: :id,
+      if_not_exists: true
+    )
+
+    stream = StringIO.new
+    ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection_pool, stream)
+    schema = stream.string
+    add_stmt = schema.each_line.find do |line|
+      line.include?("add_paradedb_index :mock_items") && line.include?("metadata_description_text")
+    end
+
+    assert_equal <<~RUBY.strip, add_stmt.to_s.strip
+      add_paradedb_index :mock_items, fields: { id: {}, "metadata ->> 'description'::text" => { tokenizer: ParadeDB::Tokenizer.simple(options: { :lowercase => true, :alias => "metadata_description_text" }) } }, key_field: :id, name: "mock_items_search_idx"
+    RUBY
+
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+    expect { conn.instance_eval(add_stmt.strip) }.not_to raise_error
+    assert index_exists?("mock_items_search_idx")
+  end
+
+  it "round-trips schema dump/load for partial paradedb indexes" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+
+    conn.add_paradedb_index(
+      :mock_items,
+      fields: {
+        id: {},
+        description: { tokenizer: ParadeDB::Tokenizer.simple(options: {alias: "description_simple"}) }
+      },
+      key_field: :id,
+      where: "category IS NOT NULL",
+      if_not_exists: true
+    )
+
+    stream = StringIO.new
+    ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection_pool, stream)
+    schema = stream.string
+    add_stmt = schema.each_line.find do |line|
+      line.include?("add_paradedb_index :mock_items") &&
+        line.include?("description_simple") &&
+        line.include?("where:")
+    end
+
+    assert_equal <<~RUBY.strip, add_stmt.to_s.strip
+      add_paradedb_index :mock_items, fields: { id: {}, description: { tokenizer: ParadeDB::Tokenizer.simple(options: { :alias => "description_simple" }) } }, key_field: :id, name: "mock_items_search_idx", where: "category IS NOT NULL"
+    RUBY
+
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+    expect { conn.instance_eval(add_stmt.strip) }.not_to raise_error
+    assert_sql_equal <<~SQL, indexdef_for("mock_items_search_idx")
+      CREATE INDEX mock_items_search_idx ON public.mock_items
+      USING paradedb (id, ((description)::pdb.simple('alias=description_simple')))
+      WITH (key_field=id)
+      WHERE (category IS NOT NULL)
+    SQL
+  end
+
+  it "round-trips vector values through a vector(n) column" do
+    IndexMigrationMockItem.reset_column_information
+
+    column = IndexMigrationMockItem.columns_hash["embedding"]
+    assert_equal :vector, column.type
+    assert_equal "vector(8)", column.sql_type
+    assert_equal 8, column.limit
+
+    item = IndexMigrationMockItem.create!(description: "item x", embedding: [1, 0, 0, 0, 0, 0, 0, 0])
+    assert_equal [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], item.reload.embedding
+
+    item.update!(embedding: [0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    assert_equal [0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], item.reload.embedding
+  end
+
+  it "dumps vector columns in schema.rb" do
+    assert_match(/t\.vector "embedding", limit: 8/, dump_schema)
+  end
+
+  it "round-trips vector opclasses through the schema dumper" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+    cosine_index = Class.new(ParadeDB::Index) do
+      self.table_name = :mock_items
+      self.key_field = :id
+      self.fields = { id: {}, description: {}, embedding: { metric: :cosine } }
+    end
+    conn.create_paradedb_index(cosine_index)
+
+    assert_match(/add_paradedb_index :mock_items,.*embedding: \{ metric: :cosine \}/, dump_schema)
+  end
+
+  it "round-trips vector index build options through the schema dumper" do
+    conn = ActiveRecord::Base.connection
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+    conn.add_paradedb_index(
+      :mock_items,
+      fields: { id: {}, description: {}, embedding: { metric: :cosine } },
+      key_field: :id,
+      index_options: { centroid_ratio: 0.01, training_samples_per_centroid: 32, cluster_replication: 1 }
+    )
+
+    add_stmt = dump_schema.each_line.find do |line|
+      line.include?("add_paradedb_index :mock_items")
+    end
+
+    assert_equal <<~RUBY.strip, add_stmt.to_s.strip
+      add_paradedb_index :mock_items, fields: { id: {}, description: {}, embedding: { metric: :cosine } }, key_field: :id, name: "mock_items_search_idx", index_options: { :centroid_ratio => 0.01, :training_samples_per_centroid => 32, :cluster_replication => 1 }
+    RUBY
+
+    conn.remove_paradedb_index(:mock_items, if_exists: true)
+    expect { conn.instance_eval(add_stmt.strip) }.not_to raise_error
+    assert index_exists?("mock_items_search_idx")
+  end
+
+  private
+
+  def dump_schema
+    io = StringIO.new
+    ActiveRecord::SchemaDumper.dump(ActiveRecord::Base.connection_pool, io)
+    io.string
+  end
+
+  def index_exists?(index_name)
+    paradedb_index_count(index_name).positive?
+  end
+
+  def paradedb_index_count(index_name)
+    sql = <<~SQL
+      SELECT COUNT(*)
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE c.relname = #{ActiveRecord::Base.connection.quote(index_name)}
+        AND n.nspname = current_schema()
+    SQL
+    ActiveRecord::Base.connection.select_value(sql).to_i
+  end
+
+  def indexdef_for(index_name)
+    sql = <<~SQL
+      SELECT pg_get_indexdef(c.oid)
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE c.relname = #{ActiveRecord::Base.connection.quote(index_name)}
+        AND n.nspname = current_schema()
+      LIMIT 1
+    SQL
+    ActiveRecord::Base.connection.select_value(sql).to_s
+  end
+
+  def build_change_migration(&block)
+    Class.new(ActiveRecord::Migration[ActiveRecord::Migration.current_version]) do
+      define_method(:change, &block)
+    end
+  end
+
+  def run_migration(migration_class, direction, connection:)
+    migration = migration_class.new
+    migration.suppress_messages do
+      migration.exec_migration(connection, direction)
+    end
+  end
+end
+
+require "rails/generators"
+require "generators/parade_db/index/index_generator"
+
+RSpec.describe ParadeDB::Generators::IndexGenerator do
+  let(:destination) { File.join(Dir.tmpdir, "parade_db_generator_test_#{Process.pid}") }
+
+  def run_generator(args, generator_options = {})
+    generator = described_class.new(
+      args,
+      generator_options,
+      destination_root: destination
+    )
+    silence_stream($stdout) { generator.invoke_all }
+    generator
+  end
+
+  def silence_stream(stream)
+    old = stream.dup
+    stream.reopen(File::NULL)
+    yield
+  ensure
+    stream.reopen(old)
+    old.close
+  end
+
+  def generated_index_path(model)
+    File.join(destination, "app/parade_db/#{model.underscore}_index.rb")
+  end
+
+  def generated_migration_path(model)
+    Dir.glob(File.join(destination, "db/migrate/*_create_#{model.underscore.pluralize}_search_index.rb")).first
+  end
+
+  before { FileUtils.mkdir_p(destination) }
+  after  { FileUtils.rm_rf(destination) }
+
+  describe "index class" do
+    it "generates the file at app/parade_db/<model>_index.rb" do
+      run_generator(["Product"])
+      expect(File.exist?(generated_index_path("Product"))).to be true
+    end
+
+    it "defines the correct class name" do
+      run_generator(["Product"])
+      content = File.read(generated_index_path("Product"))
+      expect(content).to include("class ProductIndex < ParadeDB::Index")
+    end
+
+    it "sets table_name and key_field" do
+      run_generator(["Product"])
+      content = File.read(generated_index_path("Product"))
+      expect(content).to include("self.table_name = :products")
+      expect(content).to include("self.key_field  = :id")
+    end
+
+    it "always includes the id field" do
+      run_generator(["Product"])
+      content = File.read(generated_index_path("Product"))
+      expect(content).to include("id: {}")
+    end
+
+    it "includes extra fields passed as arguments" do
+      run_generator(["Product", "description", "category", "rating"])
+      content = File.read(generated_index_path("Product"))
+      expect(content).to include("description: {}")
+      expect(content).to include("category: {}")
+      expect(content).to include("rating: {}")
+    end
+
+    it "handles multi-word model names" do
+      run_generator(["LineItem"])
+      content = File.read(generated_index_path("LineItem"))
+      expect(content).to include("class LineItemIndex < ParadeDB::Index")
+      expect(content).to include("self.table_name = :line_items")
+    end
+  end
+
+  describe "migration" do
+    it "generates a migration file" do
+      run_generator(["Product"])
+      expect(generated_migration_path("Product")).not_to be_nil
+    end
+
+    it "calls create_paradedb_index with the index class" do
+      run_generator(["Product"])
+      content = File.read(generated_migration_path("Product"))
+      expect(content).to include("create_paradedb_index(ProductIndex, if_not_exists: true)")
+    end
+
+    it "calls remove_paradedb_index in down" do
+      run_generator(["Product"])
+      content = File.read(generated_migration_path("Product"))
+      expect(content).to include("remove_paradedb_index :products, name: :products_search_idx, if_exists: true")
+    end
+
+    it "does not include disable_ddl_transaction! by default" do
+      run_generator(["Product"])
+      content = File.read(generated_migration_path("Product"))
+      expect(content).not_to include("disable_ddl_transaction!")
+    end
+
+    context "with --concurrent" do
+      it "adds disable_ddl_transaction! to the migration" do
+        run_generator(["Product"], "concurrent" => true)
+        content = File.read(generated_migration_path("Product"))
+        expect(content).to include("disable_ddl_transaction!")
+      end
+
+      it "creates the index concurrently" do
+        run_generator(["Product"], "concurrent" => true)
+        content = File.read(generated_migration_path("Product"))
+        expect(content).to include("create_paradedb_index(ProductIndex, if_not_exists: true, concurrently: true)")
+      end
+
+      it "places disable_ddl_transaction! before the up method" do
+        run_generator(["Product"], "concurrent" => true)
+        content = File.read(generated_migration_path("Product"))
+        expect(content.index("disable_ddl_transaction!")).to be < content.index("def up")
+      end
+    end
+
+    it "handles multi-word model names in migration class" do
+      run_generator(["LineItem"])
+      content = File.read(generated_migration_path("LineItem"))
+      expect(content).to include("class CreateLineItemSearchIndex")
+      expect(content).to include("remove_paradedb_index :line_items")
+    end
+  end
+end

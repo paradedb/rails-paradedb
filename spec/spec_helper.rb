@@ -132,25 +132,34 @@ def establish_test_connection
 end
 
 def setup_test_schema
-  return if defined?($paradedb_schema_loaded) && $paradedb_schema_loaded
+  connection = ActiveRecord::Base.connection
+  connection.execute("CREATE EXTENSION IF NOT EXISTS pg_search CASCADE;")
+  connection.drop_table(:mock_items, if_exists: true)
+  connection.execute("CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');")
 
-  ActiveRecord::Schema.define do
-    suppress_messages do
-      create_table :products, force: true do |t|
-        t.text :description
-        t.text :category
-        t.integer :rating
-        t.boolean :in_stock
-        t.integer :price
-      end
+  setup_test_index
+end
 
-      create_table :categories, force: true do |t|
-        t.text :name
-      end
-    end
+def setup_test_index
+  remove_test_indexes
+  ActiveRecord::Base.connection.execute(<<~SQL)
+    CREATE INDEX mock_items_search_idx ON mock_items
+    USING paradedb (id, description, rating, (category::pdb.literal), in_stock, metadata, created_at, last_updated_date, latest_available_time, weight_range, embedding vector_l2_ops)
+    WITH (key_field='id');
+  SQL
+end
+
+def remove_test_indexes
+  connection = ActiveRecord::Base.connection
+  connection.select_values(<<~SQL).each do |index|
+    SELECT indexname
+    FROM pg_indexes
+    WHERE schemaname = current_schema()
+      AND tablename = 'mock_items'
+      AND indexdef LIKE '%USING paradedb%'
+  SQL
+    connection.execute("DROP INDEX IF EXISTS #{connection.quote_table_name(index)}")
   end
-
-  $paradedb_schema_loaded = true
 end
 
 establish_test_connection
@@ -167,4 +176,9 @@ end
 
 def assert_sql_equal(expected, actual)
   assert_equal normalize_sql(expected), normalize_sql(actual)
+end
+
+def assert_query_sql(expected, actual)
+  assert_sql_equal expected, actual
+  ActiveRecord::Base.connection.execute(actual)
 end

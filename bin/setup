@@ -14,5 +14,4 @@ bundle install
 
 echo ""
 echo "==> Done"
-echo "Run unit tests: scripts/run_unit_tests.sh"
-echo "Run integration tests (requires ParadeDB): PARADEDB_WITH_PG=1 scripts/run_integration_tests.sh"
+echo "Run tests (requires ParadeDB): scripts/run_tests.sh"

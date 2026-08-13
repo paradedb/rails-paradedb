@@ -2,7 +2,7 @@
 #
 # Schema Compatibility Check
 # Validates that the rails-paradedb API wrapper stays in sync with the
-# ParadeDB SQL schema and that integration tests pass against the new version.
+# ParadeDB SQL schema and that tests pass against the new version.
 # Triggered automatically on each paradedb release (via repository_dispatch)
 # or manually via workflow_dispatch.
 
@@ -50,8 +50,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run --with json5  scripts/check_schema_compat.py ${{ env.PARADEDB_VERSION }}
 
-  integration-tests:
-    name: Integration Tests
+  tests:
+    name: Tests
     runs-on: ubuntu-latest
 
     services:
@@ -84,20 +84,13 @@ jobs:
           ruby-version: .ruby-version
           bundler-cache: true
 
-      - name: Run unit tests
-        env:
-          COVERAGE_COMMAND_NAME: unit
+      - name: Run tests
         run: bundle exec rake test
-
-      - name: Run integration tests
-        env:
-          COVERAGE_COMMAND_NAME: integration
-        run: bundle exec rake test:integration
 
   notify:
     name: Notify on Failure
     runs-on: ubuntu-latest
-    needs: [schema-compat, integration-tests]
+    needs: [schema-compat, tests]
     if: failure()
     steps:
       - name: Create GitHub Issue
@@ -108,7 +101,7 @@ jobs:
             --repo ${{ github.repository }} \
             --title "Schema compat failure for ParadeDB v${{ env.PARADEDB_VERSION }}" \
             --body "$(cat <<EOF
-          The schema compatibility check or integration tests failed against ParadeDB **v${{ env.PARADEDB_VERSION }}**.
+          The schema compatibility check or tests failed against ParadeDB **v${{ env.PARADEDB_VERSION }}**.
 
           **Workflow run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
