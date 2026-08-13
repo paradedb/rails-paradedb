@@ -43,6 +43,7 @@ module QuickstartSetup
 
     conn = ActiveRecord::Base.connection
     conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search CASCADE;")
+    conn.drop_table(:mock_items, if_exists: true)
     conn.execute(
       "CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');"
     )
