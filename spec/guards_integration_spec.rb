@@ -34,7 +34,7 @@ RSpec.describe "GuardsUnitTest" do
     assert_includes error.message, "No search field set"
   end
   it "fuzzy-style match_any without search raises" do
-    error = assert_raises(ArgumentError) { bare_relation.match_any("shoes", distance: 1) }
+    error = assert_raises(ArgumentError) { bare_relation.match_any(ParadeDB.fuzzy("shoes", 1)) }
     assert_includes error.message, "No search field set"
   end
   it "regex without search raises" do
@@ -90,64 +90,56 @@ RSpec.describe "GuardsUnitTest" do
     @builder ||= ParadeDB::Arel::Builder.new(:products)
   end
   it "match boost rejects non numeric" do
-    error = assert_raises(ArgumentError) { builder.match(:description, "shoes", boost: "high") }
-    assert_includes error.message, "boost must be numeric"
+    error = assert_raises(ArgumentError) { ParadeDB.boost("shoes", "high") }
+    assert_includes error.message, "factor must be numeric"
   end
   it "match boost accepts numeric" do
-    node = builder.match(:description, "shoes", boost: 2.5)
-    refute_nil node
-  end
-  it "match boost accepts nil" do
-    node = builder.match(:description, "shoes", boost: nil)
+    node = builder.match(:description, ParadeDB.boost("shoes", 2.5))
     refute_nil node
   end
   it "match tokenizer rejects strings" do
-    error = assert_raises(ArgumentError) { builder.match(:description, "shoes", tokenizer: "whitespace;drop") }
+    error = assert_raises(ArgumentError) { ParadeDB.tokenize("shoes", "whitespace;drop") }
     assert_includes error.message, "tokenizer must be a Tokenizer"
   end
   it "phrase slop rejects non numeric" do
-    error = assert_raises(ArgumentError) { builder.phrase(:description, "running shoes", slop: "lots") }
-    assert_includes error.message, "slop must be numeric"
+    error = assert_raises(ArgumentError) { ParadeDB.slop("running shoes", "lots") }
+    assert_includes error.message, "distance must be numeric"
   end
   it "phrase slop accepts integer" do
-    node = builder.phrase(:description, "running shoes", slop: 2)
+    node = builder.phrase(:description, ParadeDB.slop("running shoes", 2))
     refute_nil node
   end
   it "fuzzy distance on term rejects non numeric" do
-    error = assert_raises(ArgumentError) { builder.term(:description, "shoes", distance: "far") }
+    error = assert_raises(ArgumentError) { ParadeDB.fuzzy("shoes", "far") }
     assert_includes error.message, "distance must be numeric"
   end
   it "fuzzy distance on term rejects out of range" do
-    error = assert_raises(ArgumentError) { builder.term(:description, "shoes", distance: 5) }
+    error = assert_raises(ArgumentError) { ParadeDB.fuzzy("shoes", 5) }
     assert_includes error.message, "distance must be between 0 and 2"
   end
   it "fuzzy distance on match_any rejects out of range" do
-    error = assert_raises(ArgumentError) { builder.match_any(:description, "shoes", distance: 5) }
+    error = assert_raises(ArgumentError) { ParadeDB.fuzzy("shoes", 5) }
     assert_includes error.message, "distance must be between 0 and 2"
   end
-  it "match_any rejects tokenizer combined with fuzzy options" do
-    error = assert_raises(ArgumentError) do
-      builder.match_any(:description, "shoes", tokenizer: ParadeDB::Tokenizer.whitespace(), distance: 1)
-    end
-    assert_includes error.message, "tokenizer cannot be combined with fuzzy options"
+  it "match_any accepts composed tokenizer and fuzzy modifiers" do
+    node = builder.match_any(:description, ParadeDB.tokenize(ParadeDB.fuzzy("shoes", 1), ParadeDB::Tokenizer.whitespace()))
+    refute_nil node
   end
-  it "match_all rejects tokenizer combined with fuzzy options" do
-    error = assert_raises(ArgumentError) do
-      builder.match(:description, "shoes", tokenizer: ParadeDB::Tokenizer.whitespace(), prefix: true)
-    end
-    assert_includes error.message, "tokenizer cannot be combined with fuzzy options"
+  it "match_all accepts composed fuzzy and tokenizer modifiers" do
+    node = builder.match(:description, ParadeDB.fuzzy(ParadeDB.tokenize("shoes", ParadeDB::Tokenizer.whitespace()), 1, prefix: true))
+    refute_nil node
   end
   it "fuzzy boost on term rejects non numeric" do
-    error = assert_raises(ArgumentError) { builder.term(:description, "shoes", distance: 1, boost: "high") }
-    assert_includes error.message, "boost must be numeric"
+    error = assert_raises(ArgumentError) { ParadeDB.boost(ParadeDB.fuzzy("shoes", 1), "high") }
+    assert_includes error.message, "factor must be numeric"
   end
   it "fuzzy options on term accept valid numerics" do
-    node = builder.term(:description, "shoes", distance: 2, boost: 1.5)
+    node = builder.term(:description, ParadeDB.boost(ParadeDB.fuzzy("shoes", 2), 1.5))
     refute_nil node
   end
   it "term boost rejects non numeric" do
-    error = assert_raises(ArgumentError) { builder.term(:description, "shoes", boost: [1]) }
-    assert_includes error.message, "boost must be numeric"
+    error = assert_raises(ArgumentError) { ParadeDB.boost("shoes", [1]) }
+    assert_includes error.message, "factor must be numeric"
   end
   it "term set empty values raises" do
     error = assert_raises(ArgumentError) { builder.term_set(:description, []) }
@@ -162,16 +154,12 @@ RSpec.describe "GuardsUnitTest" do
     refute_nil node
   end
   it "near boost rejects non numeric" do
-    error = assert_raises(ArgumentError) { builder.near(:description, ParadeDB.proximity("a").within(1, "b"), boost: "high") }
-    assert_includes error.message, "boost must be numeric"
+    error = assert_raises(ArgumentError) { ParadeDB.boost(ParadeDB.proximity("a").within(1, "b"), "high") }
+    assert_includes error.message, "factor must be numeric"
   end
   it "near const rejects non numeric" do
-    error = assert_raises(ArgumentError) { builder.near(:description, ParadeDB.proximity("a").within(1, "b"), const: "fixed") }
-    assert_includes error.message, "const must be numeric"
-  end
-  it "near rejects boost and const together" do
-    error = assert_raises(ArgumentError) { builder.near(:description, ParadeDB.proximity("a").within(1, "b"), boost: 2.0, const: 1.0) }
-    assert_includes error.message, "boost and const are mutually exclusive"
+    error = assert_raises(ArgumentError) { ParadeDB.constant(ParadeDB.proximity("a").within(1, "b"), "fixed") }
+    assert_includes error.message, "score must be numeric"
   end
   it "near regex max expansions rejects non integer" do
     error = assert_raises(ArgumentError) do

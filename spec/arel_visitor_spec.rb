@@ -19,15 +19,15 @@ RSpec.describe "ArelVisitorTest" do
     assert_equal %("products"."description" ||| 'wireless bluetooth'), sql(node)
   end
   it "match any with tokenizer override" do
-    node = @builder.match_any(:description, "running shoes", tokenizer: ParadeDB::Tokenizer.whitespace())
+    node = @builder.match_any(:description, ParadeDB.tokenize("running shoes", ParadeDB::Tokenizer.whitespace()))
     assert_equal %("products"."description" ||| 'running shoes'::pdb.whitespace), sql(node)
   end
   it "phrase with slop" do
-    node = @builder.phrase(:description, "running shoes", slop: 2)
+    node = @builder.phrase(:description, ParadeDB.slop("running shoes", 2))
     assert_equal %("products"."description" ### 'running shoes'::pdb.slop(2)), sql(node)
   end
   it "phrase with tokenizer" do
-    node = @builder.phrase(:description, "running shoes", tokenizer: ParadeDB::Tokenizer.whitespace())
+    node = @builder.phrase(:description, ParadeDB.tokenize("running shoes", ParadeDB::Tokenizer.whitespace()))
     assert_equal %("products"."description" ### 'running shoes'::pdb.whitespace), sql(node)
   end
   it "phrase with array" do
@@ -43,23 +43,23 @@ RSpec.describe "ArelVisitorTest" do
     assert_equal %("products"."category" @@@ pdb.term_set(ARRAY['audio', 'footwear'])), sql(node)
   end
   it "term with boost" do
-    node = @builder.term(:description, "shoes", boost: 2)
+    node = @builder.term(:description, ParadeDB.boost("shoes", 2))
     assert_equal %("products"."description" === 'shoes'::pdb.boost(2)), sql(node)
   end
   it "term with fuzzy prefix" do
-    node = @builder.term(:description, "runn", distance: 1, prefix: true)
+    node = @builder.term(:description, ParadeDB.fuzzy("runn", 1, prefix: true))
     assert_equal %("products"."description" === 'runn'::pdb.fuzzy(1, "true")), sql(node)
   end
   it "term with fuzzy boost" do
-    node = @builder.term(:description, "shose", distance: 2, boost: 2)
+    node = @builder.term(:description, ParadeDB.boost(ParadeDB.fuzzy("shose", 2), 2))
     assert_equal %("products"."description" === 'shose'::pdb.fuzzy(2)::pdb.boost(2)), sql(node)
   end
   it "term with fuzzy prefix and boost" do
-    node = @builder.term(:description, "runn", distance: 1, prefix: true, boost: 1.5)
+    node = @builder.term(:description, ParadeDB.boost(ParadeDB.fuzzy("runn", 1, prefix: true), 1.5))
     assert_equal %("products"."description" === 'runn'::pdb.fuzzy(1, "true")::pdb.boost(1.5)), sql(node)
   end
   it "boost" do
-    node = @builder.match(:description, "shoes", boost: 2)
+    node = @builder.match(:description, ParadeDB.boost("shoes", 2))
     assert_equal %("products"."description" &&& 'shoes'::pdb.boost(2)), sql(node)
   end
   it "regex" do
@@ -79,7 +79,7 @@ RSpec.describe "ArelVisitorTest" do
     assert_equal %("products"."description" @@@ (pdb.prox_array('sleek', 'white') ## 1 ## 'shoes')), sql(node)
   end
   it "near with const" do
-    node = @builder.near(:description, ParadeDB.proximity("sleek").within(1, "shoes"), const: 1.0)
+    node = @builder.near(:description, ParadeDB.constant(ParadeDB.proximity("sleek").within(1, "shoes"), 1.0))
     assert_equal %("products"."description" @@@ ('sleek' ## 1 ## 'shoes')::pdb.const(1.0)), sql(node)
   end
   it "regex phrase" do

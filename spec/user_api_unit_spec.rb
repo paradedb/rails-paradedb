@@ -94,11 +94,11 @@ RSpec.describe "UserApiUnitTest" do
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ||| 'wireless bluetooth')), sql
   end
   it "matching all with tokenizer override" do
-    sql = Product.search(:description).match_all("running shoes", tokenizer: ParadeDB::Tokenizer.whitespace()).to_sql
+    sql = Product.search(:description).match_all(ParadeDB.tokenize("running shoes", ParadeDB::Tokenizer.whitespace())).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" &&& 'running shoes'::pdb.whitespace)), sql
   end
   it "matching all with tokenizer args" do
-    sql = Product.search(:description).match_all("running shoes", tokenizer: ParadeDB::Tokenizer.whitespace(options: {lowercase: false})).to_sql
+    sql = Product.search(:description).match_all(ParadeDB.tokenize("running shoes", ParadeDB::Tokenizer.whitespace(options: {lowercase: false}))).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" &&& 'running shoes'::pdb.whitespace('lowercase=false'))), sql
   end
   it "matching all with sql function argument" do
@@ -131,11 +131,11 @@ RSpec.describe "UserApiUnitTest" do
     assert_sql_equal %(SELECT products.* FROM products WHERE "products"."in_stock" = TRUE AND ("products"."description" &&& 'shoes' OR "products"."category" &&& 'footwear') ORDER BY "products"."id" DESC LIMIT 10), sql
   end
   it "phrase with slop" do
-    sql = Product.search(:description).phrase("running shoes", slop: 2).to_sql
+    sql = Product.search(:description).phrase(ParadeDB.slop("running shoes", 2)).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ### 'running shoes'::pdb.slop(2))), sql
   end
   it "phrase with tokenizer" do
-    sql = Product.search(:description).phrase("running shoes", tokenizer: ParadeDB::Tokenizer.whitespace()).to_sql
+    sql = Product.search(:description).phrase(ParadeDB.tokenize("running shoes", ParadeDB::Tokenizer.whitespace())).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ### 'running shoes'::pdb.whitespace)), sql
   end
   it "phrase with sql function argument" do
@@ -148,11 +148,11 @@ RSpec.describe "UserApiUnitTest" do
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" ### ARRAY['running', 'shoes'])), sql
   end
   it "fuzzy with prefix" do
-    sql = Product.search(:description).term("runn", distance: 1, prefix: true).to_sql
+    sql = Product.search(:description).term(ParadeDB.fuzzy("runn", 1, prefix: true)).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" === 'runn'::pdb.fuzzy(1, "true"))), sql
   end
   it "fuzzy with prefix and boost" do
-    sql = Product.search(:description).term("shose", distance: 2, prefix: false, boost: 2).to_sql
+    sql = Product.search(:description).term(ParadeDB.boost(ParadeDB.fuzzy("shose", 2, prefix: false), 2)).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" === 'shose'::pdb.fuzzy(2)::pdb.boost(2))), sql
   end
   it "regex" do
@@ -204,11 +204,11 @@ RSpec.describe "UserApiUnitTest" do
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('trail' ## 1 ## ('running' ## 1 ## 'shoes')))), sql
   end
   it "near boosted proximity" do
-    sql = Product.search(:description).near(ParadeDB.proximity("sleek").within(1, "shoes"), boost: 2.0).to_sql
+    sql = Product.search(:description).near(ParadeDB.boost(ParadeDB.proximity("sleek").within(1, "shoes"), 2.0)).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('sleek' ## 1 ## 'shoes')::pdb.boost(2.0))), sql
   end
   it "near constant score proximity" do
-    sql = Product.search(:description).near(ParadeDB.proximity("sleek").within(1, "shoes"), const: 1.0).to_sql
+    sql = Product.search(:description).near(ParadeDB.constant(ParadeDB.proximity("sleek").within(1, "shoes"), 1.0)).to_sql
     assert_sql_equal %(SELECT products.* FROM products WHERE ("products"."description" @@@ ('sleek' ## 1 ## 'shoes')::pdb.const(1.0))), sql
   end
   it "phrase prefix" do

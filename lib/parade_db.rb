@@ -85,4 +85,24 @@ module ParadeDB
   def proximity(*terms)
     Proximity::Clause.new(*terms)
   end
+
+  def boost(value, factor)
+    Arel::Builder.new.boost(value, factor)
+  end
+
+  def constant(value, score)
+    Arel::Builder.new.constant(value, score)
+  end
+
+  def fuzzy(value, distance, prefix: nil, transposition_cost_one: nil)
+    Arel::Builder.new.fuzzy(value, distance, prefix: prefix, transposition_cost_one: transposition_cost_one)
+  end
+
+  def slop(value, distance)
+    Arel::Builder.new.slop(value, distance)
+  end
+
+  def tokenize(value, tokenizer)
+    Arel::Builder.new.tokenize(value, tokenizer)
+  end
 end
