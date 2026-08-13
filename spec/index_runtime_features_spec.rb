@@ -9,12 +9,12 @@ RSpec.describe "IndexRuntimeFeatures" do
 
     conn = ActiveRecord::Base.connection
     conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search CASCADE;")
-    conn.remove_paradedb_index(:products, if_exists: true) if conn.respond_to?(:remove_paradedb_index)
+    conn.remove_paradedb_index(:mock_items, if_exists: true) if conn.respond_to?(:remove_paradedb_index)
   end
 
   after do
     ParadeDB.index_validation_mode = @previous_mode
-    ActiveRecord::Base.connection.remove_paradedb_index(:products, if_exists: true) rescue nil
+    ActiveRecord::Base.connection.remove_paradedb_index(:mock_items, if_exists: true) rescue nil
     cleanup_constants("RuntimeProduct", "RuntimeProductIndex", "CustomRuntimeIndex", "ExplicitRuntimeProduct", "DriftProduct", "DriftProductIndex")
   end
 
@@ -34,13 +34,13 @@ RSpec.describe "IndexRuntimeFeatures" do
 
   it "paradedb_index macro overrides convention" do
     Object.const_set("CustomRuntimeIndex", Class.new(ParadeDB::Index) do
-      self.table_name = :products
+      self.table_name = :mock_items
       self.key_field = :id
       self.fields = { id: {}, description: {} }
     end)
 
     Object.const_set("ExplicitRuntimeProduct", Class.new(ActiveRecord::Base) do
-      self.table_name = :products
+      self.table_name = :mock_items
       include ParadeDB::Model
       paradedb_index CustomRuntimeIndex
       paradedb_index CustomRuntimeIndex
@@ -52,11 +52,11 @@ RSpec.describe "IndexRuntimeFeatures" do
 
   it "search raises FieldNotIndexed for non-indexed fields" do
     Object.const_set("RuntimeProduct", Class.new(ActiveRecord::Base) do
-      self.table_name = :products
+      self.table_name = :mock_items
       include ParadeDB::Model
     end)
     Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
-      self.table_name = :products
+      self.table_name = :mock_items
       self.key_field = :id
       self.fields = { id: {}, description: {} }
     end)
@@ -64,17 +64,17 @@ RSpec.describe "IndexRuntimeFeatures" do
     conn = ActiveRecord::Base.connection
     conn.create_paradedb_index(RuntimeProductIndex, if_not_exists: true)
 
-    error = assert_raises(ParadeDB::FieldNotIndexed) { RuntimeProduct.search(:price) }
+    error = assert_raises(ParadeDB::FieldNotIndexed) { RuntimeProduct.search(:rating) }
     assert_includes error.message, "not indexed"
   end
 
   it "relation search raises FieldNotIndexed for non-indexed fields" do
     Object.const_set("RuntimeProduct", Class.new(ActiveRecord::Base) do
-      self.table_name = :products
+      self.table_name = :mock_items
       include ParadeDB::Model
     end)
     Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
-      self.table_name = :products
+      self.table_name = :mock_items
       self.key_field = :id
       self.fields = { id: {}, description: {} }
     end)
@@ -83,18 +83,18 @@ RSpec.describe "IndexRuntimeFeatures" do
     conn.create_paradedb_index(RuntimeProductIndex, if_not_exists: true)
 
     error = assert_raises(ParadeDB::FieldNotIndexed) do
-      RuntimeProduct.search(:description).search(:price)
+      RuntimeProduct.search(:description).search(:rating)
     end
     assert_includes error.message, "not indexed"
   end
 
   it "search uses alias cast for aliased index fields" do
     Object.const_set("RuntimeProduct", Class.new(ActiveRecord::Base) do
-      self.table_name = :products
+      self.table_name = :mock_items
       include ParadeDB::Model
     end)
     Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
-      self.table_name = :products
+      self.table_name = :mock_items
       self.key_field = :id
       self.fields = {
         id: {},
@@ -112,11 +112,11 @@ RSpec.describe "IndexRuntimeFeatures" do
 
   it "relation search uses alias cast for aliased index fields" do
     Object.const_set("RuntimeProduct", Class.new(ActiveRecord::Base) do
-      self.table_name = :products
+      self.table_name = :mock_items
       include ParadeDB::Model
     end)
     Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
-      self.table_name = :products
+      self.table_name = :mock_items
       self.key_field = :id
       self.fields = {
         id: {},
@@ -134,11 +134,11 @@ RSpec.describe "IndexRuntimeFeatures" do
 
   it "aggregate_by rejects text fields without a literal tokenizer" do
     Object.const_set("RuntimeProduct", Class.new(ActiveRecord::Base) do
-      self.table_name = :products
+      self.table_name = :mock_items
       include ParadeDB::Model
     end)
     Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
-      self.table_name = :products
+      self.table_name = :mock_items
       self.key_field = :id
       self.fields = {
         id: {},
@@ -159,11 +159,11 @@ RSpec.describe "IndexRuntimeFeatures" do
 
   it "aggregate_by rejects aliased text fields with a non-literal tokenizer" do
     Object.const_set("RuntimeProduct", Class.new(ActiveRecord::Base) do
-      self.table_name = :products
+      self.table_name = :mock_items
       include ParadeDB::Model
     end)
     Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
-      self.table_name = :products
+      self.table_name = :mock_items
       self.key_field = :id
       self.fields = {
         id: {},
@@ -184,11 +184,11 @@ RSpec.describe "IndexRuntimeFeatures" do
 
   it "aggregate_by resolves literal-tokenized aliased fields to the indexed source column" do
     Object.const_set("RuntimeProduct", Class.new(ActiveRecord::Base) do
-      self.table_name = :products
+      self.table_name = :mock_items
       include ParadeDB::Model
     end)
     Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
-      self.table_name = :products
+      self.table_name = :mock_items
       self.key_field = :id
       self.fields = {
         id: {},
@@ -200,17 +200,17 @@ RSpec.describe "IndexRuntimeFeatures" do
     conn.create_paradedb_index(RuntimeProductIndex, if_not_exists: true)
 
     sql = RuntimeProduct.aggregate_by(:description_exact, agg: ParadeDB::Aggregations.value_count(:id)).to_sql
-    assert_includes sql, %("products"."description")
-    refute_includes sql, %("products"."description_exact")
+    assert_includes sql, %("mock_items"."description")
+    refute_includes sql, %("mock_items"."description_exact")
   end
 
   it "filtered with_agg resolves aliased fields to a search alias cast" do
     Object.const_set("RuntimeProduct", Class.new(ActiveRecord::Base) do
-      self.table_name = :products
+      self.table_name = :mock_items
       include ParadeDB::Model
     end)
     Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
-      self.table_name = :products
+      self.table_name = :mock_items
       self.key_field = :id
       self.fields = {
         id: {},
@@ -230,16 +230,16 @@ RSpec.describe "IndexRuntimeFeatures" do
     ).to_sql
 
     assert_includes sql, "::pdb.alias('description_simple')"
-    refute_includes sql, %("products"."description_simple" === 'shoes')
+    refute_includes sql, %("mock_items"."description_simple" === 'shoes')
   end
 
   it "filtered facets_agg resolves aliased fields against the aggregation source alias" do
     Object.const_set("RuntimeProduct", Class.new(ActiveRecord::Base) do
-      self.table_name = :products
+      self.table_name = :mock_items
       include ParadeDB::Model
     end)
     Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
-      self.table_name = :products
+      self.table_name = :mock_items
       self.key_field = :id
       self.fields = {
         id: {},
@@ -269,11 +269,11 @@ RSpec.describe "IndexRuntimeFeatures" do
 
   it "facets raises FieldNotIndexed for non-indexed facet fields" do
     Object.const_set("RuntimeProduct", Class.new(ActiveRecord::Base) do
-      self.table_name = :products
+      self.table_name = :mock_items
       include ParadeDB::Model
     end)
     Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
-      self.table_name = :products
+      self.table_name = :mock_items
       self.key_field = :id
       self.fields = { id: {}, description: {} }
     end)
@@ -282,20 +282,20 @@ RSpec.describe "IndexRuntimeFeatures" do
     conn.create_paradedb_index(RuntimeProductIndex, if_not_exists: true)
 
     error = assert_raises(ParadeDB::FieldNotIndexed) do
-      RuntimeProduct.search(:description).match_all("shoe").build_facet_query(fields: [:price]).sql
+      RuntimeProduct.search(:description).match_all("shoe").build_facet_query(fields: [:rating]).sql
     end
     assert_includes error.message, "non-indexed fields"
   end
 
   it "raise mode detects missing catalog index drift" do
     Object.const_set("DriftProduct", Class.new(ActiveRecord::Base) do
-      self.table_name = :products
+      self.table_name = :mock_items
       include ParadeDB::Model
     end)
     Object.const_set("DriftProductIndex", Class.new(ParadeDB::Index) do
-      self.table_name = :products
+      self.table_name = :mock_items
       self.key_field = :id
-      self.index_name = :products_missing_search_idx
+      self.index_name = :mock_items_missing_search_idx
       self.fields = { id: {}, description: {} }
     end)
 

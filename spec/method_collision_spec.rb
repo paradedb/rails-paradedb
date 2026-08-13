@@ -5,7 +5,7 @@ require "spec_helper"
 RSpec.describe "MethodCollision" do
   it "including model does not override an existing search method" do
     klass = Class.new(ActiveRecord::Base) do
-      self.table_name = :products
+      self.table_name = :mock_items
 
       def self.search(_query)
         :custom_search
@@ -20,7 +20,7 @@ RSpec.describe "MethodCollision" do
 
   it "including model does not raise without collision" do
     klass = Class.new(ActiveRecord::Base) do
-      self.table_name = :products
+      self.table_name = :mock_items
       include ParadeDB::Model
     end
 

@@ -4,7 +4,7 @@ require "spec_helper"
 
 class StatementCacheProduct < ActiveRecord::Base
   include ParadeDB::Model
-  self.table_name = :products
+  self.table_name = :mock_items
 end
 
 RSpec.describe "StatementCache" do

@@ -4,7 +4,7 @@ require "spec_helper"
 
 class GuardProduct < ActiveRecord::Base
   include ParadeDB::Model
-  self.table_name = :products
+  self.table_name = :mock_items
 
   class << self
     attr_accessor :_mock_adapter_name

@@ -132,46 +132,34 @@ def establish_test_connection
 end
 
 def setup_test_schema
-  return if defined?($paradedb_schema_loaded) && $paradedb_schema_loaded
-
-  ActiveRecord::Base.connection.execute("CREATE EXTENSION IF NOT EXISTS pg_search CASCADE;")
-
-  ActiveRecord::Schema.define do
-    suppress_messages do
-      create_table :products, force: true do |t|
-        t.text :description
-        t.text :category
-        t.text :brand
-        t.text :sku
-        t.integer :rating
-        t.boolean :in_stock
-        t.integer :price
-        t.integer :category_id
-        t.datetime :created_at
-        t.datetime :discontinued_at
-        t.int4range :weight_range
-        t.vector :embedding, limit: 3
-      end
-
-      create_table :categories, force: true do |t|
-        t.text :name
-        t.boolean :active
-      end
-    end
-  end
+  connection = ActiveRecord::Base.connection
+  connection.execute("CREATE EXTENSION IF NOT EXISTS pg_search CASCADE;")
+  connection.drop_table(:mock_items, if_exists: true)
+  connection.execute("CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');")
 
   setup_test_index
-
-  $paradedb_schema_loaded = true
 end
 
 def setup_test_index
-  ActiveRecord::Base.connection.execute("DROP INDEX IF EXISTS products_search_idx;")
+  remove_test_indexes
   ActiveRecord::Base.connection.execute(<<~SQL)
-    CREATE INDEX products_search_idx ON products
-    USING paradedb (id, description, category, brand, rating, in_stock, price, weight_range, embedding vector_l2_ops)
+    CREATE INDEX mock_items_search_idx ON mock_items
+    USING paradedb (id, description, rating, (category::pdb.literal), in_stock, metadata, created_at, last_updated_date, latest_available_time, weight_range, embedding vector_l2_ops)
     WITH (key_field='id');
   SQL
+end
+
+def remove_test_indexes
+  connection = ActiveRecord::Base.connection
+  connection.select_values(<<~SQL).each do |index|
+    SELECT indexname
+    FROM pg_indexes
+    WHERE schemaname = current_schema()
+      AND tablename = 'mock_items'
+      AND indexdef LIKE '%USING paradedb%'
+  SQL
+    connection.execute("DROP INDEX IF EXISTS #{connection.quote_table_name(index)}")
+  end
 end
 
 establish_test_connection
