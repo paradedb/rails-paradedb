@@ -26,7 +26,7 @@ end
 
 def demo_distance_projection(query_embedding)
   puts "\n--- Distance Projection ---"
-  distance = MockItem.paradedb_arel.l2_distance(:embedding, query_embedding)
+  distance = MockItem.l2_distance(:embedding, query_embedding)
   results = MockItem.nearest(:embedding, query_embedding)
                     .select(MockItem.arel_table[Arel.star], distance.as("distance"))
                     .limit(3)

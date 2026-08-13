@@ -2,8 +2,8 @@
 
 require_relative "parade_db/version"
 require_relative "parade_db/errors"
-require_relative "parade_db/arel"
 require_relative "parade_db/vector"
+require_relative "parade_db/query_builder"
 require_relative "parade_db/index"
 require_relative "parade_db/aggregations"
 require_relative "parade_db/proximity"
@@ -12,7 +12,6 @@ require_relative "parade_db/diagnostics"
 require_relative "parade_db/migration_helpers"
 require_relative "parade_db/model"
 require_relative "parade_db/search_methods"
-require_relative "parade_db/railtie"
 require_relative "parade_db/tokenizer"
 
 module ParadeDB
@@ -87,22 +86,24 @@ module ParadeDB
   end
 
   def boost(value, factor)
-    Arel::Builder.new.boost(value, factor)
+    QueryBuilder.new.boost(value, factor)
   end
 
   def constant(value, score)
-    Arel::Builder.new.constant(value, score)
+    QueryBuilder.new.constant(value, score)
   end
 
   def fuzzy(value, distance, prefix: nil, transposition_cost_one: nil)
-    Arel::Builder.new.fuzzy(value, distance, prefix: prefix, transposition_cost_one: transposition_cost_one)
+    QueryBuilder.new.fuzzy(value, distance, prefix: prefix, transposition_cost_one: transposition_cost_one)
   end
 
   def slop(value, distance)
-    Arel::Builder.new.slop(value, distance)
+    QueryBuilder.new.slop(value, distance)
   end
 
   def tokenize(value, tokenizer)
-    Arel::Builder.new.tokenize(value, tokenizer)
+    QueryBuilder.new.tokenize(value, tokenizer)
   end
+
+  private_constant :QueryBuilder
 end

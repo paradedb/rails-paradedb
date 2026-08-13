@@ -32,16 +32,11 @@ gem install --no-document --install-dir "${GEM_HOME_DIR}" "${GEM_FILE}" >/dev/nu
 
 EXPECTED_VERSION="${VERSION}" GEM_HOME="${GEM_HOME_DIR}" GEM_PATH="${GEM_HOME_DIR}" ruby <<'RUBY'
 require "parade_db"
-require "arel"
 
 expected = ENV.fetch("EXPECTED_VERSION")
 abort("Version mismatch: expected #{expected}, got #{ParadeDB::VERSION}") unless ParadeDB::VERSION == expected
-
-builder = ParadeDB::Arel::Builder.new("mock_items")
-node = builder.match(:description, "running shoes")
-unless node.is_a?(Arel::Nodes::InfixOperation) && node.operator.to_s == "&&&"
-  abort("Generated node is not a ParadeDB match infix operation")
-end
+abort("ParadeDB::Arel should not be public") if ParadeDB.const_defined?(:Arel, false)
+abort("Search modifier construction failed") unless ParadeDB.boost("running shoes", 2)
 
 puts "✅ Package smoke install passed for rails-paradedb #{ParadeDB::VERSION}"
 RUBY

@@ -11,12 +11,14 @@ module ParadeDB
       :paradedb_search,
       :more_like_this,
       :nearest,
+      :l2_distance,
+      :cosine_distance,
+      :inner_product,
       :with_facets,
       :facets,
       :with_agg,
       :facets_agg,
       :aggregate_by,
-      :paradedb_arel,
       :paradedb_index,
       :paradedb_index_class,
       :paradedb_index_classes,
@@ -74,6 +76,21 @@ module ParadeDB
         all.extending(SearchMethods).nearest(column, vector, metric: metric)
       end
 
+      def l2_distance(column, vector)
+        ensure_postgres!
+        QueryBuilder.new(table_name).vector_distance(column, vector, metric: :l2)
+      end
+
+      def cosine_distance(column, vector)
+        ensure_postgres!
+        QueryBuilder.new(table_name).vector_distance(column, vector, metric: :cosine)
+      end
+
+      def inner_product(column, vector)
+        ensure_postgres!
+        QueryBuilder.new(table_name).vector_distance(column, vector, metric: :ip)
+      end
+
       def with_facets(*fields, **opts)
         ensure_postgres!
         paradedb_validate_index!
@@ -106,11 +123,6 @@ module ParadeDB
           exact: exact,
           **named_aggregations
         )
-      end
-
-      def paradedb_arel
-        ensure_postgres!
-        @paradedb_arel ||= ParadeDB::Arel::Builder.new(table_name)
       end
 
       def paradedb_index(index_class)

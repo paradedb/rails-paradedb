@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file. The format 
 ### Changed
 
 - **BREAKING**: Search modifiers are now composable functions: `ParadeDB.boost`, `ParadeDB.constant`, `ParadeDB.fuzzy`, `ParadeDB.slop`, and `ParadeDB.tokenize`. Pass the wrapped value to search methods instead of using modifier keyword arguments.
+- **BREAKING**: Removed the public `ParadeDB::Arel` builder, Arel attribute predications, and `Model.paradedb_arel`. ParadeDB queries now use a private builder composed from standard Active Record nodes.
 
 ## [0.11.0] - 2026-08-04
 
