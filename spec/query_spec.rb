@@ -46,6 +46,12 @@ RSpec.describe "UserApi" do
 
     assert_query_sql expected, sql
   end
+  it "works in subqueries" do
+    subquery = MockItem.where(in_stock: true).select(:id)
+    sql = MockItem.search(:description).match_all("shoes").where(id: subquery).to_sql
+
+    assert_query_sql %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" &&& 'shoes') AND "mock_items"."id" IN (SELECT "mock_items"."id" FROM mock_items WHERE "mock_items"."in_stock" = TRUE)), sql
+  end
   it "chain multiple search fields and" do
     sql = MockItem.search(:description).match_all("running shoes")
                  .search(:category).phrase("Footwear")
