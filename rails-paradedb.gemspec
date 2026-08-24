@@ -17,7 +17,7 @@ Gem::Specification.new do |spec|
   spec.metadata = {
     "homepage_uri" => spec.homepage,
     "source_code_uri" => "https://github.com/paradedb/rails-paradedb",
-    "documentation_uri" => "https://docs.paradedb.com",
+    "documentation_uri" => "https://paradedb.com/docs",
     "changelog_uri" => "https://github.com/paradedb/rails-paradedb/blob/main/CHANGELOG.md",
     "bug_tracker_uri" => "https://github.com/paradedb/rails-paradedb/issues",
   }
