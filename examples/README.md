@@ -53,7 +53,7 @@ BUNDLE_GEMFILE=examples/Gemfile bundle exec ruby examples/faceted_search/faceted
 
 ## Hybrid Search (RRF) (`hybrid_rrf/hybrid_rrf.rb`)
 
-Combines BM25 keyword search (good for exact matches like part numbers) with vector similarity (good for meaning) using Reciprocal Rank Fusion. Composes a ParadeDB BM25 relation with a semantic relation via CTEs, using the native vector distance helpers.
+Combines BM25 keyword search (good for exact matches like part numbers) with vector similarity (good for meaning) using Reciprocal Rank Fusion. Composes a ParadeDB search relation with a semantic relation via CTEs, using the native vector distance helpers.
 
 Requires the `pgvector` extension, which is included in the ParadeDB Docker image.
 
