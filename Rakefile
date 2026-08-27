@@ -14,13 +14,13 @@ end
 
 namespace :paradedb do
   namespace :diagnostics do
-    desc "List BM25 indexes from pdb.indexes()"
+    desc "List ParadeDB indexes from pdb.indexes()"
     task :indexes do
       rows = ParadeDB.paradedb_indexes(connection: paradedb_diagnostics_connection)
       puts JSON.pretty_generate(rows)
     end
 
-    desc "List BM25 index segments from pdb.index_segments(index)"
+    desc "List ParadeDB index segments from pdb.index_segments(index)"
     task :index_segments, [:index] do |_task, args|
       index = args[:index] || ENV["INDEX"]
       raise ArgumentError, "index is required (usage: rake paradedb:diagnostics:index_segments[my_index])" if index.nil? || index.strip.empty?
