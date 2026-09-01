@@ -8,7 +8,7 @@ gem "railties", "~> 8.1"
 gem "rspec", "~> 3.13"
 
 group :test do
-  gem "simplecov", "~> 1.0", require: false
+  gem "simplecov", "~> 1.1", require: false
   gem "simplecov-cobertura", "~> 4.0", require: false
 end
 
