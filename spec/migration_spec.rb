@@ -712,11 +712,11 @@ RSpec.describe ParadeDB::Generators::IndexGenerator do
       expect(content).to include("class ProductIndex < ParadeDB::Index")
     end
 
-    it "sets table_name and key_field" do
+    it "sets table_name without a deprecated key_field" do
       run_generator(["Product"])
       content = File.read(generated_index_path("Product"))
       expect(content).to include("self.table_name = :products")
-      expect(content).to include("self.key_field  = :id")
+      expect(content).not_to include("self.key_field")
     end
 
     it "always includes the id field" do

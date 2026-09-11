@@ -25,7 +25,7 @@ module ParadeDB
       remember_schema_index_reference(resolved)
     end
 
-    def add_paradedb_index(table, fields:, key_field:, name: nil, index_options: nil, where: nil, if_not_exists: false, concurrently: false)
+    def add_paradedb_index(table, fields:, key_field: nil, name: nil, index_options: nil, where: nil, if_not_exists: false, concurrently: false)
       ensure_postgresql_adapter!
       anonymous = Class.new(ParadeDB::Index)
       anonymous.table_name = table
@@ -86,18 +86,18 @@ module ParadeDB
       prefix = if_not_exists ? "IF NOT EXISTS " : ""
       fields_sql = compiled.entries.map { |entry| paradedb_entry_sql(entry) }.join(", ")
       with_options_sql = paradedb_with_options_sql(compiled)
+      with_clause = with_options_sql.empty? ? "" : "\nWITH (#{with_options_sql})"
       where_sql = compiled.where ? "\nWHERE #{compiled.where}" : ""
 
       <<~SQL.strip.gsub(/\s+/, " ")
         CREATE INDEX#{modifier} #{prefix}#{quote_table_name(compiled.index_name)} ON #{quote_table_name(compiled.table_name)}
-        USING paradedb (#{fields_sql})
-        WITH (#{with_options_sql})#{where_sql}
+        USING paradedb (#{fields_sql})#{with_clause}#{where_sql}
       SQL
     end
 
     def paradedb_with_options_sql(compiled)
       options = []
-      options << "key_field=#{quote(compiled.key_field.to_s)}"
+      options << "key_field=#{quote(compiled.key_field.to_s)}" unless compiled.key_field.nil?
 
       compiled.index_options.each do |key, value|
         name = key.to_sym
@@ -327,7 +327,7 @@ module ParadeDB
       fields_sql = extract_paradedb_fields_sql(indexdef)
       where = normalize_paradedb_where_clause(row["where_clause"])
 
-      if key_field && fields_sql
+      if fields_sql
         field_sqls = split_paradedb_top_level(fields_sql).map(&:strip)
         parsed = field_sqls.map { |f| paradedb_parse_column_entry(f) }
 
@@ -350,9 +350,9 @@ module ParadeDB
         end
 
         statement = "add_paradedb_index #{table.to_sym.inspect}, " \
-          "fields: { #{fields_pairs.join(', ')} }, " \
-          "key_field: #{key_field.to_sym.inspect}, " \
-          "name: #{name.inspect}"
+          "fields: { #{fields_pairs.join(', ')} }, "
+        statement += "key_field: #{key_field.to_sym.inspect}, " if key_field
+        statement += "name: #{name.inspect}"
         unless index_options.empty?
           statement += ", index_options: #{ruby_hash_literal(index_options)}"
         end
@@ -868,7 +868,7 @@ if defined?(ActiveRecord::Migration)
         connection.replace_paradedb_index(index_klass)
       end
 
-      def add_paradedb_index(table, fields:, key_field:, name: nil, index_options: nil, where: nil, if_not_exists: false, concurrently: false)
+      def add_paradedb_index(table, fields:, key_field: nil, name: nil, index_options: nil, where: nil, if_not_exists: false, concurrently: false)
         connection.add_paradedb_index(
           table,
           fields: fields,

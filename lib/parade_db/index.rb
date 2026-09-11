@@ -104,7 +104,7 @@ module ParadeDB
       class << self
         def compile!(klass)
           table_name = require_symbol!(klass.table_name, "table_name")
-          key_field = require_symbol!(klass.key_field, "key_field")
+          key_field = require_symbol!(klass.key_field, "key_field") unless klass.key_field.nil?
           index_name = klass.index_name.to_s
           raise InvalidIndexDefinition, "index_name must be present" if index_name.strip.empty?
 
@@ -116,7 +116,6 @@ module ParadeDB
 
           index_options = normalize_index_options(klass.index_options)
 
-          validate_key_field_shape!(key_field.to_s, entries)
           validate_query_key_collisions!(entries)
 
           Compiled.new(
@@ -288,23 +287,7 @@ module ParadeDB
           end
         end
 
-        def validate_key_field_shape!(key_field_name, entries)
-          unless entries.any? { |entry| entry.source == key_field_name }
-            raise InvalidIndexDefinition,
-                  "key_field #{key_field_name.inspect} must be present in fields."
-          end
 
-          first_entry = entries.first
-          unless first_entry.source == key_field_name
-            raise InvalidIndexDefinition,
-                  "key_field #{key_field_name.inspect} must be first in fields."
-          end
-
-          return if first_entry.tokenizer.nil?
-
-          raise InvalidIndexDefinition,
-                "key_field #{key_field_name.inspect} must not be tokenized."
-        end
       end
     end
   end

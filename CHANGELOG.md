@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Changed
+
+- Index definitions, migration helpers, the generator, and schema dumps now support keyless indexes. Explicit `key_field` values remain supported for older pg_search versions.
+
 ## [0.12.0] - 2026-08-13
 
 ### Changed
