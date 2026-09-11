@@ -48,6 +48,8 @@ The official [ActiveRecord](https://guides.rubyonrails.org/active_record_basics.
 | PostgreSQL | 15+ (with the ParadeDB pg_search extension)                        |
 | pgvector   | Required for vector search (included in the ParadeDB Docker image) |
 
+`ParadeDB::Index` and `add_paradedb_index` no longer require `key_field`. Keyless creation requires a pg_search version with keyless index support. The deprecated setting remains available for older servers; query helpers continue to use the model primary key when it is omitted.
+
 ## Examples
 
 - [Quickstart](examples/quickstart/quickstart.rb)

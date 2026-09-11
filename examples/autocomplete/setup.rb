@@ -46,7 +46,7 @@ module AutocompleteSetup
     conn.execute("CREATE EXTENSION IF NOT EXISTS pg_search CASCADE;")
     conn.drop_table(:mock_items, if_exists: true)
     conn.execute(
-      "CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');"
+      "CALL paradedb.create_paradedb_test_table(schema_name => 'public', table_name => 'mock_items');"
     )
     conn.remove_paradedb_index(:mock_items, name: :search_idx, if_exists: true)
     conn.create_paradedb_index(MockItemIndex)

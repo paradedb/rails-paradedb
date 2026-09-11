@@ -229,13 +229,16 @@ RSpec.describe "IndexDsl" do
     assert_operator compiled.entries.length, :>=, 4
   end
 
-  it "requires key_field" do
+  it "allows indexes without key_field" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.fields = { id: {} }
+      self.fields = { description: { tokenizer: ParadeDB::Tokenizer.simple() } }
     end
 
-    assert_raises(ParadeDB::InvalidIndexDefinition) { klass.compiled_definition }
+    compiled = klass.compiled_definition
+    assert_nil compiled.key_field
+    sql = ActiveRecord::Base.connection.send(:build_create_sql, compiled, if_not_exists: false)
+    assert_equal 'CREATE INDEX "mock_items_search_idx" ON "mock_items" USING paradedb (("description"::pdb.simple))', sql
   end
 
   it "requires alias for ambiguous entries" do
@@ -940,6 +943,36 @@ RSpec.describe "IndexRuntimeFeatures" do
   def cleanup_constants(*names)
     names.each do |name|
       Object.send(:remove_const, name) if Object.const_defined?(name)
+    end
+  end
+end
+
+RSpec.describe "Keyless index migrations" do
+  it "creates and dumps an index with a tokenized first field and no key option" do
+    conn = ActiveRecord::Base.connection
+    conn.execute("CREATE TEMP TABLE keyless_items (description text, rating int)")
+    begin
+      conn.add_paradedb_index(
+        :keyless_items,
+        fields: { description: { tokenizer: ParadeDB::Tokenizer.simple() }, rating: {} },
+        name: :keyless_items_idx,
+        where: "rating > 0"
+      )
+      definition = conn.select_value("SELECT pg_get_indexdef('keyless_items_idx'::regclass)")
+      expect(definition).not_to include("key_field", "WITH ()")
+      statement = conn.send(:paradedb_index_to_ruby, {
+        "indexdef" => definition,
+        "table_name" => "keyless_items",
+        "index_name" => "keyless_items_idx",
+        "where_clause" => "rating > 0"
+      })
+      expect(statement).to start_with("add_paradedb_index")
+      expect(statement).not_to include("key_field")
+      conn.remove_paradedb_index(:keyless_items, name: :keyless_items_idx)
+      conn.instance_eval(statement)
+      expect(conn.select_value("SELECT pg_get_indexdef('keyless_items_idx'::regclass)")).to eq(definition)
+    ensure
+      conn.execute("DROP TABLE keyless_items")
     end
   end
 end
