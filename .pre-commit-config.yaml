@@ -27,6 +27,12 @@ repos:
       - id: destroyed-symlinks
       - id: fix-byte-order-marker
 
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.13.1-1
+    hooks:
+      - id: shfmt
+        args: ["-i", "2", "-ci"]
+
   - repo: https://github.com/rhysd/actionlint
     rev: v1.7.12
     hooks:

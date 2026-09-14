@@ -18,7 +18,10 @@ fi
 case "${RAILS_VERSION:-8.1}" in
   7.2) export BUNDLE_GEMFILE="${REPO_ROOT}/gemfiles/rails72.gemfile" ;;
   8.1) export BUNDLE_GEMFILE="${REPO_ROOT}/Gemfile" ;;
-  *) echo "Unsupported Rails version: ${RAILS_VERSION}. Supported: 7.2, 8.1" >&2; exit 1 ;;
+  *)
+    echo "Unsupported Rails version: ${RAILS_VERSION}. Supported: 7.2, 8.1" >&2
+    exit 1
+    ;;
 esac
 
 echo "==> Testing with Rails ${RAILS_VERSION:-8.1} (${BUNDLE_GEMFILE})"
