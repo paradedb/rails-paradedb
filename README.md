@@ -36,7 +36,7 @@
 
 ## ParadeDB for Rails
 
-The official [ActiveRecord](https://guides.rubyonrails.org/active_record_basics.html) integration for [ParadeDB](https://paradedb.com) (powered by the [`pg_search`](https://github.com/paradedb/paradedb) Postgres extension), including first-class support for managing ParadeDB indexes and running queries using the full ParadeDB API. The integration covers both [full-text search](https://www.paradedb.com/docs/reference/full-text/overview) and [vector search](https://www.paradedb.com/docs/reference/vector/overview) over pgvector `vector` types. Follow the [getting started guide](https://www.paradedb.com/docs/start/connect-your-app#rails) to begin.
+The official [ActiveRecord](https://guides.rubyonrails.org/active_record_basics.html) integration for [ParadeDB](https://paradedb.com) (powered by the [`pg_search`](https://github.com/paradedb/paradedb) Postgres extension). The integration covers both [full-text search](https://www.paradedb.com/docs/reference/full-text/overview) and [vector search](https://www.paradedb.com/docs/reference/vector/overview) over pgvector `vector` types. Follow the [getting started guide](https://www.paradedb.com/docs/start/connect-your-app#rails) to begin.
 
 ## Requirements & Compatibility
 
