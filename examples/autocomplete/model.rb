@@ -12,7 +12,6 @@ end
 
 class MockItemIndex < ParadeDB::Index
   self.table_name = :mock_items
-  self.key_field = :id
   self.index_name = :search_idx
   self.fields = {
     id: nil,
@@ -33,7 +32,6 @@ end
 
 class AutocompleteItemIndex < ParadeDB::Index
   self.table_name = :autocomplete_items
-  self.key_field = :id
   self.index_name = :autocomplete_items_idx
   self.fields = {
     id: nil,
