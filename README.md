@@ -50,7 +50,7 @@ The official [ActiveRecord](https://guides.rubyonrails.org/active_record_basics.
 
 ## Examples
 
-See the [ParadeDB guides](https://www.paradedb.com/docs/guides/overview) for usage examples. Select the Rails tab in each guide.
+See [Run Your First Queries](https://www.paradedb.com/docs/start/run-queries) for examples and the [Reference](https://www.paradedb.com/docs/reference/overview) for query syntax. Select the Rails tab in the code examples.
 
 ## Contributing
 
