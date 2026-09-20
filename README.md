@@ -50,7 +50,7 @@ The official [ActiveRecord](https://guides.rubyonrails.org/active_record_basics.
 
 ## Examples
 
-Follow the [example setup guide](https://www.paradedb.com/docs/guides/setup), then choose a guide and select the Rails tab:
+Complete the [Start tutorial](https://www.paradedb.com/docs/start/connect-your-app), then choose a guide and select the Rails tab:
 
 - [Quickstart](https://www.paradedb.com/docs/start/connect-your-app)
 - [Vector Search](https://www.paradedb.com/docs/guides/vector-search)

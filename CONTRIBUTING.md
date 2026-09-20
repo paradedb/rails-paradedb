@@ -99,7 +99,7 @@ If you are adding a new feature that requires new documentation, please add the 
 
 - The main README.md for user-facing features
 - Inline comments for API documentation
-- The [ParadeDB guides](https://www.paradedb.com/docs/guides/setup) for usage examples
+- The [ParadeDB guides](https://www.paradedb.com/docs/guides/vector-search) for usage examples
 
 We will not merge a feature without appropriate documentation.
 
