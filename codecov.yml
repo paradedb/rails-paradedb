@@ -24,7 +24,6 @@ comment:
 
 ignore:
   - "bin/**/*"
-  - "examples/**/*"
   - "gemfiles/**/*"
   - "scripts/**/*"
   - "spec/**/*"

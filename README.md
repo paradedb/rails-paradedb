@@ -48,18 +48,6 @@ The official [ActiveRecord](https://guides.rubyonrails.org/active_record_basics.
 | PostgreSQL | 15+ (with the ParadeDB pg_search extension)                        |
 | pgvector   | Required for vector search (included in the ParadeDB Docker image) |
 
-## Examples
-
-- [Quickstart](examples/quickstart/quickstart.rb)
-- [Vector Search](examples/vector_search/vector_search.rb)
-- [Faceted Search](examples/faceted_search/faceted_search.rb)
-- [Hybrid Search (RRF)](examples/hybrid_rrf/hybrid_rrf.rb)
-- [Retrieval-Augmented Generation (RAG)](examples/rag/rag.rb)
-- [Autocomplete](examples/autocomplete/autocomplete.rb)
-- [More Like This](examples/more_like_this/more_like_this.rb)
-
-See [examples/README.md](examples/README.md) for setup instructions and a description of each example.
-
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, running tests, linting, and the PR workflow.

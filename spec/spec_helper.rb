@@ -10,7 +10,6 @@ if ENV["COVERAGE"] == "1"
     track_files "lib/**/*.rb"
     add_filter "/spec/"
     add_filter "/vendor/"
-    add_filter "/examples/"
     formatter SimpleCov::Formatter::MultiFormatter.new(
       [
         SimpleCov::Formatter::HTMLFormatter,
