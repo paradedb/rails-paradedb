@@ -24,15 +24,3 @@ updates:
       bundler-dependencies:
         patterns:
           - "*"
-
-  - package-ecosystem: "bundler"
-    directory: "/examples"
-    schedule:
-      interval: "monthly"
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-patch"]
-    groups:
-      bundler-examples-dependencies:
-        patterns:
-          - "*"

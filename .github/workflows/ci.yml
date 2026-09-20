@@ -138,13 +138,3 @@ jobs:
           verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-      - name: Run examples
-        if: matrix.ruby-version == '3.3' && matrix.rails-version == '8.1'
-        env:
-          DATABASE_URL: ${{ env.PARADEDB_TEST_DSN }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-        run: |
-          set -euo pipefail
-          BUNDLE_GEMFILE=examples/Gemfile bundle install --jobs 4 --retry 3
-          scripts/run_examples.sh
