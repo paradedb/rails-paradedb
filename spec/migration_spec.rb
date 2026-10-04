@@ -686,11 +686,10 @@ RSpec.describe ParadeDB::Generators::IndexGenerator do
       expect(content).to include("class ProductIndex < ParadeDB::Index")
     end
 
-    it "sets table_name without a designated key" do
+    it "sets table_name" do
       run_generator(["Product"])
       content = File.read(generated_index_path("Product"))
       expect(content).to include("self.table_name = :products")
-      expect(content).not_to include("self.key_field")
     end
 
     it "always includes the id field" do

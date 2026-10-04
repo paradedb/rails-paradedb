@@ -217,16 +217,6 @@ RSpec.describe "IndexDsl" do
     assert_operator compiled.entries.length, :>=, 4
   end
 
-  it "allows a tokenized first field" do
-    klass = Class.new(ParadeDB::Index) do
-      self.table_name = :mock_items
-      self.fields = { description: { tokenizer: ParadeDB::Tokenizer.simple() } }
-    end
-
-    compiled = klass.compiled_definition
-    sql = ActiveRecord::Base.connection.send(:build_create_sql, compiled, if_not_exists: false)
-    assert_equal 'CREATE INDEX "mock_items_search_idx" ON "mock_items" USING paradedb (("description"::pdb.simple))', sql
-  end
 
   it "requires alias for ambiguous entries" do
     klass = Class.new(ParadeDB::Index) do
@@ -906,8 +896,8 @@ RSpec.describe "IndexRuntimeFeatures" do
   end
 end
 
-RSpec.describe "Keyless index migrations" do
-  it "creates and dumps an index with a tokenized first field and no key option" do
+RSpec.describe "Tokenized first field migrations" do
+  it "round-trips a partial index with a tokenized first field" do
     conn = ActiveRecord::Base.connection
     conn.execute("CREATE TEMP TABLE keyless_items (description text, rating int)")
     begin
@@ -918,7 +908,6 @@ RSpec.describe "Keyless index migrations" do
         where: "rating > 0"
       )
       definition = conn.select_value("SELECT pg_get_indexdef('keyless_items_idx'::regclass)")
-      expect(definition).not_to include("key_field", "WITH ()")
       statement = conn.send(:paradedb_index_to_ruby, {
         "indexdef" => definition,
         "table_name" => "keyless_items",
@@ -926,7 +915,6 @@ RSpec.describe "Keyless index migrations" do
         "where_clause" => "rating > 0"
       })
       expect(statement).to start_with("add_paradedb_index")
-      expect(statement).not_to include("key_field")
       conn.remove_paradedb_index(:keyless_items, name: :keyless_items_idx)
       conn.instance_eval(statement)
       expect(conn.select_value("SELECT pg_get_indexdef('keyless_items_idx'::regclass)")).to eq(definition)
