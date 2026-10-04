@@ -246,9 +246,9 @@ module ParadeDB
 
     def more_like_this(key, fields: nil, **options)
       ensure_paradedb_runtime!
-      runtime_key_field = paradedb_runtime_key_field
-      key_value = more_like_this_key_value(key, runtime_key_field)
-      pk_node = builder[runtime_key_field]
+      row_identifier = primary_key
+      key_value = more_like_this_key_value(key, row_identifier)
+      pk_node = builder[row_identifier]
       mlt_options = normalize_more_like_this_options(options)
       node = builder.more_like_this(pk_node, key_value, fields: fields, options: mlt_options)
       where(grouped(node))
@@ -257,7 +257,7 @@ module ParadeDB
     # ---- Decorators ----
 
     def with_score
-      with_projection(builder.score(paradedb_runtime_key_field).as("search_score"))
+      with_projection(builder.score(primary_key).as("search_score"))
     end
 
     def with_snippet(column, start_tag: nil, end_tag: nil, max_chars: nil)
@@ -335,7 +335,7 @@ module ParadeDB
       facet_args = normalize_facet_inputs(fields: fields, size: size, order: order, missing: missing, agg: agg)
       FacetQuery.build(
         relation: self,
-        primary_key: paradedb_runtime_key_field,
+        primary_key: primary_key,
         builder: builder,
         fields: facet_args[:fields],
         size: facet_args[:size],
@@ -416,7 +416,7 @@ module ParadeDB
     end
 
     # Orders by vector distance for Top-K pushdown inside the ParadeDB index.
-    # Adds `key_field @@@ pdb.all()` when the relation has no ParadeDB predicate,
+    # Adds `primary_key @@@ pdb.all()` when the relation has no ParadeDB predicate,
     # since vector ordering requires a @@@ predicate to activate the index scan.
     # Callers must add `.limit(k)`; the metric defaults to the index opclass metric.
     def nearest(column, vector, metric: nil)
@@ -434,7 +434,7 @@ module ParadeDB
 
     def ensure_paradedb_predicate
       # Add pdb.all() sentinel to force aggregate pushdown
-      where(grouped(builder.match_all(paradedb_runtime_key_field)))
+      where(grouped(builder.match_all(primary_key)))
     end
 
     private
@@ -443,15 +443,6 @@ module ParadeDB
       return nil unless klass.respond_to?(:paradedb_index_entry, true)
 
       klass.send(:paradedb_index_entry, column)&.metric
-    end
-
-    def paradedb_runtime_key_field
-      return primary_key unless klass.respond_to?(:paradedb_key_field)
-
-      key_field = klass.paradedb_key_field
-      return primary_key if key_field.nil? || key_field.to_s.empty?
-
-      key_field
     end
 
     def default_range_type_for_field(field)
@@ -483,13 +474,13 @@ module ParadeDB
       sql_type if QueryBuilder::RANGE_TYPES.include?(sql_type)
     end
 
-    def more_like_this_key_value(key, runtime_key_field)
-      return key.public_send(runtime_key_field) if key.respond_to?(runtime_key_field)
-      return key.id if runtime_key_field.to_s == "id" && key.respond_to?(:id)
+    def more_like_this_key_value(key, row_identifier)
+      return key.public_send(row_identifier) if key.respond_to?(row_identifier)
+      return key.id if row_identifier.to_s == "id" && key.respond_to?(:id)
       return key if scalar_more_like_this_key?(key)
 
       raise ArgumentError,
-            "more_like_this key object must respond to #{runtime_key_field.inspect} or be a scalar id/document value"
+            "more_like_this key object must respond to #{row_identifier.inspect} or be a scalar id/document value"
     end
 
     def scalar_more_like_this_key?(key)
@@ -635,7 +626,7 @@ module ParadeDB
     def build_aggregation_query(agg_specs, exact: nil)
       AggregationQuery.build(
         relation: self,
-        primary_key: paradedb_runtime_key_field,
+        primary_key: primary_key,
         builder: builder,
         agg_specs: agg_specs,
         exact: exact,

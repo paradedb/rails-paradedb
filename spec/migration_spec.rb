@@ -10,7 +10,6 @@ end
 
 class IndexMigrationMockItemIndex < ParadeDB::Index
   self.table_name = :mock_items
-  self.key_field = :id
   self.index_options = { target_segment_count: 17 }
   self.fields = {
     id: {},
@@ -27,7 +26,6 @@ end
 
 class IndexMigrationMockItemByNameIndex < ParadeDB::Index
   self.table_name = :mock_items
-  self.key_field = :id
   self.index_name = :mock_items_by_name_search_idx
   self.fields = {
     id: {},
@@ -69,7 +67,6 @@ RSpec.describe "IndexMigration" do
   it "raises when multiple tokenizers for a field are missing aliases" do
     bad_index = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = {
         id: {},
         description: {
@@ -114,7 +111,6 @@ RSpec.describe "IndexMigration" do
 
     index_klass = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.index_name = :mock_items_filtered_search_idx
       self.where = "category IS NOT NULL"
       self.fields = {
@@ -129,7 +125,6 @@ RSpec.describe "IndexMigration" do
     assert_sql_equal <<~SQL, indexdef_for("mock_items_filtered_search_idx")
       CREATE INDEX mock_items_filtered_search_idx ON public.mock_items
       USING paradedb (id, ((description)::pdb.simple), category)
-      WITH (key_field=id)
       WHERE (category IS NOT NULL)
     SQL
   end
@@ -144,7 +139,6 @@ RSpec.describe "IndexMigration" do
         id: {},
         description: { tokenizer: ParadeDB::Tokenizer.simple() }
       },
-      key_field: :id,
       name: :mock_items_custom_search_idx,
       if_not_exists: true
     )
@@ -164,7 +158,6 @@ RSpec.describe "IndexMigration" do
         id: {},
         description: { tokenizer: ParadeDB::Tokenizer.simple() }
       },
-      key_field: :id,
       name: :mock_items_partial_search_idx,
       where: "category IS NOT NULL",
       if_not_exists: true
@@ -174,7 +167,6 @@ RSpec.describe "IndexMigration" do
     assert_sql_equal <<~SQL, indexdef_for("mock_items_partial_search_idx")
       CREATE INDEX mock_items_partial_search_idx ON public.mock_items
       USING paradedb (id, ((description)::pdb.simple))
-      WITH (key_field=id)
       WHERE (category IS NOT NULL)
     SQL
 
@@ -191,7 +183,6 @@ RSpec.describe "IndexMigration" do
         id: {},
         description: { tokenizer: ParadeDB::Tokenizer.simple() }
       },
-      key_field: :id,
       name: :mock_items_concurrent_search_idx,
       concurrently: true
     )
@@ -229,7 +220,6 @@ RSpec.describe "IndexMigration" do
           id: {},
           description: { tokenizer: ParadeDB::Tokenizer.simple() }
         },
-        key_field: :id,
         name: :mock_items_custom_search_idx,
         if_not_exists: true
       )
@@ -253,7 +243,6 @@ RSpec.describe "IndexMigration" do
         id: {},
         description: { tokenizer: ParadeDB::Tokenizer.simple() }
       },
-      key_field: :id,
       name: :mock_items_alias_idx
     )
     assert index_exists?("mock_items_alias_idx")
@@ -286,7 +275,6 @@ RSpec.describe "IndexMigration" do
 
     v1 = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = {
         id: {},
         description: { tokenizer: ParadeDB::Tokenizer.simple() }
@@ -294,7 +282,6 @@ RSpec.describe "IndexMigration" do
     end
     v2 = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = {
         id: {},
         description: { tokenizer: ParadeDB::Tokenizer.simple() },
@@ -312,7 +299,6 @@ RSpec.describe "IndexMigration" do
     assert_sql_equal <<~SQL, after_indexdef
       CREATE INDEX mock_items_search_idx ON public.mock_items
       USING paradedb (id, ((description)::pdb.simple), ((category)::pdb.literal))
-      WITH (key_field=id)
     SQL
   end
 
@@ -347,7 +333,6 @@ RSpec.describe "IndexMigration" do
             id: {},
             description: { tokenizer: ParadeDB::Tokenizer.simple() }
           },
-          key_field: :id,
           name: :mock_items_concurrent_search_idx,
           concurrently: true
         )
@@ -375,7 +360,6 @@ RSpec.describe "IndexMigration" do
         id: {},
         description: { tokenizer: ParadeDB::Tokenizer.simple(options: {alias: "description_simple"}) }
       },
-      key_field: :id,
       index_options: { target_segment_count: 17 },
       if_not_exists: true
     )
@@ -392,7 +376,7 @@ RSpec.describe "IndexMigration" do
     end
 
     assert_equal <<~RUBY.strip, add_stmt.to_s.strip
-      add_paradedb_index :mock_items, fields: { id: {}, description: { tokenizer: ParadeDB::Tokenizer.simple(options: { :alias => "description_simple" }) } }, key_field: :id, name: "mock_items_search_idx", index_options: { :target_segment_count => 17 }
+      add_paradedb_index :mock_items, fields: { id: {}, description: { tokenizer: ParadeDB::Tokenizer.simple(options: { :alias => "description_simple" }) } }, name: "mock_items_search_idx", index_options: { :target_segment_count => 17 }
     RUBY
     expect(schema).not_to match(/add_index.*mock_items_search_idx/)
     expect(schema).not_to match(/t\.index.*mock_items_search_idx/)
@@ -404,7 +388,6 @@ RSpec.describe "IndexMigration" do
 
     expression_index = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = {
         id: {},
         "(metadata->>'description')::text": {
@@ -419,7 +402,6 @@ RSpec.describe "IndexMigration" do
     assert_sql_equal <<~SQL, indexdef
       CREATE INDEX mock_items_search_idx ON public.mock_items
       USING paradedb (id, (((metadata ->> 'description'::text))::pdb.simple('alias=metadata_description')))
-      WITH (key_field=id)
     SQL
   end
 
@@ -437,7 +419,6 @@ RSpec.describe "IndexMigration" do
           description: {},
           "(rating + 1)" => { alias: "rating" }
         },
-        key_field: :id,
         name: :search_idx
       )
     end.not_to raise_error
@@ -445,7 +426,6 @@ RSpec.describe "IndexMigration" do
     assert_sql_equal <<~SQL, indexdef_for("search_idx")
       CREATE INDEX search_idx ON public.mock_items USING paradedb
       (id, description, (((rating + 1))::pdb.alias('alias=rating')))
-      WITH (key_field=id)
     SQL
     assert index_exists?("search_idx")
   ensure
@@ -467,7 +447,6 @@ RSpec.describe "IndexMigration" do
           ]
         }
       },
-      key_field: :id,
       index_options: { target_segment_count: 17 },
       if_not_exists: true
     )
@@ -482,7 +461,7 @@ RSpec.describe "IndexMigration" do
     end
 
     assert_equal <<~RUBY.strip, add_stmt.to_s.strip
-      add_paradedb_index :mock_items, fields: { id: {}, description: { tokenizers: [ParadeDB::Tokenizer.literal(), ParadeDB::Tokenizer.simple(options: { :alias => "description_simple" })] } }, key_field: :id, name: "mock_items_search_idx", index_options: { :target_segment_count => 17 }
+      add_paradedb_index :mock_items, fields: { id: {}, description: { tokenizers: [ParadeDB::Tokenizer.literal(), ParadeDB::Tokenizer.simple(options: { :alias => "description_simple" })] } }, name: "mock_items_search_idx", index_options: { :target_segment_count => 17 }
     RUBY
 
     conn.remove_paradedb_index(:mock_items, if_exists: true)
@@ -502,7 +481,6 @@ RSpec.describe "IndexMigration" do
           tokenizer: ParadeDB::Tokenizer.simple(options: {alias: "metadata_description_text", lowercase: true})
         }
       },
-      key_field: :id,
       if_not_exists: true
     )
 
@@ -514,7 +492,7 @@ RSpec.describe "IndexMigration" do
     end
 
     assert_equal <<~RUBY.strip, add_stmt.to_s.strip
-      add_paradedb_index :mock_items, fields: { id: {}, "metadata ->> 'description'::text" => { tokenizer: ParadeDB::Tokenizer.simple(options: { :lowercase => true, :alias => "metadata_description_text" }) } }, key_field: :id, name: "mock_items_search_idx"
+      add_paradedb_index :mock_items, fields: { id: {}, "metadata ->> 'description'::text" => { tokenizer: ParadeDB::Tokenizer.simple(options: { :lowercase => true, :alias => "metadata_description_text" }) } }, name: "mock_items_search_idx"
     RUBY
 
     conn.remove_paradedb_index(:mock_items, if_exists: true)
@@ -532,7 +510,6 @@ RSpec.describe "IndexMigration" do
         id: {},
         description: { tokenizer: ParadeDB::Tokenizer.simple(options: {alias: "description_simple"}) }
       },
-      key_field: :id,
       where: "category IS NOT NULL",
       if_not_exists: true
     )
@@ -547,7 +524,7 @@ RSpec.describe "IndexMigration" do
     end
 
     assert_equal <<~RUBY.strip, add_stmt.to_s.strip
-      add_paradedb_index :mock_items, fields: { id: {}, description: { tokenizer: ParadeDB::Tokenizer.simple(options: { :alias => "description_simple" }) } }, key_field: :id, name: "mock_items_search_idx", where: "category IS NOT NULL"
+      add_paradedb_index :mock_items, fields: { id: {}, description: { tokenizer: ParadeDB::Tokenizer.simple(options: { :alias => "description_simple" }) } }, name: "mock_items_search_idx", where: "category IS NOT NULL"
     RUBY
 
     conn.remove_paradedb_index(:mock_items, if_exists: true)
@@ -555,7 +532,6 @@ RSpec.describe "IndexMigration" do
     assert_sql_equal <<~SQL, indexdef_for("mock_items_search_idx")
       CREATE INDEX mock_items_search_idx ON public.mock_items
       USING paradedb (id, ((description)::pdb.simple('alias=description_simple')))
-      WITH (key_field=id)
       WHERE (category IS NOT NULL)
     SQL
   end
@@ -584,7 +560,6 @@ RSpec.describe "IndexMigration" do
     conn.remove_paradedb_index(:mock_items, if_exists: true)
     cosine_index = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = { id: {}, description: {}, embedding: { metric: :cosine } }
     end
     conn.create_paradedb_index(cosine_index)
@@ -598,8 +573,7 @@ RSpec.describe "IndexMigration" do
     conn.add_paradedb_index(
       :mock_items,
       fields: { id: {}, description: {}, embedding: { metric: :cosine } },
-      key_field: :id,
-      index_options: { centroid_ratio: 0.01, training_samples_per_centroid: 32, cluster_replication: 1 }
+      index_options: { training_sample_ratio: 0.01, max_leaf_size: 32 }
     )
 
     add_stmt = dump_schema.each_line.find do |line|
@@ -607,7 +581,7 @@ RSpec.describe "IndexMigration" do
     end
 
     assert_equal <<~RUBY.strip, add_stmt.to_s.strip
-      add_paradedb_index :mock_items, fields: { id: {}, description: {}, embedding: { metric: :cosine } }, key_field: :id, name: "mock_items_search_idx", index_options: { :centroid_ratio => 0.01, :training_samples_per_centroid => 32, :cluster_replication => 1 }
+      add_paradedb_index :mock_items, fields: { id: {}, description: {}, embedding: { metric: :cosine } }, name: "mock_items_search_idx", index_options: { :training_sample_ratio => 0.01, :max_leaf_size => 32 }
     RUBY
 
     conn.remove_paradedb_index(:mock_items, if_exists: true)
@@ -712,7 +686,7 @@ RSpec.describe ParadeDB::Generators::IndexGenerator do
       expect(content).to include("class ProductIndex < ParadeDB::Index")
     end
 
-    it "sets table_name without a deprecated key_field" do
+    it "sets table_name without a designated key" do
       run_generator(["Product"])
       content = File.read(generated_index_path("Product"))
       expect(content).to include("self.table_name = :products")

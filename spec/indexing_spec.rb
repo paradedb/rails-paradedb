@@ -6,7 +6,6 @@ RSpec.describe "IndexDsl" do
   it "compiles structured hash fields with index_options" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.index_options = { target_segment_count: 17 }
       self.fields = {
         id: {},
@@ -28,14 +27,13 @@ RSpec.describe "IndexDsl" do
   it "compiles vector index build options and renders them in WITH" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
-      self.index_options = { centroid_ratio: 0.01, training_samples_per_centroid: 32, cluster_replication: 2 }
+      self.index_options = { training_sample_ratio: 0.01, max_leaf_size: 32 }
       self.fields = { id: {}, description: nil, embedding: { metric: :cosine } }
     end
 
     compiled = klass.compiled_definition
     assert_equal(
-      { centroid_ratio: 0.01, training_samples_per_centroid: 32, cluster_replication: 2 },
+      { training_sample_ratio: 0.01, max_leaf_size: 32 },
       compiled.index_options
     )
 
@@ -43,15 +41,14 @@ RSpec.describe "IndexDsl" do
     assert_sql_equal <<~SQL, sql
       CREATE INDEX mock_items_search_idx ON mock_items
       USING paradedb (id, description, embedding vector_cosine_ops)
-      WITH (key_field='id', centroid_ratio=0.01, training_samples_per_centroid=32, cluster_replication=2)
+      WITH (training_sample_ratio=0.01, max_leaf_size=32)
     SQL
   end
 
   it "renders a single vector index build option in WITH" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
-      self.index_options = { centroid_ratio: 0.5 }
+      self.index_options = { training_sample_ratio: 0.5 }
       self.fields = { id: {}, description: nil }
     end
 
@@ -59,7 +56,7 @@ RSpec.describe "IndexDsl" do
     assert_sql_equal <<~SQL, sql
       CREATE INDEX mock_items_search_idx ON mock_items
       USING paradedb (id, description)
-      WITH (key_field='id', centroid_ratio=0.5)
+      WITH (training_sample_ratio=0.5)
     SQL
   end
 
@@ -67,19 +64,18 @@ RSpec.describe "IndexDsl" do
     build = lambda do |options|
       Class.new(ParadeDB::Index) do
         self.table_name = :mock_items
-        self.key_field = :id
         self.index_options = options
         self.fields = { id: {} }
       end
     end
 
-    [{ centroid_ratio: 0.0000001 }, { centroid_ratio: 1.5 }, { centroid_ratio: "0.01" }].each do |options|
+    [{ training_sample_ratio: 0.0000001 }, { training_sample_ratio: 1.5 }, { training_sample_ratio: "0.01" }].each do |options|
       error = assert_raises(ParadeDB::InvalidIndexDefinition) { build.call(options).compiled_definition }
-      assert_includes error.message, "centroid_ratio"
+      assert_includes error.message, "training_sample_ratio"
       assert_includes error.message, "between 0.000001 and 1.0"
     end
 
-    %i[training_samples_per_centroid cluster_replication].each do |key|
+    %i[max_leaf_size].each do |key|
       [0, -1, 1.5, "32"].each do |value|
         error = assert_raises(ParadeDB::InvalidIndexDefinition) { build.call({ key => value }).compiled_definition }
         assert_includes error.message, "index_options[#{key.inspect}] must be an Integer > 0"
@@ -95,7 +91,7 @@ RSpec.describe "IndexDsl" do
     indexdef = <<~SQL.squish
       CREATE INDEX mock_items_search_idx ON public.mock_items
       USING paradedb (id, description, embedding vector_cosine_ops)
-      WITH (key_field='id', centroid_ratio='0.01', training_samples_per_centroid='32', cluster_replication='2')
+      WITH (training_sample_ratio='0.01', max_leaf_size='32')
     SQL
 
     ruby_stmt = conn.send(
@@ -104,12 +100,12 @@ RSpec.describe "IndexDsl" do
         "indexdef" => indexdef,
         "table_name" => "mock_items",
         "index_name" => "mock_items_search_idx",
-        "reloptions" => '["key_field=id","centroid_ratio=0.01","training_samples_per_centroid=32","cluster_replication=2"]'
+        "reloptions" => '["training_sample_ratio=0.01","max_leaf_size=32",""]'
       }
     )
 
     assert_equal(
-      %(add_paradedb_index :mock_items, fields: { id: {}, description: {}, embedding: { metric: :cosine } }, key_field: :id, name: "mock_items_search_idx", index_options: { :centroid_ratio => 0.01, :training_samples_per_centroid => 32, :cluster_replication => 2 }),
+      %(add_paradedb_index :mock_items, fields: { id: {}, description: {}, embedding: { metric: :cosine } }, name: "mock_items_search_idx", index_options: { :training_sample_ratio => 0.01, :max_leaf_size => 32 }),
       ruby_stmt
     )
   end
@@ -119,10 +115,10 @@ RSpec.describe "IndexDsl" do
 
     options = conn.send(
       :extract_paradedb_index_options,
-      ["key_field=id", "centroid_ratio=0.01", "training_samples_per_centroid=32", "cluster_replication=2"]
+      [ "training_sample_ratio=0.01", "max_leaf_size=32", ""]
     )
     assert_equal(
-      { centroid_ratio: 0.01, training_samples_per_centroid: 32, cluster_replication: 2 },
+      { training_sample_ratio: 0.01, max_leaf_size: 32 },
       options
     )
 
@@ -132,7 +128,7 @@ RSpec.describe "IndexDsl" do
       {},
       conn.send(
         :extract_paradedb_index_options,
-        ["key_field=id", "mystery=1", "centroid_ratio=abc", "training_samples_per_centroid=1.5", "cluster_replication"]
+        [ "mystery=1", "training_sample_ratio=abc", "max_leaf_size=1.5"]
       )
     )
   end
@@ -140,7 +136,6 @@ RSpec.describe "IndexDsl" do
   it "compiles partial index predicates" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.where = "archived_at IS NULL"
       self.fields = {
         id: {},
@@ -155,7 +150,6 @@ RSpec.describe "IndexDsl" do
     assert_sql_equal <<~SQL, sql
       CREATE INDEX mock_items_search_idx ON mock_items
       USING paradedb (id, (description::pdb.simple))
-      WITH (key_field='id')
       WHERE archived_at IS NULL
     SQL
   end
@@ -163,7 +157,6 @@ RSpec.describe "IndexDsl" do
   it "renders concurrent create index SQL" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = {
         id: {},
         description: { tokenizer: ParadeDB::Tokenizer.simple() }
@@ -174,14 +167,12 @@ RSpec.describe "IndexDsl" do
     assert_sql_equal <<~SQL, sql
       CREATE INDEX CONCURRENTLY IF NOT EXISTS mock_items_search_idx ON mock_items
       USING paradedb (id, (description::pdb.simple))
-      WITH (key_field='id')
     SQL
   end
 
   it "rejects mixing tokenizers with single tokenizer keys" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = {
         id: {},
         description: {
@@ -198,7 +189,6 @@ RSpec.describe "IndexDsl" do
   it "rejects non-Tokenizer tokenizer config" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = {
         id: {},
         description: { tokenizer: :simple }
@@ -212,7 +202,6 @@ RSpec.describe "IndexDsl" do
   it "compiles a valid index definition" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = {
         id: {},
         description: { tokenizer: ParadeDB::Tokenizer.simple() },
@@ -224,19 +213,17 @@ RSpec.describe "IndexDsl" do
     compiled = klass.compiled_definition
 
     assert_equal :mock_items, compiled.table_name
-    assert_equal :id, compiled.key_field
     assert_equal "mock_items_search_idx", compiled.index_name
     assert_operator compiled.entries.length, :>=, 4
   end
 
-  it "allows indexes without key_field" do
+  it "allows a tokenized first field" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
       self.fields = { description: { tokenizer: ParadeDB::Tokenizer.simple() } }
     end
 
     compiled = klass.compiled_definition
-    assert_nil compiled.key_field
     sql = ActiveRecord::Base.connection.send(:build_create_sql, compiled, if_not_exists: false)
     assert_equal 'CREATE INDEX "mock_items_search_idx" ON "mock_items" USING paradedb (("description"::pdb.simple))', sql
   end
@@ -244,7 +231,6 @@ RSpec.describe "IndexDsl" do
   it "requires alias for ambiguous entries" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = {
         id: {},
         description: {
@@ -264,7 +250,6 @@ RSpec.describe "IndexDsl" do
   it "allows disambiguated tokenizers with aliases" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = {
         id: {},
         description: {
@@ -286,7 +271,6 @@ RSpec.describe "IndexDsl" do
   it "renders ngram tokenizer with min and max arguments" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = {
         id: {},
         description: { tokenizer: ParadeDB::Tokenizer.ngram(2, 5) }
@@ -297,14 +281,12 @@ RSpec.describe "IndexDsl" do
     assert_sql_equal <<~SQL, sql
       CREATE INDEX mock_items_search_idx ON mock_items
       USING paradedb (id, (description::pdb.ngram(2, 5)))
-      WITH (key_field='id')
     SQL
   end
 
   it "rejects non-Tokenizer values in tokenizers arrays" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = {
         id: {},
         description: { tokenizers: [ParadeDB::Tokenizer.literal(), :simple] }
@@ -318,7 +300,6 @@ RSpec.describe "IndexDsl" do
   it "renders custom tokenizer objects" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = {
         id: {},
         description: { tokenizer: ParadeDB::Tokenizer.new("pdb::xyz", nil, nil) },
@@ -330,14 +311,12 @@ RSpec.describe "IndexDsl" do
     assert_sql_equal <<~SQL, sql
       CREATE INDEX mock_items_search_idx ON mock_items
       USING paradedb (id, (description::pdb::xyz), ((metadata->>'title')::pdb::abc(12, 'fafda')))
-      WITH (key_field='id')
     SQL
   end
 
   it "round-trips tokenizer args through schema ruby" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = {
         id: {},
         description: {
@@ -361,11 +340,10 @@ RSpec.describe "IndexDsl" do
     recorder = Class.new do
       attr_reader :captured
 
-      def add_paradedb_index(table, fields:, key_field:, name:, index_options: nil, if_not_exists: false)
+      def add_paradedb_index(table, fields:, name:, index_options: nil, if_not_exists: false)
         @captured = {
           table: table,
           fields: fields,
-          key_field: key_field,
           name: name,
           index_options: index_options,
           if_not_exists: if_not_exists
@@ -377,7 +355,6 @@ RSpec.describe "IndexDsl" do
 
     reloaded = Class.new(ParadeDB::Index) do
       self.table_name = recorder.captured[:table]
-      self.key_field = recorder.captured[:key_field]
       self.index_name = recorder.captured[:name]
       self.fields = recorder.captured[:fields]
       self.index_options = recorder.captured[:index_options] if recorder.captured[:index_options]
@@ -394,7 +371,6 @@ RSpec.describe "IndexDsl" do
     indexdef = <<~SQL.squish
       CREATE INDEX mock_items_search_idx ON public.mock_items
       USING paradedb (id, description)
-      WITH (key_field=id)
     SQL
 
     ruby_stmt = conn.send(
@@ -407,7 +383,7 @@ RSpec.describe "IndexDsl" do
     )
 
     assert_equal(
-      %(add_paradedb_index :mock_items, fields: { id: {}, description: {} }, key_field: :id, name: "mock_items_search_idx"),
+      %(add_paradedb_index :mock_items, fields: { id: {}, description: {} }, name: "mock_items_search_idx"),
       ruby_stmt
     )
   end
@@ -424,7 +400,7 @@ RSpec.describe "IndexDsl" do
   it "inverts index helpers to paradedb-named commands in the command recorder" do
     recorder = ActiveRecord::Migration::CommandRecorder.new(ActiveRecord::Base.connection)
 
-    method, args = recorder.inverse_of(:add_paradedb_index, [:mock_items, { key_field: :id, name: :mock_items_alias_idx }])
+    method, args = recorder.inverse_of(:add_paradedb_index, [:mock_items, { name: :mock_items_alias_idx }])
     assert_equal :remove_paradedb_index, method
     assert_equal :mock_items, args.first
     assert_equal({ if_exists: true, name: :mock_items_alias_idx }, args.last)
@@ -441,7 +417,6 @@ RSpec.describe "IndexDsl" do
   def vector_index_klass(metric: :cosine)
     Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.index_name = :mock_items_vector_search_idx
       self.fields = { id: {}, description: nil, embedding: { metric: metric } }
     end
@@ -464,7 +439,6 @@ RSpec.describe "IndexDsl" do
     assert_sql_equal <<~SQL, sql
       CREATE INDEX mock_items_vector_search_idx ON mock_items
       USING paradedb (id, description, embedding vector_cosine_ops)
-      WITH (key_field='id')
     SQL
   end
 
@@ -486,7 +460,6 @@ RSpec.describe "IndexDsl" do
   it "rejects metric combined with other field config" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = { id: {}, embedding: { metric: :l2, tokenizer: ParadeDB::Tokenizer.simple() } }
     end
 
@@ -512,15 +485,14 @@ RSpec.describe "IndexDsl" do
     recorder = Class.new do
       attr_reader :captured
 
-      def add_paradedb_index(table, fields:, key_field:, name:, **)
-        @captured = { table: table, fields: fields, key_field: key_field, name: name }
+      def add_paradedb_index(table, fields:, name:, **)
+        @captured = { table: table, fields: fields, name: name }
       end
     end.new
     recorder.instance_eval(ruby_stmt)
 
     reloaded = Class.new(ParadeDB::Index) do
       self.table_name = recorder.captured[:table]
-      self.key_field = recorder.captured[:key_field]
       self.index_name = recorder.captured[:name]
       self.fields = recorder.captured[:fields]
     end
@@ -535,7 +507,6 @@ RSpec.describe "IndexDsl" do
     indexdef = <<~SQL.squish
       CREATE INDEX vsp_idx ON public.vsp
       USING paradedb (id, label, vec vector_l2_ops)
-      WITH (key_field='id')
     SQL
 
     ruby_stmt = conn.send(
@@ -669,7 +640,6 @@ RSpec.describe "IndexRuntimeFeatures" do
   it "paradedb_index macro overrides convention" do
     Object.const_set("CustomRuntimeIndex", Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = { id: {}, description: {} }
     end)
 
@@ -691,7 +661,6 @@ RSpec.describe "IndexRuntimeFeatures" do
     end)
     Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = { id: {}, description: {} }
     end)
 
@@ -709,7 +678,6 @@ RSpec.describe "IndexRuntimeFeatures" do
     end)
     Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = { id: {}, description: {} }
     end)
 
@@ -729,7 +697,6 @@ RSpec.describe "IndexRuntimeFeatures" do
     end)
     Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = {
         id: {},
         category: {},
@@ -751,7 +718,6 @@ RSpec.describe "IndexRuntimeFeatures" do
     end)
     Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = {
         id: {},
         category: {},
@@ -773,7 +739,6 @@ RSpec.describe "IndexRuntimeFeatures" do
     end)
     Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = {
         id: {},
         category: {}
@@ -798,7 +763,6 @@ RSpec.describe "IndexRuntimeFeatures" do
     end)
     Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = {
         id: {},
         description: { tokenizer: ParadeDB::Tokenizer.simple(options: {alias: "description_simple"}) }
@@ -823,7 +787,6 @@ RSpec.describe "IndexRuntimeFeatures" do
     end)
     Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = {
         id: {},
         description: { tokenizer: ParadeDB::Tokenizer.literal(options: {alias: "description_exact"}) }
@@ -845,7 +808,6 @@ RSpec.describe "IndexRuntimeFeatures" do
     end)
     Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = {
         id: {},
         description: { tokenizer: ParadeDB::Tokenizer.simple(options: {alias: "description_simple"}) }
@@ -874,7 +836,6 @@ RSpec.describe "IndexRuntimeFeatures" do
     end)
     Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = {
         id: {},
         description: { tokenizer: ParadeDB::Tokenizer.simple(options: {alias: "description_simple"}) }
@@ -908,7 +869,6 @@ RSpec.describe "IndexRuntimeFeatures" do
     end)
     Object.const_set("RuntimeProductIndex", Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.fields = { id: {}, description: {} }
     end)
 
@@ -928,7 +888,6 @@ RSpec.describe "IndexRuntimeFeatures" do
     end)
     Object.const_set("DriftProductIndex", Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.key_field = :id
       self.index_name = :mock_items_missing_search_idx
       self.fields = { id: {}, description: {} }
     end)

@@ -25,11 +25,10 @@ module ParadeDB
       remember_schema_index_reference(resolved)
     end
 
-    def add_paradedb_index(table, fields:, key_field: nil, name: nil, index_options: nil, where: nil, if_not_exists: false, concurrently: false)
+    def add_paradedb_index(table, fields:, name: nil, index_options: nil, where: nil, if_not_exists: false, concurrently: false)
       ensure_postgresql_adapter!
       anonymous = Class.new(ParadeDB::Index)
       anonymous.table_name = table
-      anonymous.key_field = key_field
       anonymous.index_name = name unless name.nil?
       anonymous.fields = fields
       anonymous.index_options = index_options unless index_options.nil?
@@ -97,15 +96,13 @@ module ParadeDB
 
     def paradedb_with_options_sql(compiled)
       options = []
-      options << "key_field=#{quote(compiled.key_field.to_s)}" unless compiled.key_field.nil?
-
       compiled.index_options.each do |key, value|
         name = key.to_sym
         case name
-        when :target_segment_count, :training_samples_per_centroid, :cluster_replication
+        when :target_segment_count, :max_leaf_size
           options << "#{name}=#{Integer(value)}"
-        when :centroid_ratio
-          options << "centroid_ratio=#{Float(value)}"
+        when :training_sample_ratio
+          options << "training_sample_ratio=#{Float(value)}"
         else
           raise ParadeDB::InvalidIndexDefinition, "unsupported index option #{key.inspect}"
         end
@@ -322,7 +319,6 @@ module ParadeDB
       table = row["table_name"]
       name = row["index_name"]
 
-      key_field = extract_paradedb_key_field(indexdef)
       index_options = extract_paradedb_index_options(row["reloptions"])
       fields_sql = extract_paradedb_fields_sql(indexdef)
       where = normalize_paradedb_where_clause(row["where_clause"])
@@ -351,7 +347,6 @@ module ParadeDB
 
         statement = "add_paradedb_index #{table.to_sym.inspect}, " \
           "fields: { #{fields_pairs.join(', ')} }, "
-        statement += "key_field: #{key_field.to_sym.inspect}, " if key_field
         statement += "name: #{name.inspect}"
         unless index_options.empty?
           statement += ", index_options: #{ruby_hash_literal(index_options)}"
@@ -363,28 +358,18 @@ module ParadeDB
       end
     end
 
-    def extract_paradedb_key_field(indexdef)
-      quoted = indexdef.match(/WITH\s*\([^)]*key_field\s*=\s*'((?:[^']|'')*)'/i)
-      return quoted[1].gsub("''", "'") if quoted
-
-      unquoted = indexdef.match(/WITH\s*\([^)]*key_field\s*=\s*([a-zA-Z_][a-zA-Z0-9_]*)/i)
-      return unquoted[1] if unquoted
-
-      nil
-    end
-
     def extract_paradedb_index_options(reloptions)
       paradedb_reloption_entries(reloptions).each_with_object({}) do |entry, options|
         key, separator, value = entry.to_s.partition("=")
         next if separator.empty?
 
         case key
-        when "target_segment_count", "training_samples_per_centroid", "cluster_replication"
+        when "target_segment_count", "max_leaf_size"
           parsed = Integer(value, 10, exception: false)
           options[key.to_sym] = parsed if parsed
-        when "centroid_ratio"
+        when "training_sample_ratio"
           parsed = Float(value, exception: false)
-          options[:centroid_ratio] = parsed if parsed
+          options[:training_sample_ratio] = parsed if parsed
         end
       end
     end
@@ -868,11 +853,10 @@ if defined?(ActiveRecord::Migration)
         connection.replace_paradedb_index(index_klass)
       end
 
-      def add_paradedb_index(table, fields:, key_field: nil, name: nil, index_options: nil, where: nil, if_not_exists: false, concurrently: false)
+      def add_paradedb_index(table, fields:, name: nil, index_options: nil, where: nil, if_not_exists: false, concurrently: false)
         connection.add_paradedb_index(
           table,
           fields: fields,
-          key_field: key_field,
           name: name,
           index_options: index_options,
           where: where,

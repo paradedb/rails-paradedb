@@ -23,7 +23,6 @@ module ParadeDB
       :paradedb_index_class,
       :paradedb_index_classes,
       :paradedb_indexed_fields,
-      :paradedb_key_field,
       :paradedb_index_name,
       :paradedb_validate_index!
     ].freeze
@@ -153,11 +152,6 @@ module ParadeDB
         return [] if definition.nil?
 
         definition.entries.map(&:query_key).uniq
-      end
-
-      def paradedb_key_field
-        definition = paradedb_index_definition
-        definition&.key_field
       end
 
       def paradedb_index_name
