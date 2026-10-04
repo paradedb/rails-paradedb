@@ -79,7 +79,7 @@ module ParadeDB
     # Consumed by migration helpers; validates and normalizes the DSL class
     class DefinitionCompiler
       FIELD_OPTION_KEYS = %i[fast record normalizer expand_dots].freeze
-      INDEX_OPTION_KEYS = %i[target_segment_count training_sample_ratio max_leaf_size].freeze
+      INDEX_OPTION_KEYS = %i[target_segment_count training_sample_ratio max_leaf_size partition_by vector_fields vector_router].freeze
       POSITIVE_INTEGER_INDEX_OPTION_KEYS = %i[target_segment_count max_leaf_size].freeze
 
       class Compiled
@@ -253,6 +253,19 @@ module ParadeDB
               raise InvalidIndexDefinition,
                     "index_options[:training_sample_ratio] must be a Numeric between 0.000001 and 1.0"
             end
+          end
+
+          if normalized.key?(:vector_router) && !%w[graph ivf].include?(normalized[:vector_router].to_s)
+            raise InvalidIndexDefinition, "index_options[:vector_router] must be graph or ivf"
+          end
+          if normalized.key?(:partition_by)
+            value = normalized[:partition_by]
+            unless value.is_a?(String) && value.split(",", -1).all? { |field| !field.strip.empty? } && !value.empty?
+              raise InvalidIndexDefinition, "index_options[:partition_by] must contain non-empty index field names"
+            end
+          end
+          if normalized.key?(:vector_fields) && !normalized[:vector_fields].is_a?(Hash)
+            raise InvalidIndexDefinition, "index_options[:vector_fields] must be a Hash"
           end
 
           normalized
