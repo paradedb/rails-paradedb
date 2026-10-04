@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** Remove the key-field setting from index definitions, migration helpers, and schema dumps. Query helpers use the model primary key. Require ParadeDB 0.26.0 or newer.
+- **Breaking:** Update vector index build options to `training_sample_ratio` and `max_leaf_size` for ParadeDB 0.26.0 and remove the obsolete cluster replication option.
+
 ## [0.12.0] - 2026-08-13
 
 ### Changed

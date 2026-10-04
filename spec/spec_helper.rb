@@ -134,7 +134,7 @@ def setup_test_schema
   connection = ActiveRecord::Base.connection
   connection.execute("CREATE EXTENSION IF NOT EXISTS pg_search CASCADE;")
   connection.drop_table(:mock_items, if_exists: true)
-  connection.execute("CALL paradedb.create_bm25_test_table(schema_name => 'public', table_name => 'mock_items');")
+  connection.execute("CALL paradedb.create_paradedb_test_table(schema_name => 'public', table_name => 'mock_items');")
 
   setup_test_index
 end
@@ -144,7 +144,6 @@ def setup_test_index
   ActiveRecord::Base.connection.execute(<<~SQL)
     CREATE INDEX mock_items_search_idx ON mock_items
     USING paradedb (id, description, rating, (category::pdb.literal), in_stock, metadata, created_at, last_updated_date, latest_available_time, weight_range, embedding vector_l2_ops)
-    WITH (key_field='id');
   SQL
 end
 

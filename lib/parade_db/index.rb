@@ -6,14 +6,10 @@ require_relative "vector"
 module ParadeDB
   class Index
     class << self
-      attr_writer :table_name, :key_field, :index_name, :fields, :index_options, :where
+      attr_writer :table_name, :index_name, :fields, :index_options, :where
 
       def table_name
         @table_name
-      end
-
-      def key_field
-        @key_field
       end
 
       def index_name
@@ -83,15 +79,14 @@ module ParadeDB
     # Consumed by migration helpers; validates and normalizes the DSL class
     class DefinitionCompiler
       FIELD_OPTION_KEYS = %i[fast record normalizer expand_dots].freeze
-      INDEX_OPTION_KEYS = %i[target_segment_count centroid_ratio training_samples_per_centroid cluster_replication].freeze
-      POSITIVE_INTEGER_INDEX_OPTION_KEYS = %i[target_segment_count training_samples_per_centroid cluster_replication].freeze
+      INDEX_OPTION_KEYS = %i[target_segment_count training_sample_ratio max_leaf_size].freeze
+      POSITIVE_INTEGER_INDEX_OPTION_KEYS = %i[target_segment_count max_leaf_size].freeze
 
       class Compiled
-        attr_reader :table_name, :key_field, :index_name, :entries, :index_options, :field_options, :where
+        attr_reader :table_name, :index_name, :entries, :index_options, :field_options, :where
 
-        def initialize(table_name:, key_field:, index_name:, entries:, index_options:, field_options:, where:)
+        def initialize(table_name:, index_name:, entries:, index_options:, field_options:, where:)
           @table_name = table_name
-          @key_field = key_field
           @index_name = index_name
           @entries = entries
           @index_options = index_options
@@ -104,7 +99,6 @@ module ParadeDB
       class << self
         def compile!(klass)
           table_name = require_symbol!(klass.table_name, "table_name")
-          key_field = require_symbol!(klass.key_field, "key_field")
           index_name = klass.index_name.to_s
           raise InvalidIndexDefinition, "index_name must be present" if index_name.strip.empty?
 
@@ -116,12 +110,10 @@ module ParadeDB
 
           index_options = normalize_index_options(klass.index_options)
 
-          validate_key_field_shape!(key_field.to_s, entries)
           validate_query_key_collisions!(entries)
 
           Compiled.new(
             table_name: table_name,
-            key_field: key_field,
             index_name: index_name,
             entries: entries,
             index_options: index_options,
@@ -255,11 +247,11 @@ module ParadeDB
             end
           end
 
-          if normalized.key?(:centroid_ratio)
-            ratio = normalized[:centroid_ratio]
+          if normalized.key?(:training_sample_ratio)
+            ratio = normalized[:training_sample_ratio]
             unless ratio.is_a?(Numeric) && ratio >= 0.000001 && ratio <= 1.0
               raise InvalidIndexDefinition,
-                    "index_options[:centroid_ratio] must be a Numeric between 0.000001 and 1.0"
+                    "index_options[:training_sample_ratio] must be a Numeric between 0.000001 and 1.0"
             end
           end
 
@@ -288,23 +280,7 @@ module ParadeDB
           end
         end
 
-        def validate_key_field_shape!(key_field_name, entries)
-          unless entries.any? { |entry| entry.source == key_field_name }
-            raise InvalidIndexDefinition,
-                  "key_field #{key_field_name.inspect} must be present in fields."
-          end
 
-          first_entry = entries.first
-          unless first_entry.source == key_field_name
-            raise InvalidIndexDefinition,
-                  "key_field #{key_field_name.inspect} must be first in fields."
-          end
-
-          return if first_entry.tokenizer.nil?
-
-          raise InvalidIndexDefinition,
-                "key_field #{key_field_name.inspect} must not be tokenized."
-        end
       end
     end
   end
