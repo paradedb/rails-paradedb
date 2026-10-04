@@ -1,5 +1,5 @@
 {
-  "_comment": "Symbols present in the pg_search schema that rails-paradedb intentionally does not wrap. Remove an entry here when you add it to api.json. Sections can be either a flat list or grouped object of lists.",
+  "_comment": "Symbols present in the pg_search schema that rails-paradedb intentionally does not wrap. Remove an entry here when you add it to api.json5. Sections can be either a flat list or grouped object of lists.",
 
   "operators": [
   ],

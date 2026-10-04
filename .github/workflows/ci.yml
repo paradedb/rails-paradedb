@@ -63,6 +63,9 @@ jobs:
       - name: Check API coverage
         run: uv run --with json5 scripts/check_api_coverage.py
 
+      - name: Test tooling scripts
+        run: uv run --with json5 python -m unittest discover -s scripts/tests -p "test_*.py"
+
       - name: Package install smoke test
         run: bash scripts/smoke_package_install.sh
 
@@ -107,7 +110,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres -d postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 12

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Check compatibility between the ORM's api.json5 and a released pg_search schema.
 
@@ -9,7 +10,7 @@ checked in both directions:
             (surfaces new paradedb APIs that haven't been wrapped yet).
 
 Example:
-    python scripts/check_schema_compat.py 0.25.0
+    python scripts/check_schema_compat.py 0.26.0
 
 The ignore list is read automatically from apiignore.json5 (repo root) if it exists.
 """
@@ -116,10 +117,11 @@ def normalize_version(version: str) -> str:
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Download pg_search.schema.sql for a ParadeDB release and check it against this repo's api.json5."
+            "Download pg_search.schema.sql for a ParadeDB release and check it "
+            "against this repo's api.json5."
         )
     )
-    parser.add_argument("version", help="ParadeDB version to check, for example 0.25.0")
+    parser.add_argument("version", help="ParadeDB version to check, for example 0.26.0")
     return parser.parse_args(argv)
 
 
@@ -228,6 +230,20 @@ def run_checks(schema_path: Path, api_path: Path) -> int:
             if sym not in api_set and sym not in ignore_set:
                 uncovered.append((kind, sym))
 
+    stale_ignored: list[tuple[str, str]] = []
+    for kind in ("functions", "operators", "types"):
+        schema_set = set(schema_symbols.get(kind, []))
+        for symbol in sorted(normalize_ignored_symbols(ignored, kind) - schema_set):
+            stale_ignored.append((kind, symbol))
+    if stale_ignored:
+        print(
+            f"\n❌ {len(stale_ignored)} ignored symbols no longer exist in the schema:"
+        )
+        for kind, name in stale_ignored:
+            print(f"   {kind}: {name}")
+        print("\nRemove these stale entries from apiignore.json5.")
+        rc = 1
+
     total_schema = sum(len(v) for v in schema_symbols.values())
     if uncovered:
         print(
@@ -236,7 +252,8 @@ def run_checks(schema_path: Path, api_path: Path) -> int:
         for kind, name in uncovered:
             print(f"   {kind}: {name}")
         print(
-            "\nThese are paradedb APIs not yet wrapped.\nEither add them to api.json5 or add them to apiignore.json5."
+            "\nThese are paradedb APIs not yet wrapped.\n"
+            "Either add them to api.json5 or add them to apiignore.json5."
         )
         rc = 1
     else:
