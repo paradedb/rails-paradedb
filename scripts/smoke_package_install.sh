@@ -5,24 +5,18 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
 VERSION="$(ruby -e 'require File.expand_path("lib/parade_db/version", Dir.pwd); print ParadeDB::VERSION')"
-GEM_FILE="rails-paradedb-${VERSION}.gem"
-
-rm -f "${GEM_FILE}"
-gem build rails-paradedb.gemspec >/dev/null
+SMOKE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/rails-paradedb-smoke.XXXXXX")"
+trap 'rm -rf "${SMOKE_DIR}"' EXIT
+GEM_FILE="${SMOKE_DIR}/rails-paradedb-${VERSION}.gem"
+gem build rails-paradedb.gemspec --output "${GEM_FILE}" >/dev/null
 
 if [[ ! -f "${GEM_FILE}" ]]; then
-  echo "❌ Expected gem file not found after build: ${GEM_FILE}" >&2
+  echo "Expected gem file not found after build: ${GEM_FILE}" >&2
   exit 1
 fi
 
-SMOKE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/rails-paradedb-smoke.XXXXXX")"
 GEM_HOME_DIR="${SMOKE_DIR}/gem-home"
 HOME_DIR="${SMOKE_DIR}/home"
-
-cleanup() {
-  rm -rf "${SMOKE_DIR}" "${GEM_FILE}"
-}
-trap cleanup EXIT
 
 mkdir -p "${GEM_HOME_DIR}" "${HOME_DIR}"
 export HOME="${HOME_DIR}"

@@ -70,7 +70,7 @@ jobs:
         run: bash scripts/smoke_package_install.sh
 
   matrix-tests:
-    name: Ruby ${{ matrix.ruby-version }} / Rails ${{ matrix.rails-version }}
+    name: Ruby ${{ matrix.ruby-version }} / Rails ${{ matrix.rails-version }} / PG ${{ matrix.postgres-version }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -80,29 +80,48 @@ jobs:
           - rails-version: "7.2"
             ruby-version: "3.2"
             gemfile: "gemfiles/rails72.gemfile"
+            postgres-version: "18"
           - rails-version: "7.2"
             ruby-version: "3.3"
             gemfile: "gemfiles/rails72.gemfile"
+            postgres-version: "18"
           - rails-version: "7.2"
             ruby-version: "3.4"
             gemfile: "gemfiles/rails72.gemfile"
+            postgres-version: "18"
           # Rails 8.1 supports Ruby 3.2+
           - rails-version: "8.1"
             ruby-version: "3.2"
             gemfile: "Gemfile"
+            postgres-version: "18"
           - rails-version: "8.1"
             ruby-version: "3.3"
             gemfile: "Gemfile"
+            postgres-version: "18"
           - rails-version: "8.1"
             ruby-version: "3.4"
             gemfile: "Gemfile"
+            postgres-version: "18"
           - rails-version: "8.1"
             ruby-version: "4.0"
             gemfile: "Gemfile"
+            postgres-version: "18"
+          - rails-version: "8.1"
+            ruby-version: "4.0"
+            gemfile: "Gemfile"
+            postgres-version: "15"
+          - rails-version: "8.1"
+            ruby-version: "4.0"
+            gemfile: "Gemfile"
+            postgres-version: "16"
+          - rails-version: "8.1"
+            ruby-version: "4.0"
+            gemfile: "Gemfile"
+            postgres-version: "17"
 
     services:
       paradedb:
-        image: paradedb/paradedb:0.26.0-pg18
+        image: paradedb/paradedb:0.26.0-pg${{ matrix.postgres-version }}
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -138,7 +157,7 @@ jobs:
         uses: codecov/codecov-action@v7
         with:
           files: ./coverage/coverage.xml
-          flags: rails-paradedb,rb${{ matrix.ruby-version }},rl${{ matrix.rails-version }}
+          flags: rails-paradedb,rb${{ matrix.ruby-version }},rl${{ matrix.rails-version }},pg${{ matrix.postgres-version }}
           fail_ci_if_error: false
           verbose: true
         env:
