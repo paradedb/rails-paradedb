@@ -106,7 +106,6 @@ jobs:
             ruby-version: "4.0"
             gemfile: "Gemfile"
             postgres-version: "18"
-
           - rails-version: "8.1"
             ruby-version: "4.0"
             gemfile: "Gemfile"
