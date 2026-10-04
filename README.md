@@ -36,17 +36,17 @@
 
 ## ParadeDB for Rails
 
-The official [ActiveRecord](https://guides.rubyonrails.org/active_record_basics.html) integration for [ParadeDB](https://paradedb.com) (powered by the [`pg_search`](https://github.com/paradedb/paradedb) Postgres extension). Follow the [getting started guide](https://www.paradedb.com/docs/start/connect-your-app#rails) to begin.
+The official [ActiveRecord](https://guides.rubyonrails.org/active_record_basics.html) integration for ParadeDB. Get started with the [setup guide](https://www.paradedb.com/docs/start/connect-your-app#rails).
 
 ## Requirements & Compatibility
 
-| Component  | Supported                                                                                                                                                         |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Ruby       | 3.2+                                                                                                                                                              |
-| Rails      | 7.2+                                                                                                                                                              |
-| ParadeDB   | 0.26.0+                                                                                                                                                           |
-| PostgreSQL | 15+ (with the ParadeDB pg_search extension)                                                                                                                       |
-| pgvector   | Provides vector data types for ParadeDB’s [native vector search](https://www.paradedb.com/docs/reference/vector/overview) (included in the ParadeDB Docker image) |
+| Component            | Supported                                                                                                                     |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Ruby                 | 3.2+                                                                                                                          |
+| Rails                | 7.2+                                                                                                                          |
+| PostgreSQL           | 15+                                                                                                                           |
+| pgvector             | 0.7.0+ (provides vector types for ParadeDB’s [native vector search](https://www.paradedb.com/docs/reference/vector/overview)) |
+| ParadeDB / pg_search | 0.26.0+                                                                                                                       |
 
 ## Contributing
 
@@ -54,15 +54,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, running tests, lin
 
 ## Support
 
-If you're missing a feature or have found a bug, please open a
-[GitHub Issue](https://github.com/paradedb/rails-paradedb/issues/new/choose).
-
-To get community support, you can:
-
-- Post a question in the [ParadeDB Slack Community](https://paradedb.com/slack)
-- Ask for help on our [GitHub Discussions](https://github.com/paradedb/paradedb/discussions)
-
-If you need commercial support, please [contact the ParadeDB team](mailto:sales@paradedb.com).
+If you're missing a feature or have found a bug, please open a [GitHub Issue](https://github.com/paradedb/rails-paradedb/issues/new/choose). For community support, join the [ParadeDB Slack Community](https://paradedb.com/slack).
 
 ## Acknowledgments
 
