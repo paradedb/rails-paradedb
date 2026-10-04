@@ -40,13 +40,13 @@ The official [ActiveRecord](https://guides.rubyonrails.org/active_record_basics.
 
 ## Requirements & Compatibility
 
-| Component            | Supported                                                                                                                                                   |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Ruby                 | 3.2+                                                                                                                                                        |
-| Rails                | 7.2+                                                                                                                                                        |
-| ParadeDB / pg_search | 0.26.0+                                                                                                                                                     |
-| PostgreSQL           | 15+                                                                                                                                                         |
-| pgvector             | 0.7.0+ (vector types for ParadeDB’s [native vector search](https://www.paradedb.com/docs/reference/vector/overview); included in the ParadeDB Docker image) |
+| Component            | Supported                                                                                                                                                            |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ruby                 | 3.2+                                                                                                                                                                 |
+| Rails                | 7.2+                                                                                                                                                                 |
+| PostgreSQL           | 15+                                                                                                                                                                  |
+| pgvector             | 0.7.0+ (provides vector types for ParadeDB’s [native vector search](https://www.paradedb.com/docs/reference/vector/overview), included in the ParadeDB Docker image) |
+| ParadeDB / pg_search | 0.26.0+                                                                                                                                                              |
 
 ## Contributing
 
