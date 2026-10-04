@@ -24,6 +24,12 @@ module ParadeDB
       return "pdb.#{name}(#{args.join(",")})"
     end
 
+    def render_search
+      args = Array(positional_args).map(&:to_s)
+      args.concat((options || {}).map { |key, value| "#{key}=#{value}" })
+      name + (args.empty? ? "" : "(#{args.join(',')})")
+    end
+
     def self.whitespace(options: nil)
       new("whitespace", nil, options)
     end

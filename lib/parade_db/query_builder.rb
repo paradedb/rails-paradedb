@@ -144,8 +144,12 @@ module ParadeDB
       ::Arel::Nodes::NamedFunction.new("pdb.score", [column_node(key)])
     end
 
-    def snippet(column, *args)
-      ::Arel::Nodes::NamedFunction.new("pdb.snippet", [column_node(column)] + args.map { |arg| quoted_value(arg) })
+    def snippet(column, *args, start_tag: nil, end_tag: nil, max_num_chars: nil, limit: nil, offset: nil)
+      values = [column_node(column)] + args.map { |arg| quoted_value(arg) }
+      {start_tag: start_tag, end_tag: end_tag, max_num_chars: max_num_chars, limit: limit, offset: offset}.each do |name, value|
+        values << keyword_arg_node(name.to_s, value, quoted_name: %i[limit offset].include?(name)) unless value.nil?
+      end
+      ::Arel::Nodes::NamedFunction.new("pdb.snippet", values)
     end
 
     def snippets(column, start_tag: nil, end_tag: nil, max_num_chars: nil, limit: nil, offset: nil, sort_by: nil)
@@ -159,8 +163,16 @@ module ParadeDB
       ::Arel::Nodes::NamedFunction.new("pdb.snippets", args)
     end
 
-    def snippet_positions(column)
-      ::Arel::Nodes::NamedFunction.new("pdb.snippet_positions", [column_node(column)])
+    def snippet_positions(column, limit: nil, offset: nil)
+      args = [column_node(column)]
+      args << keyword_arg_node("limit", limit, quoted_name: true) unless limit.nil?
+      args << keyword_arg_node("offset", offset, quoted_name: true) unless offset.nil?
+      ::Arel::Nodes::NamedFunction.new("pdb.snippet_positions", args)
+    end
+
+    def query(column, query)
+      input = query.is_a?(SearchQuery) ? query : SearchQuery.parse(query)
+      infix("@@@", column_node(column), ::Arel.sql(input.to_sql))
     end
 
     def agg(json, exact: nil, visibility: nil)

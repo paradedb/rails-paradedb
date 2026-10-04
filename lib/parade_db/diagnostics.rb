@@ -4,6 +4,20 @@ module ParadeDB
   module Diagnostics
     module_function
 
+    def aggregate(index, query, spec, solve_mvcc: nil, memory_limit: 500000000, bucket_limit: nil, visibility: nil, connection: ActiveRecord::Base.connection)
+      unless memory_limit.is_a?(Integer) && memory_limit.positive? && (bucket_limit.nil? || (bucket_limit.is_a?(Integer) && bucket_limit.positive?))
+        raise ArgumentError, "memory_limit and bucket_limit must be positive integers"
+      end
+      if visibility && !%w[transaction raw threshold].include?(visibility)
+        raise ArgumentError, "visibility must be transaction, raw, or threshold"
+      end
+      raise ArgumentError, "Specify solve_mvcc or visibility, not both" unless solve_mvcc.nil? || visibility.nil?
+      input = query.is_a?(SearchQuery) ? query : SearchQuery.parse(query)
+      args = ["#{connection.quote(index.to_s)}::regclass", input.to_sql(connection: connection), "#{connection.quote(JSON.generate(spec))}::json", connection.quote(solve_mvcc), memory_limit, bucket_limit || "NULL", connection.quote(visibility)]
+      value = connection.select_value("SELECT paradedb.aggregate(#{args.join(', ')})")
+      value.is_a?(String) ? JSON.parse(value) : value
+    end
+
     def indexes(connection: ActiveRecord::Base.connection)
       execute_table_function(connection, "SELECT * FROM pdb.indexes()")
     end

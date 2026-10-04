@@ -342,7 +342,7 @@ RSpec.describe "UserApi" do
                  .to_sql
 
     expected = <<~SQL.strip
-      SELECT mock_items.*, pdb.snippet("mock_items"."description", '<mark>', '</mark>', 100) AS description_snippet FROM mock_items
+      SELECT mock_items.*, pdb.snippet("mock_items"."description", start_tag => '<mark>', end_tag => '</mark>', max_num_chars => 100) AS description_snippet FROM mock_items
       WHERE ("mock_items"."description" &&& 'running shoes')
     SQL
 
@@ -915,7 +915,7 @@ RSpec.describe "Guards" do
 
   it "validates projection options" do
     [
-      [-> { GuardTestProduct.search(:description).match_all("shoes").with_snippet(:description, max_chars: "abc") }, /invalid value/i],
+      [-> { GuardTestProduct.search(:description).match_all("shoes").with_snippet(:description, max_chars: "abc") }, /max_chars must be an integer/],
       [-> { GuardTestProduct.search(:description).match_all("shoes").with_snippets(:description, max_chars: "abc") }, /max_chars must be an integer/],
       [-> { GuardTestProduct.search(:description).match_all("shoes").with_snippets(:description, limit: "abc") }, /limit must be an integer/],
       [-> { GuardTestProduct.search(:description).match_all("shoes").with_snippets(:description, offset: "abc") }, /offset must be an integer/],
