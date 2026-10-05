@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "spec_helper"
+require_relative "support/partitioned_vector_index"
 require "stringio"
 
 class IndexMigrationMockItem < ActiveRecord::Base
@@ -764,5 +765,18 @@ RSpec.describe ParadeDB::Generators::IndexGenerator do
       expect(content).to include("class CreateLineItemSearchIndex")
       expect(content).to include("remove_paradedb_index :line_items")
     end
+  end
+end
+
+RSpec.describe "Partitioned vector index migrations" do
+  include_context "partitioned vector index"
+
+  it "preserves partition and vector options in schema dumps" do
+    connection = ActiveRecord::Base.connection
+    options = connection.select_value("SELECT reloptions FROM pg_class WHERE oid = 'pg26_idx'::regclass")
+    expect(options).to include("partition_by=rating,id", "target_segment_count=8")
+    dump = StringIO.new
+    ActiveRecord::SchemaDumper.dump(connection.pool, dump)
+    expect(dump.string).to include(':partition_by => "rating,id"', ':vector_fields =>')
   end
 end

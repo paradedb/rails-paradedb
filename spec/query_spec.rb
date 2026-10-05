@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "spec_helper"
+require_relative "support/partitioned_vector_index"
 
 class MockItem < ActiveRecord::Base
   include ParadeDB::Model
@@ -1139,5 +1140,22 @@ RSpec.describe "ModelPrimaryKeyRuntime" do
       ORDER BY "mock_items"."id" ASC
       LIMIT 10
     SQL
+  end
+end
+
+RSpec.describe "Partitioned vector index queries" do
+  include_context "partitioned vector index"
+
+  it "filters partitions and supports aggregate visibility modes" do
+    connection = ActiveRecord::Base.connection
+    expect(connection.select_value("SELECT COUNT(*) FROM pg26_items WHERE description @@@ 'shoes' AND rating = 1")).to eq(683)
+    model = Class.new(ActiveRecord::Base) do
+      include ParadeDB::Model
+      self.table_name = "pg26_items"
+    end
+    %w[transaction raw threshold].each do |visibility|
+      result = model.search(:id).match_all.facets_agg(visibility: visibility, count: ParadeDB::Aggregations.value_count(:id))
+      expect(result["count"]["value"]).to eq(2048)
+    end
   end
 end

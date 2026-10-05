@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "spec_helper"
+require_relative "support/partitioned_vector_index"
 
 RSpec.describe "Diagnostics" do
   before(:context) do
@@ -30,5 +31,20 @@ RSpec.describe "Diagnostics" do
     refute_empty rows
     assert_includes rows.first.keys, "check_name"
     assert_includes rows.first.keys, "passed"
+  end
+end
+
+RSpec.describe "Partitioned vector index diagnostics" do
+  include_context "partitioned vector index"
+
+  it "reports vector configuration before and after reindexing" do
+    connection = ActiveRecord::Base.connection
+    expect(ParadeDB::Diagnostics.vector_config("pg26_idx", "embedding").first["quantized"]).to eq(false)
+    expect(ParadeDB::Diagnostics.vector_info("pg26_idx", "embedding")).not_to be_empty
+    connection.execute("ALTER INDEX pg26_idx SET (target_segment_count = 1, max_leaf_size = 16, vector_fields = '{\"embedding\":{\"quantization\":true}}')")
+    connection.execute("REINDEX INDEX pg26_idx")
+    expect(ParadeDB::Diagnostics.vector_config("pg26_idx", "embedding").first["quantized"]).to eq(true)
+    expect(ParadeDB::Diagnostics.vector_estimator_info("pg26_idx", "embedding")).to be_an(Array)
+    expect(ParadeDB::Diagnostics.vector_estimator_info("pg26_idx", "embedding", queries: [Array.new(64, 0.1)])).to be_an(Array)
   end
 end
