@@ -101,7 +101,7 @@ module ParadeDB
         case name
         when :target_segment_count, :max_leaf_size
           options << "#{name}=#{Integer(value)}"
-        when :partition_by
+        when :partition_by, :vector_router
           options << "#{name}=#{quote(value.to_s)}"
         when :vector_fields
           options << "vector_fields=#{quote(JSON.generate(value))}"
@@ -371,7 +371,7 @@ module ParadeDB
         when "target_segment_count", "max_leaf_size"
           parsed = Integer(value, 10, exception: false)
           options[key.to_sym] = parsed if parsed
-        when "partition_by"
+        when "partition_by", "vector_router"
           options[key.to_sym] = value
         when "vector_fields"
           options[:vector_fields] = JSON.parse(value)
