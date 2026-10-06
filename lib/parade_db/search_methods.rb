@@ -260,15 +260,20 @@ module ParadeDB
       with_projection(builder.score(primary_key).as("search_score"))
     end
 
-    def with_snippet(column, start_tag: nil, end_tag: nil, max_chars: nil, limit: nil, offset: nil)
-      snippet = builder.snippet(column, start_tag: start_tag, end_tag: end_tag,
-        max_num_chars: normalize_integer_option!(max_chars, "max_chars"),
-        limit: normalize_integer_option!(limit, "limit"), offset: normalize_integer_option!(offset, "offset"))
-      with_projection(snippet.as("#{column}_snippet"))
-    end
+    def with_snippet(column, start_tag: nil, end_tag: nil, max_chars: nil)
+      formatted_args = []
+      formatted_args << start_tag unless start_tag.nil?
+      formatted_args << end_tag unless end_tag.nil?
+      formatted_args << Integer(max_chars) unless max_chars.nil?
 
-    def search_query(query)
-      where(grouped(builder.query(primary_key, query)))
+      snippet =
+        if formatted_args.empty?
+          builder.snippet(column)
+        else
+          builder.snippet(column, *formatted_args)
+        end
+
+      with_projection(snippet.as("#{column}_snippet"))
     end
 
     def with_snippets(

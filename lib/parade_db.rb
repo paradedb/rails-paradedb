@@ -3,7 +3,6 @@
 require_relative "parade_db/version"
 require_relative "parade_db/errors"
 require_relative "parade_db/vector"
-require_relative "parade_db/search_query"
 require_relative "parade_db/query_builder"
 require_relative "parade_db/index"
 require_relative "parade_db/aggregations"

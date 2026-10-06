@@ -17,6 +17,4 @@ RSpec.shared_context "API parameter index" do
 
   after(:context) { ActiveRecord::Base.connection.execute("DROP TABLE IF EXISTS api_parameter_items") }
 
-  let(:conjunction) { ParadeDB::SearchQuery.boolean(should: ["description:red", "description:shoes"], minimum_should_match: 2) }
-  let(:query) { ParadeDB::SearchQuery.boolean(must: [ParadeDB::SearchQuery.disjunction_max([conjunction, "description:boots"], tie_breaker: 0.5)], must_not: ["description:blue"]) }
 end
