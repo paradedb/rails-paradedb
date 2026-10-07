@@ -163,10 +163,14 @@ module ParadeDB
       ::Arel::Nodes::NamedFunction.new("pdb.snippet_positions", [column_node(column)])
     end
 
-    def agg(json, exact: nil)
+    def agg(json, exact: nil, visibility: nil)
       raise ArgumentError, "exact must be true, false, or nil" unless exact.nil? || exact == true || exact == false
 
       args = [quoted_value(json)]
+      unless visibility.nil?
+        raise ArgumentError, "Specify visibility or exact, not both" unless exact.nil?
+        args << quoted_value(visibility.to_s)
+      end
       args << quoted_value(false) if exact == false
       ::Arel::Nodes::NamedFunction.new("pdb.agg", args)
     end

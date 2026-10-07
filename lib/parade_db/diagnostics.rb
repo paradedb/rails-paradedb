@@ -13,6 +13,25 @@ module ParadeDB
       execute_table_function(connection, sql)
     end
 
+    def vector_info(index, field, connection: ActiveRecord::Base.connection)
+      args = "#{connection.quote(index.to_s)}::regclass, #{connection.quote(field.to_s)}::text"
+      execute_table_function(connection, "SELECT * FROM paradedb.vector_info(#{args})")
+    end
+
+    def vector_config(index, field, connection: ActiveRecord::Base.connection)
+      args = "#{connection.quote(index.to_s)}::regclass, #{connection.quote(field.to_s)}::text"
+      execute_table_function(connection, "SELECT * FROM paradedb.vector_config(#{args})")
+    end
+
+    def vector_estimator_info(index, field, queries: nil, connection: ActiveRecord::Base.connection)
+      args = "#{connection.quote(index.to_s)}::regclass, #{connection.quote(field.to_s)}::text"
+      unless queries.nil?
+        vectors = queries.map { |query| connection.quote("[#{query.map { |value| Float(value) }.join(',')}]") }
+        args += ", ARRAY[#{vectors.join(', ')}]::vector[]"
+      end
+      execute_table_function(connection, "SELECT * FROM paradedb.vector_estimator_info(#{args})")
+    end
+
     def verify_index(
       index,
       heapallindexed: false,

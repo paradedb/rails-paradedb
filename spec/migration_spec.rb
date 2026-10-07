@@ -360,7 +360,7 @@ RSpec.describe "IndexMigration" do
         id: {},
         description: { tokenizer: ParadeDB::Tokenizer.simple(options: {alias: "description_simple"}) }
       },
-      index_options: { target_segment_count: 17 },
+      index_options: { target_segment_count: 17, partition_by: ["id"] },
       if_not_exists: true
     )
     conn.instance_variable_set(:@paradedb_schema_index_references, [])
@@ -376,7 +376,7 @@ RSpec.describe "IndexMigration" do
     end
 
     assert_equal <<~RUBY.strip, add_stmt.to_s.strip
-      add_paradedb_index :mock_items, fields: { id: {}, description: { tokenizer: ParadeDB::Tokenizer.simple(options: { :alias => "description_simple" }) } }, name: "mock_items_search_idx", index_options: { :target_segment_count => 17 }
+      add_paradedb_index :mock_items, fields: { id: {}, description: { tokenizer: ParadeDB::Tokenizer.simple(options: { :alias => "description_simple" }) } }, name: "mock_items_search_idx", index_options: { :target_segment_count => 17, :partition_by => ["id"] }
     RUBY
     expect(schema).not_to match(/add_index.*mock_items_search_idx/)
     expect(schema).not_to match(/t\.index.*mock_items_search_idx/)

@@ -568,16 +568,18 @@ RSpec.describe "UserApi" do
                                           :normalize_named_aggregation_specs,
                                           docs: ParadeDB::Aggregations.value_count(:id),
                                           avg_rating: ParadeDB::Aggregations.avg(:rating)
-                                        )
+                                        ),
+                             visibility: "transaction"
                            )
                            .sql
 
-    assert_query_sql %(SELECT pdb.agg('{"value_count":{"field":"id"}}') AS docs_facet, pdb.agg('{"avg":{"field":"rating"}}') AS avg_rating_facet FROM (SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" &&& 'shoes')) paradedb_agg_source), facet_sql
+    assert_query_sql %(SELECT pdb.agg('{"value_count":{"field":"id"}}', 'transaction') AS docs_facet, pdb.agg('{"avg":{"field":"rating"}}', 'transaction') AS avg_rating_facet FROM (SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" &&& 'shoes')) paradedb_agg_source), facet_sql
   end
   it "with_agg adds multiple window aggregates" do
     sql = MockItem.search(:description)
                      .match_all("shoes")
                      .with_agg(
+                       visibility: "threshold",
                        docs: ParadeDB::Aggregations.value_count(:id),
                        avg_rating: ParadeDB::Aggregations.avg(:rating)
                      )
@@ -585,7 +587,7 @@ RSpec.describe "UserApi" do
                      .limit(10)
                      .to_sql
 
-    assert_query_sql %(SELECT mock_items.*, pdb.agg('{"value_count":{"field":"id"}}') OVER () AS _docs_facet, pdb.agg('{"avg":{"field":"rating"}}') OVER () AS _avg_rating_facet FROM mock_items WHERE ("mock_items"."description" &&& 'shoes') ORDER BY "mock_items"."id" ASC LIMIT 10), sql
+    assert_query_sql %(SELECT mock_items.*, pdb.agg('{"value_count":{"field":"id"}}', 'threshold') OVER () AS _docs_facet, pdb.agg('{"avg":{"field":"rating"}}', 'threshold') OVER () AS _avg_rating_facet FROM mock_items WHERE ("mock_items"."description" &&& 'shoes') ORDER BY "mock_items"."id" ASC LIMIT 10), sql
   end
   it "with_agg exact false emits second agg argument" do
     sql = MockItem.search(:description)
