@@ -86,6 +86,35 @@ jobs:
           echo "VERSION=${VERSION}" >> "${GITHUB_ENV}"
           echo "Version validation passed for ${VERSION}"
 
+      - name: Determine if latest
+        id: latest
+        env:
+          BETA: ${{ github.event.inputs.beta }}
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 --no-tags origin "+refs/tags/v*:refs/tags/v*"
+          IS_LATEST=$(python3 - <<'PYTHON'
+          import os
+          import re
+          import subprocess
+
+          def stable_version(value):
+              match = re.fullmatch(r"v?([0-9]+)\.([0-9]+)\.([0-9]+)", value)
+              return tuple(map(int, match.groups())) if match else None
+
+          target = stable_version(os.environ["VERSION"])
+          if os.environ["BETA"] == "true":
+              print("false")
+          elif target is None:
+              raise SystemExit("Non-beta releases must use a stable major.minor.patch version")
+          else:
+              tags = subprocess.check_output(["git", "tag", "-l", "v*"], text=True)
+              versions = [version for tag in tags.splitlines() if (version := stable_version(tag))]
+              print("true" if not versions or target >= max(versions) else "false")
+          PYTHON
+          )
+          echo "is_latest=${IS_LATEST}" >> "$GITHUB_OUTPUT"
+
       - name: Build package
         run: |
           set -euo pipefail
@@ -111,18 +140,6 @@ jobs:
           chmod 0600 "${HOME}/.gem/credentials"
 
           gem push "rails-paradedb-${VERSION}.gem"
-
-      - name: Determine if latest
-        id: latest
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          LATEST=$(gh release list --jq '.[] | select(.isLatest == true) | .name' --json=name,isLatest | sed 's/^v//' || echo "0.0.0")
-          if npx --yes semver -r ">${LATEST:-0.0.0}" "${VERSION}"; then
-            echo "is_latest=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "is_latest=false" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
