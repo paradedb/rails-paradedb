@@ -79,7 +79,7 @@ module ParadeDB
     # Consumed by migration helpers; validates and normalizes the DSL class
     class DefinitionCompiler
       FIELD_OPTION_KEYS = %i[fast record normalizer expand_dots].freeze
-      INDEX_OPTION_KEYS = %i[target_segment_count training_sample_ratio max_leaf_size partition_by vector_fields].freeze
+      INDEX_OPTION_KEYS = %i[target_segment_count training_sample_ratio max_leaf_size partition_by vector_fields search_tokenizer layer_sizes background_layer_sizes mutable_segment_rows].freeze
       POSITIVE_INTEGER_INDEX_OPTION_KEYS = %i[target_segment_count max_leaf_size].freeze
 
       class Compiled
@@ -247,6 +247,17 @@ module ParadeDB
             end
           end
 
+          if normalized[:search_tokenizer].is_a?(ParadeDB::Tokenizer)
+            normalized[:search_tokenizer] = normalized[:search_tokenizer].render_search
+          end
+          %i[search_tokenizer layer_sizes background_layer_sizes].each do |key|
+            if normalized.key?(key) && (!normalized[key].is_a?(String) || normalized[key].strip.empty?)
+              raise InvalidIndexDefinition, "index_options[#{key.inspect}] must be a non-empty string"
+            end
+          end
+          if normalized.key?(:mutable_segment_rows) && (!normalized[:mutable_segment_rows].is_a?(Integer) || !(0..10000).cover?(normalized[:mutable_segment_rows]))
+            raise InvalidIndexDefinition, "mutable_segment_rows must be an integer between 0 and 10000"
+          end
           if normalized.key?(:training_sample_ratio)
             ratio = normalized[:training_sample_ratio]
             unless ratio.is_a?(Numeric) && ratio >= 0.000001 && ratio <= 1.0

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "spec_helper"
+require_relative "support/api_parameter_index"
 require "stringio"
 
 class IndexMigrationMockItem < ActiveRecord::Base
@@ -764,5 +765,18 @@ RSpec.describe ParadeDB::Generators::IndexGenerator do
       expect(content).to include("class CreateLineItemSearchIndex")
       expect(content).to include("remove_paradedb_index :line_items")
     end
+  end
+end
+
+RSpec.describe "Index tuning option migrations" do
+  include_context "API parameter index"
+
+  it "preserves index tuning options through schema dumps" do
+    connection = ActiveRecord::Base.connection
+    options = connection.select_value("SELECT reloptions FROM pg_class WHERE oid = 'api_parameter_idx'::regclass")
+    expect(options).to include("layer_sizes=0", "background_layer_sizes=100MB, 1GB", "mutable_segment_rows=0", "search_tokenizer=simple(lowercase=true)")
+    dump = StringIO.new
+    ActiveRecord::SchemaDumper.dump(connection.pool, dump)
+    expect(dump.string).to include(':layer_sizes => "0"', ':background_layer_sizes => "100MB, 1GB"', ':mutable_segment_rows => 0', ':search_tokenizer => "simple(lowercase=true)"')
   end
 end

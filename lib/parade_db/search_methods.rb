@@ -299,8 +299,8 @@ module ParadeDB
       with_projection(snippets.as(normalize_projection_alias(as, "#{column}_snippets")))
     end
 
-    def with_snippet_positions(column, as: nil)
-      positions = builder.snippet_positions(column)
+    def with_snippet_positions(column, as: nil, limit: nil, offset: nil)
+      positions = builder.snippet_positions(column, limit: normalize_integer_option!(limit, "limit"), offset: normalize_integer_option!(offset, "offset"))
       with_projection(positions.as(normalize_projection_alias(as, "#{column}_snippet_positions")))
     end
 

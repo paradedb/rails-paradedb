@@ -99,10 +99,12 @@ module ParadeDB
       compiled.index_options.each do |key, value|
         name = key.to_sym
         case name
-        when :target_segment_count, :max_leaf_size
+        when :target_segment_count, :max_leaf_size, :mutable_segment_rows
           options << "#{name}=#{Integer(value)}"
         when :partition_by
           options << "#{name}=#{quote(value.join(","))}"
+        when :search_tokenizer, :layer_sizes, :background_layer_sizes
+          options << "#{name}=#{quote(value.to_s)}"
         when :vector_fields
           options << "vector_fields=#{quote(JSON.generate(value))}"
         when :training_sample_ratio
@@ -368,11 +370,13 @@ module ParadeDB
         next if separator.empty?
 
         case key
-        when "target_segment_count", "max_leaf_size"
+        when "target_segment_count", "max_leaf_size", "mutable_segment_rows"
           parsed = Integer(value, 10, exception: false)
           options[key.to_sym] = parsed if parsed
         when "partition_by"
           options[key.to_sym] = value.split(",")
+        when "search_tokenizer", "layer_sizes", "background_layer_sizes"
+          options[key.to_sym] = value
         when "vector_fields"
           options[:vector_fields] = JSON.parse(value)
         when "training_sample_ratio"

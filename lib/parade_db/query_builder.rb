@@ -159,8 +159,11 @@ module ParadeDB
       ::Arel::Nodes::NamedFunction.new("pdb.snippets", args)
     end
 
-    def snippet_positions(column)
-      ::Arel::Nodes::NamedFunction.new("pdb.snippet_positions", [column_node(column)])
+    def snippet_positions(column, limit: nil, offset: nil)
+      args = [column_node(column)]
+      args << keyword_arg_node("limit", limit, quoted_name: true) unless limit.nil?
+      args << keyword_arg_node("offset", offset, quoted_name: true) unless offset.nil?
+      ::Arel::Nodes::NamedFunction.new("pdb.snippet_positions", args)
     end
 
     def agg(json, exact: nil, visibility: nil)

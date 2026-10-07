@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "spec_helper"
+require_relative "support/api_parameter_index"
 
 class MockItem < ActiveRecord::Base
   include ParadeDB::Model
@@ -1141,5 +1142,17 @@ RSpec.describe "ModelPrimaryKeyRuntime" do
       ORDER BY "mock_items"."id" ASC
       LIMIT 10
     SQL
+  end
+end
+
+RSpec.describe "Snippet-position pagination" do
+  include_context "API parameter index"
+
+  it "supports snippet-position pagination" do
+    relation = ApiParameterItem.search(:description).match_any("shoes")
+    rows = relation.with_snippet_positions(:description, limit: 1, offset: 1).order(:id).to_a
+    expect(rows.length).to eq(2)
+    native = ActiveRecord::Base.connection.select_rows("SELECT id, pdb.snippet_positions(description, \"limit\" => 1, \"offset\" => 1) FROM api_parameter_items WHERE description ||| 'shoes' ORDER BY id")
+    expect(rows.map { |row| [row.id, row.description_snippet_positions] }).to eq(native)
   end
 end
