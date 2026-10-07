@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-07
+
+### Added
+
+- Index partitioning, target segment count, and vector quantization configuration.
+- Vector storage, configuration, and estimator diagnostics, plus aggregation visibility modes.
+- Snippet-position pagination with `limit` and `offset`.
+- Index layer sizes, background layer sizes, and mutable segment row limits.
+- Index search tokenizer configuration.
+
 ### Changed
 
 - **Breaking:** Remove the key-field setting from index definitions, migration helpers, and schema dumps. Query helpers use the model primary key. Require ParadeDB 0.26.0 or newer.
@@ -188,6 +198,7 @@ All notable changes to this project will be documented in this file. The format 
 - Schema dump/load round-trip for tokenizer configuration and index options
   (including `target_segment_count`)
 
+[0.13.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.13.0
 [0.12.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.12.0
 [0.11.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.11.0
 [0.10.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.10.0
