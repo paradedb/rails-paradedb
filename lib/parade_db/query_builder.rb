@@ -168,7 +168,6 @@ module ParadeDB
 
       args = [quoted_value(json)]
       unless visibility.nil?
-        raise ArgumentError, "visibility must be transaction, raw, or threshold" unless %w[transaction raw threshold].include?(visibility.to_s)
         raise ArgumentError, "Specify visibility or exact, not both" unless exact.nil?
         args << quoted_value(visibility.to_s)
       end

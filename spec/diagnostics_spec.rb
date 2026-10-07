@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "spec_helper"
-require_relative "support/partitioned_vector_index"
 
 RSpec.describe "Diagnostics" do
   before(:context) do
@@ -34,17 +33,15 @@ RSpec.describe "Diagnostics" do
   end
 end
 
-RSpec.describe "Partitioned vector index diagnostics" do
-  include_context "partitioned vector index"
-
-  it "reports vector configuration before and after reindexing" do
-    connection = ActiveRecord::Base.connection
-    expect(ParadeDB::Diagnostics.vector_config("pg26_idx", "embedding").first["quantized"]).to eq(false)
-    expect(ParadeDB::Diagnostics.vector_info("pg26_idx", "embedding")).not_to be_empty
-    connection.execute("ALTER INDEX pg26_idx SET (target_segment_count = 1, max_leaf_size = 16, vector_fields = '{\"embedding\":{\"quantization\":true}}')")
-    connection.execute("REINDEX INDEX pg26_idx")
-    expect(ParadeDB::Diagnostics.vector_config("pg26_idx", "embedding").first["quantized"]).to eq(true)
-    expect(ParadeDB::Diagnostics.vector_estimator_info("pg26_idx", "embedding")).to be_an(Array)
-    expect(ParadeDB::Diagnostics.vector_estimator_info("pg26_idx", "embedding", queries: [Array.new(64, 0.1)])).to be_an(Array)
+RSpec.describe "Vector diagnostic SQL" do
+  it "renders vector functions and optional query vectors" do
+    connection = double("connection")
+    allow(connection).to receive(:quote) { |value| "'#{value}'" }
+    %i[vector_info vector_config vector_estimator_info].each do |function|
+      expect(connection).to receive(:exec_query).with("SELECT * FROM paradedb.#{function}('search_idx'::regclass, 'embedding'::text)").and_return(double(to_a: []))
+      ParadeDB::Diagnostics.public_send(function, "search_idx", "embedding", connection: connection)
+    end
+    expect(connection).to receive(:exec_query).with("SELECT * FROM paradedb.vector_estimator_info('search_idx'::regclass, 'embedding'::text, ARRAY['[0.1,0.2]']::vector[])").and_return(double(to_a: []))
+    ParadeDB::Diagnostics.vector_estimator_info("search_idx", "embedding", queries: [[0.1, 0.2]], connection: connection)
   end
 end

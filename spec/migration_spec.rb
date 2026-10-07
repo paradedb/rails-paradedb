@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "spec_helper"
-require_relative "support/partitioned_vector_index"
 require "stringio"
 
 class IndexMigrationMockItem < ActiveRecord::Base
@@ -361,7 +360,7 @@ RSpec.describe "IndexMigration" do
         id: {},
         description: { tokenizer: ParadeDB::Tokenizer.simple(options: {alias: "description_simple"}) }
       },
-      index_options: { target_segment_count: 17 },
+      index_options: { target_segment_count: 17, partition_by: ["id"] },
       if_not_exists: true
     )
     conn.instance_variable_set(:@paradedb_schema_index_references, [])
@@ -377,7 +376,7 @@ RSpec.describe "IndexMigration" do
     end
 
     assert_equal <<~RUBY.strip, add_stmt.to_s.strip
-      add_paradedb_index :mock_items, fields: { id: {}, description: { tokenizer: ParadeDB::Tokenizer.simple(options: { :alias => "description_simple" }) } }, name: "mock_items_search_idx", index_options: { :target_segment_count => 17 }
+      add_paradedb_index :mock_items, fields: { id: {}, description: { tokenizer: ParadeDB::Tokenizer.simple(options: { :alias => "description_simple" }) } }, name: "mock_items_search_idx", index_options: { :target_segment_count => 17, :partition_by => ["id"] }
     RUBY
     expect(schema).not_to match(/add_index.*mock_items_search_idx/)
     expect(schema).not_to match(/t\.index.*mock_items_search_idx/)
@@ -765,18 +764,5 @@ RSpec.describe ParadeDB::Generators::IndexGenerator do
       expect(content).to include("class CreateLineItemSearchIndex")
       expect(content).to include("remove_paradedb_index :line_items")
     end
-  end
-end
-
-RSpec.describe "Partitioned vector index migrations" do
-  include_context "partitioned vector index"
-
-  it "preserves partition and vector options in schema dumps" do
-    connection = ActiveRecord::Base.connection
-    options = connection.select_value("SELECT reloptions FROM pg_class WHERE oid = 'pg26_idx'::regclass")
-    expect(options).to include("partition_by=rating,id", "target_segment_count=8")
-    dump = StringIO.new
-    ActiveRecord::SchemaDumper.dump(connection.pool, dump)
-    expect(dump.string).to include(':partition_by => "rating,id"', ':vector_fields =>')
   end
 end

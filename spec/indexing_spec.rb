@@ -27,13 +27,13 @@ RSpec.describe "IndexDsl" do
   it "compiles vector index build options and renders them in WITH" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.index_options = { training_sample_ratio: 0.01, max_leaf_size: 32 }
+      self.index_options = { training_sample_ratio: 0.01, max_leaf_size: 32, partition_by: ["id"], target_segment_count: 8, vector_fields: {embedding: {quantization: false}} }
       self.fields = { id: {}, description: nil, embedding: { metric: :cosine } }
     end
 
     compiled = klass.compiled_definition
     assert_equal(
-      { training_sample_ratio: 0.01, max_leaf_size: 32 },
+      { training_sample_ratio: 0.01, max_leaf_size: 32, partition_by: ["id"], target_segment_count: 8, vector_fields: {embedding: {quantization: false}} },
       compiled.index_options
     )
 
@@ -41,7 +41,7 @@ RSpec.describe "IndexDsl" do
     assert_sql_equal <<~SQL, sql
       CREATE INDEX mock_items_search_idx ON mock_items
       USING paradedb (id, description, embedding vector_cosine_ops)
-      WITH (training_sample_ratio=0.01, max_leaf_size=32)
+      WITH (training_sample_ratio=0.01, max_leaf_size=32, partition_by='id', target_segment_count=8, vector_fields='{"embedding":{"quantization":false}}')
     SQL
   end
 
@@ -115,10 +115,10 @@ RSpec.describe "IndexDsl" do
 
     options = conn.send(
       :extract_paradedb_index_options,
-      [ "training_sample_ratio=0.01", "max_leaf_size=32", ""]
+      [ "training_sample_ratio=0.01", "max_leaf_size=32", "partition_by=id", "target_segment_count=8", 'vector_fields={"embedding":{"quantization":false}}', ""]
     )
     assert_equal(
-      { training_sample_ratio: 0.01, max_leaf_size: 32 },
+      { training_sample_ratio: 0.01, max_leaf_size: 32, partition_by: ["id"], target_segment_count: 8, vector_fields: {"embedding" => {"quantization" => false}} },
       options
     )
 

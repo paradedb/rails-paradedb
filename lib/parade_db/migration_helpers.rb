@@ -102,7 +102,7 @@ module ParadeDB
         when :target_segment_count, :max_leaf_size
           options << "#{name}=#{Integer(value)}"
         when :partition_by
-          options << "#{name}=#{quote(value.to_s)}"
+          options << "#{name}=#{quote(value.join(","))}"
         when :vector_fields
           options << "vector_fields=#{quote(JSON.generate(value))}"
         when :training_sample_ratio
@@ -372,7 +372,7 @@ module ParadeDB
           parsed = Integer(value, 10, exception: false)
           options[key.to_sym] = parsed if parsed
         when "partition_by"
-          options[key.to_sym] = value
+          options[key.to_sym] = value.split(",")
         when "vector_fields"
           options[:vector_fields] = JSON.parse(value)
         when "training_sample_ratio"

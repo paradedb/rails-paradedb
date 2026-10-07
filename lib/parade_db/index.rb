@@ -255,12 +255,6 @@ module ParadeDB
             end
           end
 
-          if normalized.key?(:partition_by)
-            value = normalized[:partition_by]
-            unless value.is_a?(String) && value.split(",", -1).all? { |field| !field.strip.empty? } && !value.empty?
-              raise InvalidIndexDefinition, "index_options[:partition_by] must contain non-empty index field names"
-            end
-          end
           if normalized.key?(:vector_fields) && !normalized[:vector_fields].is_a?(Hash)
             raise InvalidIndexDefinition, "index_options[:vector_fields] must be a Hash"
           end

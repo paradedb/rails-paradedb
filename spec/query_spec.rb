@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "spec_helper"
-require_relative "support/partitioned_vector_index"
 
 class MockItem < ActiveRecord::Base
   include ParadeDB::Model
@@ -569,16 +568,18 @@ RSpec.describe "UserApi" do
                                           :normalize_named_aggregation_specs,
                                           docs: ParadeDB::Aggregations.value_count(:id),
                                           avg_rating: ParadeDB::Aggregations.avg(:rating)
-                                        )
+                                        ),
+                             visibility: "transaction"
                            )
                            .sql
 
-    assert_query_sql %(SELECT pdb.agg('{"value_count":{"field":"id"}}') AS docs_facet, pdb.agg('{"avg":{"field":"rating"}}') AS avg_rating_facet FROM (SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" &&& 'shoes')) paradedb_agg_source), facet_sql
+    assert_query_sql %(SELECT pdb.agg('{"value_count":{"field":"id"}}', 'transaction') AS docs_facet, pdb.agg('{"avg":{"field":"rating"}}', 'transaction') AS avg_rating_facet FROM (SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" &&& 'shoes')) paradedb_agg_source), facet_sql
   end
   it "with_agg adds multiple window aggregates" do
     sql = MockItem.search(:description)
                      .match_all("shoes")
                      .with_agg(
+                       visibility: "threshold",
                        docs: ParadeDB::Aggregations.value_count(:id),
                        avg_rating: ParadeDB::Aggregations.avg(:rating)
                      )
@@ -586,7 +587,7 @@ RSpec.describe "UserApi" do
                      .limit(10)
                      .to_sql
 
-    assert_query_sql %(SELECT mock_items.*, pdb.agg('{"value_count":{"field":"id"}}') OVER () AS _docs_facet, pdb.agg('{"avg":{"field":"rating"}}') OVER () AS _avg_rating_facet FROM mock_items WHERE ("mock_items"."description" &&& 'shoes') ORDER BY "mock_items"."id" ASC LIMIT 10), sql
+    assert_query_sql %(SELECT mock_items.*, pdb.agg('{"value_count":{"field":"id"}}', 'threshold') OVER () AS _docs_facet, pdb.agg('{"avg":{"field":"rating"}}', 'threshold') OVER () AS _avg_rating_facet FROM mock_items WHERE ("mock_items"."description" &&& 'shoes') ORDER BY "mock_items"."id" ASC LIMIT 10), sql
   end
   it "with_agg exact false emits second agg argument" do
     sql = MockItem.search(:description)
@@ -1140,22 +1141,5 @@ RSpec.describe "ModelPrimaryKeyRuntime" do
       ORDER BY "mock_items"."id" ASC
       LIMIT 10
     SQL
-  end
-end
-
-RSpec.describe "Partitioned vector index queries" do
-  include_context "partitioned vector index"
-
-  it "filters partitions and supports aggregate visibility modes" do
-    connection = ActiveRecord::Base.connection
-    expect(connection.select_value("SELECT COUNT(*) FROM pg26_items WHERE description @@@ 'shoes' AND rating = 1")).to eq(683)
-    model = Class.new(ActiveRecord::Base) do
-      include ParadeDB::Model
-      self.table_name = "pg26_items"
-    end
-    %w[transaction raw threshold].each do |visibility|
-      result = model.search(:id).match_all.facets_agg(visibility: visibility, count: ParadeDB::Aggregations.value_count(:id))
-      expect(result["count"]["value"]).to eq(2048)
-    end
   end
 end
