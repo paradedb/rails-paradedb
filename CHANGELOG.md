@@ -4,9 +4,15 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-16
+
 ### Added
 
-- Cross-group facets using `relation.builder.combine_agg` with Arel `over` (ParadeDB 0.26.2+).
+- Cross-group facets using `relation.builder.combine_agg` with Arel `over`.
+
+### Changed
+
+- **Breaking:** Require ParadeDB 0.26.2 or newer.
 
 ## [0.13.0] - 2026-10-07
 
@@ -201,6 +207,8 @@ All notable changes to this project will be documented in this file. The format 
 
 - Schema dump/load round-trip for tokenizer configuration and index options
   (including `target_segment_count`)
+
+[0.14.0]: https://github.com/paradedb/rails-paradedb/compare/v0.13.0...v0.14.0
 
 [0.13.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.13.0
 [0.12.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.12.0

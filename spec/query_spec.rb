@@ -676,7 +676,7 @@ RSpec.describe "UserApi" do
     SQL
     assert_query_sql expected, query.to_sql
     rows = query.to_a
-    expect(rows.length).to eq(2)
+    expect(rows.map { |row| row["in_stock"] }).to match_array(MockItem.distinct.pluck(:in_stock))
     count = rows.sum { |row| row["group_rows"] }
     expect(rows.map { |row| JSON.parse(row.read_attribute_before_type_cast("total")) }).to all(eq({"value" => count}))
   end

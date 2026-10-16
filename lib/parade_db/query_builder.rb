@@ -178,7 +178,7 @@ module ParadeDB
       ::Arel::Nodes::NamedFunction.new("pdb.agg", args)
     end
 
-    # Combine pdb.agg across GROUP BY groups (ParadeDB 0.26.2+).
+    # Combine pdb.agg across GROUP BY groups.
     # Use combine_agg(agg(json)).over to produce the required OVER () form.
     def combine_agg(aggregate)
       ::Arel::Nodes::NamedFunction.new("pdb.combine_agg", [aggregate])
