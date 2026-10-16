@@ -46,7 +46,7 @@ The official [ActiveRecord](https://guides.rubyonrails.org/active_record_basics.
 | Rails                | 7.2+                                                                                                                          |
 | PostgreSQL           | 15+                                                                                                                           |
 | pgvector             | 0.7.0+ (provides vector types for ParadeDB’s [native vector search](https://www.paradedb.com/docs/reference/vector/overview)) |
-| ParadeDB / pg_search | 0.26.0+                                                                                                                       |
+| ParadeDB / pg_search | 0.26.2+                                                                                                                       |
 
 ## Contributing
 
