@@ -209,7 +209,6 @@ All notable changes to this project will be documented in this file. The format 
   (including `target_segment_count`)
 
 [0.14.0]: https://github.com/paradedb/rails-paradedb/compare/v0.13.0...v0.14.0
-
 [0.13.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.13.0
 [0.12.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.12.0
 [0.11.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.11.0
