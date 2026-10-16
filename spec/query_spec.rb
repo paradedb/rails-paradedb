@@ -660,6 +660,26 @@ RSpec.describe "UserApi" do
 
     assert_query_sql expected, sql
   end
+  it "combines facets across groups" do
+    scope = MockItem.search(:id)
+    builder = scope.builder
+    total = builder.combine_agg(builder.agg('{"value_count":{"field":"id"}}')).over.as("total")
+    query = scope.where(builder.match_all(:id))
+                    .select(:in_stock, Arel.sql("COUNT(*) AS group_rows"), total)
+                    .group(:in_stock)
+                    .order(:in_stock)
+
+    expected = <<~SQL.strip
+      SELECT "mock_items"."in_stock", COUNT(*) AS group_rows, pdb.combine_agg(pdb.agg('{"value_count":{"field":"id"}}')) OVER () AS total
+      FROM "mock_items" WHERE "mock_items"."id" @@@ pdb.all()
+      GROUP BY "mock_items"."in_stock" ORDER BY "mock_items"."in_stock" ASC
+    SQL
+    assert_query_sql expected, query.to_sql
+    rows = query.to_a
+    expect(rows.length).to eq(2)
+    count = rows.sum { |row| row["group_rows"] }
+    expect(rows.map { |row| JSON.parse(row.read_attribute_before_type_cast("total")) }).to all(eq({"value" => count}))
+  end
   it "model aggregate_by adds match all when no paradedb predicate exists" do
     sql = MockItem.aggregate_by(:rating, agg: ParadeDB::Aggregations.value_count(:id)).to_sql
 
