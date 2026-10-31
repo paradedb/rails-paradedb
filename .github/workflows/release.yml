@@ -41,10 +41,10 @@ jobs:
           exit 1
 
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1
         with:
           ruby-version: .ruby-version
           bundler-cache: true
@@ -142,7 +142,7 @@ jobs:
           gem push "rails-paradedb-${VERSION}.gem"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           tag_name: v${{ env.VERSION }}
           target_commitish: ${{ github.sha }}
