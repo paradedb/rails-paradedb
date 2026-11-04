@@ -16,7 +16,7 @@ bootstrap_return() {
   exit "${code}"
 }
 
-RUBY_VERSION="4.0.0"
+RUBY_VERSION="4.0.9"
 BUNDLER_VERSION="4.0.3"
 
 # Skip rbenv setup if Ruby 4.0+ is already available (e.g., in CI)
