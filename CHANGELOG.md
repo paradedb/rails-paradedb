@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Added
+
+- Synonym search using `ParadeDB.expand`, which builds the `pdb.expand` subquery for `match_any` and `match_all`. It needs a ParadeDB version that has `pdb.expand`.
+
 ### Changed
 
 - **Breaking:** Require ParadeDB 0.27.0 or newer.

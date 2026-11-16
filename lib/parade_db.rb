@@ -105,5 +105,9 @@ module ParadeDB
     QueryBuilder.new.tokenize(value, tokenizer)
   end
 
+  def expand(text, rules, column)
+    QueryBuilder.new.expand(text, rules, column)
+  end
+
   private_constant :QueryBuilder
 end

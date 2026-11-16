@@ -905,6 +905,9 @@ RSpec.describe "Guards" do
       [-> { ParadeDB.fuzzy("shoes", "far") }, "distance must be numeric"],
       [-> { ParadeDB.fuzzy("shoes", 5) }, "distance must be between 0 and 2"],
       [-> { ParadeDB.constant("shoes", "fixed") }, "score must be numeric"],
+      [-> { ParadeDB.expand(" ", ShopSynonym, :rule) }, "expand requires non-empty search text"],
+      [-> { ParadeDB.expand("sofa", "shop_synonyms", :rule) }, "expand requires a model class or relation"],
+      [-> { ParadeDB.expand("sofa", ShopSynonym, nil) }, "expand requires a rule column name"],
       [-> { ParadeDB.regex_term("sl.*", max_expansions: "100") }, "max_expansions must be an integer"],
       [-> { builder.near(:description, "running") }, "near requires a ParadeDB.proximity"],
       [-> { builder.near(:description, ParadeDB.proximity("running")) }, "near requires at least one within clause"],
@@ -1174,5 +1177,95 @@ RSpec.describe "Snippet-position pagination" do
     expect(rows.length).to eq(2)
     native = ActiveRecord::Base.connection.select_rows("SELECT id, pdb.snippet_positions(description, \"limit\" => 1, \"offset\" => 1) FROM api_parameter_items WHERE description ||| 'shoes' ORDER BY id")
     expect(rows.map { |row| [row.id, row.description_snippet_positions] }).to eq(native)
+  end
+end
+
+class ShopSynonym < ActiveRecord::Base
+  self.table_name = :shop_synonyms
+end
+
+class Synonym < ActiveRecord::Base
+  self.table_name = :synonyms
+end
+
+RSpec.describe "Synonym expansion" do
+  before(:context) do
+    setup_test_index
+    connection = ActiveRecord::Base.connection
+    @expand_supported = connection.select_value("SELECT to_regprocedure('pdb.expand(text, text)') IS NOT NULL")
+    # The SQL-shape examples also run on servers without synonyms, where the rule column is plain text.
+    rule_type = @expand_supported ? "pdb.synonym_rule" : "text"
+    connection.execute(<<~SQL)
+      CREATE TABLE shop_synonyms (rule #{rule_type} NOT NULL);
+      INSERT INTO shop_synonyms VALUES ('sofa, couch, divan'), ('sneakers => running shoes');
+      CREATE TABLE synonyms (set_name text NOT NULL, rule #{rule_type} NOT NULL);
+      INSERT INTO synonyms VALUES ('shop', 'sofa, couch'), ('colors', 'red, crimson');
+    SQL
+    if @expand_supported
+      connection.execute(<<~SQL)
+        CREATE INDEX shop_synonyms_idx ON shop_synonyms USING paradedb (rule);
+        CREATE INDEX shop_idx ON synonyms USING paradedb (rule) WHERE set_name = 'shop';
+      SQL
+    end
+  end
+
+  after(:context) { ActiveRecord::Base.connection.execute("DROP TABLE IF EXISTS shop_synonyms, synonyms") }
+
+  it "passes the expand subquery to match and its modifiers" do
+    rules = ParadeDB.expand("sofa", ShopSynonym, :rule)
+    subquery = %((SELECT pdb.expand('sofa', "shop_synonyms"."rule") FROM "shop_synonyms"))
+    {
+      %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" ||| #{subquery})) => MockItem.search(:description).match_any(rules),
+      %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" &&& #{subquery})) => MockItem.search(:description).match_all(rules),
+      %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" ||| #{subquery}::pdb.fuzzy(1))) => MockItem.search(:description).match_any(ParadeDB.fuzzy(rules, 1)),
+      %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" ||| #{subquery}::pdb.boost(2))) => MockItem.search(:description).match_any(ParadeDB.boost(rules, 2))
+    }.each do |expected, relation|
+      assert_sql_equal expected, relation.to_sql
+    end
+  end
+
+  it "writes the values of the set filter into the SQL with prepared statements" do
+    connection = ActiveRecord::Base.connection
+    assert connection.prepared_statements
+
+    {
+      %(WHERE "synonyms"."set_name" = 'shop') => Synonym.where(set_name: "shop"),
+      %(WHERE "synonyms"."set_name" = 'shop' LIMIT 5) => Synonym.select(:set_name).order(:set_name).where(set_name: "shop").limit(5)
+    }.each do |filter, rules|
+      relation = MockItem.search(:description).match_any(ParadeDB.expand("sofa", rules, :rule))
+      expected = %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" ||| (SELECT pdb.expand('sofa', "synonyms"."rule") FROM "synonyms" #{filter})))
+
+      assert_sql_equal expected, connection.to_sql(relation.arel)
+      assert_sql_equal expected, relation.to_sql
+    end
+  end
+
+  describe "with a synonym index" do
+    before { skip "the server has no pdb.expand" unless @expand_supported }
+
+    def explain(relation)
+      ActiveRecord::Base.connection.select_values("EXPLAIN (COSTS OFF) #{relation.to_sql}").join("\n")
+    end
+
+    it "reads the rules from the index on the whole table" do
+      relation = MockItem.search(:description).match_any(ParadeDB.expand("couch", ShopSynonym, :rule))
+
+      assert_equal ["Classic leather sofa"], relation.pluck(:description)
+      assert_includes explain(relation), "Synonyms: shop_synonyms_idx"
+    end
+
+    it "reads the rules from the partial index of the set filter" do
+      relation = MockItem.search(:description).match_any(ParadeDB.expand("couch", Synonym.where(set_name: "shop"), :rule))
+
+      assert_equal ["Classic leather sofa"], relation.pluck(:description)
+      assert_includes explain(relation), "Synonyms: shop_idx"
+    end
+
+    it "keeps the typed words fuzzy" do
+      relation = MockItem.search(:description).match_any(ParadeDB.fuzzy(ParadeDB.expand("shoe couch", ShopSynonym, :rule), 1))
+
+      assert_equal ["Classic leather sofa", "Generic shoes", "Sleek running shoes", "White jogging shoes"], relation.pluck(:description).sort
+      assert_includes explain(relation), "Synonyms: shop_synonyms_idx"
+    end
   end
 end

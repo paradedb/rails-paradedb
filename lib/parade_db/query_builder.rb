@@ -48,6 +48,17 @@ module ParadeDB
       Modifier.new(type: :tokenizer, value: value, options: { tokenizer: tokenizer })
     end
 
+    def expand(text, rules, column)
+      raise ArgumentError, "expand requires non-empty search text" unless text.is_a?(String) && !text.strip.empty?
+      raise ArgumentError, "expand requires a rule column name" unless column.is_a?(Symbol) || column.is_a?(String)
+
+      relation = expand_rules_relation(rules)
+      call = ::Arel::Nodes::NamedFunction.new("pdb.expand", [quoted_value(text), relation.table[column]])
+      # The planner reads a synonym index only when `pdb.expand` is the subquery's one output and its WHERE
+      # matches the index predicate. A bind parameter can't match in a generic plan, so `to_sql` inlines the values.
+      ::Arel::Nodes::Grouping.new(::Arel.sql(relation.except(:select, :order).select(call).to_sql))
+    end
+
     def match(column, term = nil)
       infix("&&&", column_node(column), term_query_node(term))
     end
@@ -235,6 +246,13 @@ module ParadeDB
       when :tokenizer
         cast_node(node, modifier.options[:tokenizer].render)
       end
+    end
+
+    def expand_rules_relation(rules)
+      return rules if rules.is_a?(::ActiveRecord::Relation)
+      return rules.all if rules.is_a?(Class) && rules < ::ActiveRecord::Base
+
+      raise ArgumentError, "expand requires a model class or relation for the rules table, got #{rules.class}"
     end
 
     def vector_operand(vector)
