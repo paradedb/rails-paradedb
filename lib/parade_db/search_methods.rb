@@ -260,6 +260,10 @@ module ParadeDB
       with_projection(builder.score(primary_key).as("search_score"))
     end
 
+    def with_score_explanation
+      with_projection(builder.explain_score(primary_key).as("search_score_explanation"))
+    end
+
     def with_snippet(column, start_tag: nil, end_tag: nil, max_chars: nil)
       formatted_args = []
       formatted_args << start_tag unless start_tag.nil?

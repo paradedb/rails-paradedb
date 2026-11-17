@@ -389,6 +389,17 @@ RSpec.describe "UserApi" do
 
     assert_query_sql expected, sql
   end
+  it "with score explanation selects pdb.explain_score of the key" do
+    sql = MockItem.search(:description).match_all("shoes").with_score.with_score_explanation.to_sql
+
+    expected = <<~SQL.strip
+      SELECT mock_items.*, pdb.score("mock_items"."id") AS search_score, pdb.explain_score("mock_items"."id") AS search_score_explanation FROM mock_items
+      WHERE ("mock_items"."description" &&& 'shoes')
+    SQL
+
+    # Only the SQL is compared, because a server without `pdb.explain_score` can't run it.
+    assert_sql_equal expected, sql
+  end
   it "with snippet then with score keeps both projections" do
     sql = MockItem.search(:description)
                  .match_all("shoes")
@@ -1218,10 +1229,21 @@ RSpec.describe "Synonym expansion" do
       %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" ||| #{subquery})) => MockItem.search(:description).match_any(rules),
       %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" &&& #{subquery})) => MockItem.search(:description).match_all(rules),
       %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" ||| #{subquery}::pdb.fuzzy(1))) => MockItem.search(:description).match_any(ParadeDB.fuzzy(rules, 1)),
-      %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" ||| #{subquery}::pdb.boost(2))) => MockItem.search(:description).match_any(ParadeDB.boost(rules, 2))
+      %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" ||| #{subquery}::pdb.boost(2))) => MockItem.search(:description).match_any(ParadeDB.boost(rules, 2)),
+      %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" ### #{subquery})) => MockItem.search(:description).phrase(rules),
+      %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" ### #{subquery}::pdb.slop(2))) => MockItem.search(:description).phrase(ParadeDB.slop(rules, 2)),
+      %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" @@@ #{subquery})) => MockItem.search(:description).parse(rules),
+      %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" @@@ #{subquery}::pdb.fuzzy(1))) => MockItem.search(:description).parse(ParadeDB.fuzzy(rules, 1))
     }.each do |expected, relation|
       assert_sql_equal expected, relation.to_sql
     end
+  end
+
+  it "rejects parse options with an expansion" do
+    rules = ParadeDB.expand("sofa", ShopSynonym, :rule)
+
+    error = assert_raises(ArgumentError) { MockItem.search(:description).parse(rules, lenient: true) }
+    assert_equal "parse options do not apply to an expansion", error.message
   end
 
   it "writes the values of the set filter into the SQL with prepared statements" do
@@ -1261,11 +1283,40 @@ RSpec.describe "Synonym expansion" do
       assert_includes explain(relation), "Synonyms: shop_idx"
     end
 
+    it "expands a phrase and a parsed query" do
+      phrase = MockItem.search(:description).phrase(ParadeDB.expand("leather couch", ShopSynonym, :rule))
+      parse = MockItem.search(:description).parse(ParadeDB.expand("leather AND couch", ShopSynonym, :rule))
+
+      [phrase, parse].each do |relation|
+        assert_equal ["Classic leather sofa"], relation.pluck(:description)
+        assert_includes explain(relation), "Synonyms: shop_synonyms_idx"
+      end
+    end
+
     it "keeps the typed words fuzzy" do
       relation = MockItem.search(:description).match_any(ParadeDB.fuzzy(ParadeDB.expand("shoe couch", ShopSynonym, :rule), 1))
 
       assert_equal ["Classic leather sofa", "Generic shoes", "Sleek running shoes", "White jogging shoes"], relation.pluck(:description).sort
       assert_includes explain(relation), "Synonyms: shop_synonyms_idx"
     end
+  end
+end
+
+RSpec.describe "Score explanation" do
+  before(:context) do
+    setup_test_index
+    @explain_score_supported = ActiveRecord::Base.connection.select_value(
+      "SELECT to_regprocedure('pdb.explain_score(anyelement)') IS NOT NULL"
+    )
+  end
+
+  it "explains the score of a row" do
+    skip "the server has no pdb.explain_score" unless @explain_score_supported
+
+    row = MockItem.search(:description).match_any("shoes").with_score.with_score_explanation
+                  .order(search_score: :desc, id: :asc).first
+
+    assert_equal row.search_score, row.search_score_explanation["value"]
+    assert_equal "TermQuery, product of...", row.search_score_explanation["description"]
   end
 end

@@ -116,6 +116,13 @@ module ParadeDB
     end
 
     def parse(column, query, lenient: nil, conjunction_mode: nil)
+      # `pdb.parse` takes only text, and `expand` already returns a query.
+      if expansion?(query)
+        raise ArgumentError, "parse options do not apply to an expansion" unless lenient.nil? && conjunction_mode.nil?
+
+        return infix("@@@", column_node(column), search_value_node(query))
+      end
+
       args = [quoted_value(query)]
       args << keyword_arg_node("lenient", lenient) unless lenient.nil?
       args << keyword_arg_node("conjunction_mode", conjunction_mode) unless conjunction_mode.nil?
@@ -153,6 +160,10 @@ module ParadeDB
 
     def score(key)
       ::Arel::Nodes::NamedFunction.new("pdb.score", [column_node(key)])
+    end
+
+    def explain_score(key)
+      ::Arel::Nodes::NamedFunction.new("pdb.explain_score", [column_node(key)])
     end
 
     def snippet(column, *args)
@@ -403,6 +414,11 @@ module ParadeDB
 
     def arel_expression?(value)
       value.is_a?(::Arel::Nodes::Node) || value.is_a?(::Arel::Attributes::Attribute)
+    end
+
+    def expansion?(value)
+      value = value.value while value.is_a?(Modifier)
+      arel_expression?(value)
     end
 
     def normalize_term_set_terms(terms)
