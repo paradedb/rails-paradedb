@@ -9,7 +9,7 @@ module ParadeDB
     RANGE_RELATIONS = %w[Intersects Contains Within].freeze
     Modifier = Data.define(:type, :value, :options)
     # `parse` has to tell an expansion from the other Arel nodes that it takes as a query string.
-    Expansion = Class.new(::Arel::Nodes::Grouping)
+    Expansion = Module.new
     # The subquery returns the one row of an aggregate, so these clauses would not pick rules.
     UNSUPPORTED_RULES_CLAUSES = %i[limit offset distinct group having lock from eager_load].freeze
     attr_reader :table
@@ -60,7 +60,7 @@ module ParadeDB
       call = ::Arel::Nodes::NamedFunction.new("pdb.expand", [quoted_value(text), relation.table[column]])
       # The planner reads a synonym index only when `pdb.expand` is the subquery's one output and its WHERE
       # matches the index predicate. A bind parameter can't match in a generic plan, so `to_sql` inlines the values.
-      Expansion.new(::Arel.sql(relation.except(:select, :order).select(call).to_sql))
+      ::Arel::Nodes::Grouping.new(::Arel.sql(relation.except(:select, :order).select(call).to_sql)).extend(Expansion)
     end
 
     def match(column, term = nil)
