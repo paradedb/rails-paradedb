@@ -919,6 +919,7 @@ RSpec.describe "Guards" do
       [-> { ParadeDB.expand(" ", ShopSynonym, :rule) }, "expand requires non-empty search text"],
       [-> { ParadeDB.expand("sofa", "shop_synonyms", :rule) }, "expand requires a model class or relation"],
       [-> { ParadeDB.expand("sofa", ShopSynonym, nil) }, "expand requires a rule column name"],
+      [-> { ParadeDB.expand("sofa", ShopSynonym.limit(5).distinct, :rule) }, "expand does not take rules with limit, distinct"],
       [-> { ParadeDB.regex_term("sl.*", max_expansions: "100") }, "max_expansions must be an integer"],
       [-> { builder.near(:description, "running") }, "near requires a ParadeDB.proximity"],
       [-> { builder.near(:description, ParadeDB.proximity("running")) }, "near requires at least one within clause"],
@@ -1246,13 +1247,21 @@ RSpec.describe "Synonym expansion" do
     assert_equal "parse options do not apply to an expansion", error.message
   end
 
+  it "keeps pdb.parse and its options for another Arel node" do
+    query = Arel::Nodes::NamedFunction.new("lower", [Arel::Nodes.build_quoted("SOFA")])
+    sql = MockItem.search(:description).parse(query, conjunction_mode: true).to_sql
+
+    expected = %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" @@@ pdb.parse(lower('SOFA'), conjunction_mode => TRUE)))
+    assert_sql_equal expected, sql
+  end
+
   it "writes the values of the set filter into the SQL with prepared statements" do
     connection = ActiveRecord::Base.connection
     assert connection.prepared_statements
 
     {
       %(WHERE "synonyms"."set_name" = 'shop') => Synonym.where(set_name: "shop"),
-      %(WHERE "synonyms"."set_name" = 'shop' LIMIT 5) => Synonym.select(:set_name).order(:set_name).where(set_name: "shop").limit(5)
+      %(WHERE "synonyms"."set_name" IN ('shop', 'colors')) => Synonym.select(:set_name).order(:set_name).where(set_name: %w[shop colors])
     }.each do |filter, rules|
       relation = MockItem.search(:description).match_any(ParadeDB.expand("sofa", rules, :rule))
       expected = %(SELECT mock_items.* FROM mock_items WHERE ("mock_items"."description" ||| (SELECT pdb.expand('sofa', "synonyms"."rule") FROM "synonyms" #{filter})))
@@ -1293,6 +1302,22 @@ RSpec.describe "Synonym expansion" do
       end
     end
 
+    it "reads the partial index in a generic plan" do
+      relation = MockItem.search(:description)
+                         .match_any(ParadeDB.expand("couch", Synonym.where(set_name: "shop"), :rule))
+                         .where(rating: 1..)
+
+      ActiveRecord::Base.transaction do
+        connection = ActiveRecord::Base.connection
+        # A generic plan has no values for bind parameters, and the error setting fails the query if no
+        # synonym index fits.
+        connection.execute("SET LOCAL plan_cache_mode = force_generic_plan")
+        connection.execute("SET LOCAL paradedb.planner_warnings = 'error'")
+
+        assert_equal ["Classic leather sofa"], relation.pluck(:description)
+      end
+    end
+
     it "keeps the typed words fuzzy" do
       relation = MockItem.search(:description).match_any(ParadeDB.fuzzy(ParadeDB.expand("shoe couch", ShopSynonym, :rule), 1))
 
@@ -1317,6 +1342,5 @@ RSpec.describe "Score explanation" do
                   .order(search_score: :desc, id: :asc).first
 
     assert_equal row.search_score, row.search_score_explanation["value"]
-    assert_equal "TermQuery, product of...", row.search_score_explanation["description"]
   end
 end

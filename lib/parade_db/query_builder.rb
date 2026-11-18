@@ -8,6 +8,10 @@ module ParadeDB
     RANGE_TYPES = %w[int4range int8range numrange daterange tsrange tstzrange].freeze
     RANGE_RELATIONS = %w[Intersects Contains Within].freeze
     Modifier = Data.define(:type, :value, :options)
+    # `parse` has to tell an expansion from the other Arel nodes that it takes as a query string.
+    Expansion = Class.new(::Arel::Nodes::Grouping)
+    # The subquery returns the one row of an aggregate, so these clauses would not pick rules.
+    UNSUPPORTED_RULES_CLAUSES = %i[limit offset distinct group having lock from eager_load].freeze
     attr_reader :table
 
     def initialize(table = nil)
@@ -56,7 +60,7 @@ module ParadeDB
       call = ::Arel::Nodes::NamedFunction.new("pdb.expand", [quoted_value(text), relation.table[column]])
       # The planner reads a synonym index only when `pdb.expand` is the subquery's one output and its WHERE
       # matches the index predicate. A bind parameter can't match in a generic plan, so `to_sql` inlines the values.
-      ::Arel::Nodes::Grouping.new(::Arel.sql(relation.except(:select, :order).select(call).to_sql))
+      Expansion.new(::Arel.sql(relation.except(:select, :order).select(call).to_sql))
     end
 
     def match(column, term = nil)
@@ -260,10 +264,15 @@ module ParadeDB
     end
 
     def expand_rules_relation(rules)
-      return rules if rules.is_a?(::ActiveRecord::Relation)
-      return rules.all if rules.is_a?(Class) && rules < ::ActiveRecord::Base
+      relation = rules.is_a?(Class) && rules < ::ActiveRecord::Base ? rules.all : rules
+      unless relation.is_a?(::ActiveRecord::Relation)
+        raise ArgumentError, "expand requires a model class or relation for the rules table, got #{rules.class}"
+      end
 
-      raise ArgumentError, "expand requires a model class or relation for the rules table, got #{rules.class}"
+      unsupported = UNSUPPORTED_RULES_CLAUSES.select { |clause| relation.values[clause].present? }
+      raise ArgumentError, "expand does not take rules with #{unsupported.join(', ')}" unless unsupported.empty?
+
+      relation
     end
 
     def vector_operand(vector)
@@ -418,7 +427,7 @@ module ParadeDB
 
     def expansion?(value)
       value = value.value while value.is_a?(Modifier)
-      arel_expression?(value)
+      value.is_a?(Expansion)
     end
 
     def normalize_term_set_terms(terms)
