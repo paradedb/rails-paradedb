@@ -1203,22 +1203,14 @@ end
 RSpec.describe "Synonym expansion" do
   before(:context) do
     setup_test_index
-    connection = ActiveRecord::Base.connection
-    @expand_supported = connection.select_value("SELECT to_regprocedure('pdb.expand(text, text)') IS NOT NULL")
-    # The SQL-shape examples also run on servers without synonyms, where the rule column is plain text.
-    rule_type = @expand_supported ? "pdb.synonym_rule" : "text"
-    connection.execute(<<~SQL)
-      CREATE TABLE shop_synonyms (rule #{rule_type} NOT NULL);
+    ActiveRecord::Base.connection.execute(<<~SQL)
+      CREATE TABLE shop_synonyms (rule pdb.synonym_rule NOT NULL);
       INSERT INTO shop_synonyms VALUES ('sofa, couch, divan'), ('sneakers => running shoes');
-      CREATE TABLE synonyms (set_name text NOT NULL, rule #{rule_type} NOT NULL);
+      CREATE INDEX shop_synonyms_idx ON shop_synonyms USING paradedb (rule);
+      CREATE TABLE synonyms (set_name text NOT NULL, rule pdb.synonym_rule NOT NULL);
       INSERT INTO synonyms VALUES ('shop', 'sofa, couch'), ('colors', 'red, crimson');
+      CREATE INDEX shop_idx ON synonyms USING paradedb (rule) WHERE set_name = 'shop';
     SQL
-    if @expand_supported
-      connection.execute(<<~SQL)
-        CREATE INDEX shop_synonyms_idx ON shop_synonyms USING paradedb (rule);
-        CREATE INDEX shop_idx ON synonyms USING paradedb (rule) WHERE set_name = 'shop';
-      SQL
-    end
   end
 
   after(:context) { ActiveRecord::Base.connection.execute("DROP TABLE IF EXISTS shop_synonyms, synonyms") }
@@ -1272,8 +1264,6 @@ RSpec.describe "Synonym expansion" do
   end
 
   describe "with a synonym index" do
-    before { skip "the server has no pdb.expand" unless @expand_supported }
-
     def explain(relation)
       ActiveRecord::Base.connection.select_values("EXPLAIN (COSTS OFF) #{relation.to_sql}").join("\n")
     end
@@ -1328,16 +1318,9 @@ RSpec.describe "Synonym expansion" do
 end
 
 RSpec.describe "Score explanation" do
-  before(:context) do
-    setup_test_index
-    @explain_score_supported = ActiveRecord::Base.connection.select_value(
-      "SELECT to_regprocedure('pdb.explain_score(anyelement)') IS NOT NULL"
-    )
-  end
+  before(:context) { setup_test_index }
 
   it "explains the score of a row" do
-    skip "the server has no pdb.explain_score" unless @explain_score_supported
-
     row = MockItem.search(:description).match_any("shoes").with_score.with_score_explanation
                   .order(search_score: :desc, id: :asc).first
 
