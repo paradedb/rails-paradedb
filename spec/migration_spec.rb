@@ -574,7 +574,7 @@ RSpec.describe "IndexMigration" do
     conn.add_paradedb_index(
       :mock_items,
       fields: { id: {}, description: {}, embedding: { metric: :cosine } },
-      index_options: { training_sample_ratio: 0.01, max_leaf_size: 32 }
+      index_options: { training_sample_ratio: 0.01, target_leaf_size: 32, quantization: 0 }
     )
 
     add_stmt = dump_schema.each_line.find do |line|
@@ -582,7 +582,7 @@ RSpec.describe "IndexMigration" do
     end
 
     assert_equal <<~RUBY.strip, add_stmt.to_s.strip
-      add_paradedb_index :mock_items, fields: { id: {}, description: {}, embedding: { metric: :cosine } }, name: "mock_items_search_idx", index_options: { :training_sample_ratio => 0.01, :max_leaf_size => 32 }
+      add_paradedb_index :mock_items, fields: { id: {}, description: {}, embedding: { metric: :cosine } }, name: "mock_items_search_idx", index_options: { :training_sample_ratio => 0.01, :target_leaf_size => 32, :quantization => 0 }
     RUBY
 
     conn.remove_paradedb_index(:mock_items, if_exists: true)
