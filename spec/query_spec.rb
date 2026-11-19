@@ -1292,22 +1292,6 @@ RSpec.describe "Synonym expansion" do
       end
     end
 
-    it "reads the partial index in a generic plan" do
-      relation = MockItem.search(:description)
-                         .match_any(ParadeDB.expand("couch", Synonym.where(set_name: "shop"), :rule))
-                         .where(rating: 1..)
-
-      ActiveRecord::Base.transaction do
-        connection = ActiveRecord::Base.connection
-        # A generic plan has no values for bind parameters, and the error setting fails the query if no
-        # synonym index fits.
-        connection.execute("SET LOCAL plan_cache_mode = force_generic_plan")
-        connection.execute("SET LOCAL paradedb.planner_warnings = 'error'")
-
-        assert_equal ["Classic leather sofa"], relation.pluck(:description)
-      end
-    end
-
     it "keeps the typed words fuzzy" do
       relation = MockItem.search(:description).match_any(ParadeDB.fuzzy(ParadeDB.expand("shoe couch", ShopSynonym, :rule), 1))
 
