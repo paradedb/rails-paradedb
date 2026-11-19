@@ -79,8 +79,8 @@ module ParadeDB
     # Consumed by migration helpers; validates and normalizes the DSL class
     class DefinitionCompiler
       FIELD_OPTION_KEYS = %i[fast record normalizer expand_dots].freeze
-      INDEX_OPTION_KEYS = %i[target_segment_count training_sample_ratio max_leaf_size partition_by vector_fields search_tokenizer layer_sizes background_layer_sizes mutable_segment_rows].freeze
-      POSITIVE_INTEGER_INDEX_OPTION_KEYS = %i[target_segment_count max_leaf_size].freeze
+      INDEX_OPTION_KEYS = %i[target_segment_count training_sample_ratio target_leaf_size partition_by quantization search_tokenizer layer_sizes background_layer_sizes mutable_segment_rows].freeze
+      POSITIVE_INTEGER_INDEX_OPTION_KEYS = %i[target_segment_count target_leaf_size].freeze
 
       class Compiled
         attr_reader :table_name, :index_name, :entries, :index_options, :field_options, :where
@@ -266,8 +266,12 @@ module ParadeDB
             end
           end
 
-          if normalized.key?(:vector_fields) && !normalized[:vector_fields].is_a?(Hash)
-            raise InvalidIndexDefinition, "index_options[:vector_fields] must be a Hash"
+          if normalized.key?(:quantization)
+            quantization = normalized[:quantization]
+            layers = quantization.is_a?(Array) && !quantization.empty? && quantization.all?(Integer)
+            unless layers || (quantization.is_a?(Integer) && quantization.zero?)
+              raise InvalidIndexDefinition, "index_options[:quantization] must be 0 or an Array of layer widths"
+            end
           end
 
           normalized

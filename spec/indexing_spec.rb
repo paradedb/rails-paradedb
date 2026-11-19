@@ -27,13 +27,13 @@ RSpec.describe "IndexDsl" do
   it "compiles vector index build options and renders them in WITH" do
     klass = Class.new(ParadeDB::Index) do
       self.table_name = :mock_items
-      self.index_options = { training_sample_ratio: 0.01, max_leaf_size: 32, partition_by: ["id"], target_segment_count: 8, vector_fields: {embedding: {quantization: false}} }
+      self.index_options = { training_sample_ratio: 0.01, target_leaf_size: 32, partition_by: ["id"], target_segment_count: 8, quantization: [1, 4] }
       self.fields = { id: {}, description: nil, embedding: { metric: :cosine } }
     end
 
     compiled = klass.compiled_definition
     assert_equal(
-      { training_sample_ratio: 0.01, max_leaf_size: 32, partition_by: ["id"], target_segment_count: 8, vector_fields: {embedding: {quantization: false}} },
+      { training_sample_ratio: 0.01, target_leaf_size: 32, partition_by: ["id"], target_segment_count: 8, quantization: [1, 4] },
       compiled.index_options
     )
 
@@ -41,7 +41,7 @@ RSpec.describe "IndexDsl" do
     assert_sql_equal <<~SQL, sql
       CREATE INDEX mock_items_search_idx ON mock_items
       USING paradedb (id, description, embedding vector_cosine_ops)
-      WITH (training_sample_ratio=0.01, max_leaf_size=32, partition_by='id', target_segment_count=8, vector_fields='{"embedding":{"quantization":false}}')
+      WITH (training_sample_ratio=0.01, target_leaf_size=32, partition_by='id', target_segment_count=8, quantization='[1,4]')
     SQL
   end
 
@@ -75,11 +75,16 @@ RSpec.describe "IndexDsl" do
       assert_includes error.message, "between 0.000001 and 1.0"
     end
 
-    %i[max_leaf_size].each do |key|
+    %i[target_leaf_size].each do |key|
       [0, -1, 1.5, "32"].each do |value|
         error = assert_raises(ParadeDB::InvalidIndexDefinition) { build.call({ key => value }).compiled_definition }
         assert_includes error.message, "index_options[#{key.inspect}] must be an Integer > 0"
       end
+    end
+
+    [false, 1, "[1,1]", [], [1.5]].each do |value|
+      error = assert_raises(ParadeDB::InvalidIndexDefinition) { build.call({ quantization: value }).compiled_definition }
+      assert_includes error.message, "index_options[:quantization] must be 0 or an Array of layer widths"
     end
 
     error = assert_raises(ParadeDB::InvalidIndexDefinition) { build.call({ centroid: 0.01 }).compiled_definition }
@@ -91,7 +96,7 @@ RSpec.describe "IndexDsl" do
     indexdef = <<~SQL.squish
       CREATE INDEX mock_items_search_idx ON public.mock_items
       USING paradedb (id, description, embedding vector_cosine_ops)
-      WITH (training_sample_ratio='0.01', max_leaf_size='32')
+      WITH (training_sample_ratio='0.01', target_leaf_size='32')
     SQL
 
     ruby_stmt = conn.send(
@@ -100,12 +105,12 @@ RSpec.describe "IndexDsl" do
         "indexdef" => indexdef,
         "table_name" => "mock_items",
         "index_name" => "mock_items_search_idx",
-        "reloptions" => '["training_sample_ratio=0.01","max_leaf_size=32",""]'
+        "reloptions" => '["training_sample_ratio=0.01","target_leaf_size=32",""]'
       }
     )
 
     assert_equal(
-      %(add_paradedb_index :mock_items, fields: { id: {}, description: {}, embedding: { metric: :cosine } }, name: "mock_items_search_idx", index_options: { :training_sample_ratio => 0.01, :max_leaf_size => 32 }),
+      %(add_paradedb_index :mock_items, fields: { id: {}, description: {}, embedding: { metric: :cosine } }, name: "mock_items_search_idx", index_options: { :training_sample_ratio => 0.01, :target_leaf_size => 32 }),
       ruby_stmt
     )
   end
@@ -115,10 +120,10 @@ RSpec.describe "IndexDsl" do
 
     options = conn.send(
       :extract_paradedb_index_options,
-      [ "training_sample_ratio=0.01", "max_leaf_size=32", "partition_by=id", "target_segment_count=8", 'vector_fields={"embedding":{"quantization":false}}', ""]
+      [ "training_sample_ratio=0.01", "target_leaf_size=32", "partition_by=id", "target_segment_count=8", "quantization=[1,4]", ""]
     )
     assert_equal(
-      { training_sample_ratio: 0.01, max_leaf_size: 32, partition_by: ["id"], target_segment_count: 8, vector_fields: {"embedding" => {"quantization" => false}} },
+      { training_sample_ratio: 0.01, target_leaf_size: 32, partition_by: ["id"], target_segment_count: 8, quantization: [1, 4] },
       options
     )
 
@@ -128,7 +133,7 @@ RSpec.describe "IndexDsl" do
       {},
       conn.send(
         :extract_paradedb_index_options,
-        [ "mystery=1", "training_sample_ratio=abc", "max_leaf_size=1.5"]
+        [ "mystery=1", "training_sample_ratio=abc", "target_leaf_size=1.5"]
       )
     )
   end
