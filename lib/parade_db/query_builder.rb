@@ -8,6 +8,10 @@ module ParadeDB
     RANGE_TYPES = %w[int4range int8range numrange daterange tsrange tstzrange].freeze
     RANGE_RELATIONS = %w[Intersects Contains Within].freeze
     Modifier = Data.define(:type, :value, :options)
+    # `parse` has to tell an expansion from the other Arel nodes that it takes as a query string.
+    Expansion = Module.new
+    # The subquery returns the one row of an aggregate, so these clauses would not pick rules.
+    UNSUPPORTED_RULES_CLAUSES = %i[limit offset distinct group having lock from eager_load].freeze
     attr_reader :table
 
     def initialize(table = nil)
@@ -46,6 +50,17 @@ module ParadeDB
       raise ArgumentError, "tokenizer must be a Tokenizer" unless tokenizer.is_a?(ParadeDB::Tokenizer)
 
       Modifier.new(type: :tokenizer, value: value, options: { tokenizer: tokenizer })
+    end
+
+    def expand(text, rules, column)
+      raise ArgumentError, "expand requires non-empty search text" unless text.is_a?(String) && !text.strip.empty?
+      raise ArgumentError, "expand requires a rule column name" unless column.is_a?(Symbol) || column.is_a?(String)
+
+      relation = expand_rules_relation(rules)
+      call = ::Arel::Nodes::NamedFunction.new("pdb.expand", [quoted_value(text), relation.table[column]])
+      # The planner reads a synonym index only when `pdb.expand` is the subquery's one output and its WHERE
+      # matches the index predicate. A bind parameter can't match in a generic plan, so `to_sql` inlines the values.
+      ::Arel::Nodes::Grouping.new(::Arel.sql(relation.except(:select, :order).select(call).to_sql)).extend(Expansion)
     end
 
     def match(column, term = nil)
@@ -105,6 +120,13 @@ module ParadeDB
     end
 
     def parse(column, query, lenient: nil, conjunction_mode: nil)
+      # `pdb.parse` takes only text, and `expand` already returns a query.
+      if expansion?(query)
+        raise ArgumentError, "parse options do not apply to an expansion" unless lenient.nil? && conjunction_mode.nil?
+
+        return infix("@@@", column_node(column), search_value_node(query))
+      end
+
       args = [quoted_value(query)]
       args << keyword_arg_node("lenient", lenient) unless lenient.nil?
       args << keyword_arg_node("conjunction_mode", conjunction_mode) unless conjunction_mode.nil?
@@ -142,6 +164,10 @@ module ParadeDB
 
     def score(key)
       ::Arel::Nodes::NamedFunction.new("pdb.score", [column_node(key)])
+    end
+
+    def explain_score(key)
+      ::Arel::Nodes::NamedFunction.new("pdb.explain_score", [column_node(key)])
     end
 
     def snippet(column, *args)
@@ -235,6 +261,18 @@ module ParadeDB
       when :tokenizer
         cast_node(node, modifier.options[:tokenizer].render)
       end
+    end
+
+    def expand_rules_relation(rules)
+      relation = rules.is_a?(Class) && rules < ::ActiveRecord::Base ? rules.all : rules
+      unless relation.is_a?(::ActiveRecord::Relation)
+        raise ArgumentError, "expand requires a model class or relation for the rules table, got #{rules.class}"
+      end
+
+      unsupported = UNSUPPORTED_RULES_CLAUSES.select { |clause| relation.values[clause].present? }
+      raise ArgumentError, "expand does not take rules with #{unsupported.join(', ')}" unless unsupported.empty?
+
+      relation
     end
 
     def vector_operand(vector)
@@ -385,6 +423,11 @@ module ParadeDB
 
     def arel_expression?(value)
       value.is_a?(::Arel::Nodes::Node) || value.is_a?(::Arel::Attributes::Attribute)
+    end
+
+    def expansion?(value)
+      value = value.value while value.is_a?(Modifier)
+      value.is_a?(Expansion)
     end
 
     def normalize_term_set_terms(terms)
