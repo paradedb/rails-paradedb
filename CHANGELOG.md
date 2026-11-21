@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-21
+
 ### Changed
 
 - **Breaking:** Require Ruby 3.4 or newer.
@@ -224,6 +226,7 @@ All notable changes to this project will be documented in this file. The format 
 - Schema dump/load round-trip for tokenizer configuration and index options
   (including `target_segment_count`)
 
+[0.16.0]: https://github.com/paradedb/rails-paradedb/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/paradedb/rails-paradedb/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/paradedb/rails-paradedb/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/paradedb/rails-paradedb/releases/tag/v0.13.0
