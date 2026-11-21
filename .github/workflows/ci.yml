@@ -70,54 +70,34 @@ jobs:
         run: bash scripts/smoke_package_install.sh
 
   matrix-tests:
-    name: Ruby ${{ matrix.ruby-version }} / Rails ${{ matrix.rails-version }} / PG ${{ matrix.postgres-version }}
+    name: Ruby ${{ matrix.runtime.ruby-version }} / Rails ${{ matrix.runtime.rails-version }} / PG ${{ matrix.postgres-version }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # Rails 7.2 supports Ruby 3.1+ — test on 3.2/3.3/3.4
+        postgres-version: ["15", "16", "17", "18"]
+        runtime:
           - rails-version: "7.2"
             ruby-version: "3.2"
             gemfile: "gemfiles/rails72.gemfile"
-            postgres-version: "18"
           - rails-version: "7.2"
             ruby-version: "3.3"
             gemfile: "gemfiles/rails72.gemfile"
-            postgres-version: "18"
           - rails-version: "7.2"
             ruby-version: "3.4"
             gemfile: "gemfiles/rails72.gemfile"
-            postgres-version: "18"
-          # Rails 8.1 supports Ruby 3.2+
           - rails-version: "8.1"
             ruby-version: "3.2"
             gemfile: "Gemfile"
-            postgres-version: "18"
           - rails-version: "8.1"
             ruby-version: "3.3"
             gemfile: "Gemfile"
-            postgres-version: "18"
           - rails-version: "8.1"
             ruby-version: "3.4"
             gemfile: "Gemfile"
-            postgres-version: "18"
           - rails-version: "8.1"
             ruby-version: "4.0"
             gemfile: "Gemfile"
-            postgres-version: "18"
-          - rails-version: "8.1"
-            ruby-version: "4.0"
-            gemfile: "Gemfile"
-            postgres-version: "15"
-          - rails-version: "8.1"
-            ruby-version: "4.0"
-            gemfile: "Gemfile"
-            postgres-version: "16"
-          - rails-version: "8.1"
-            ruby-version: "4.0"
-            gemfile: "Gemfile"
-            postgres-version: "17"
 
     services:
       paradedb:
@@ -135,7 +115,7 @@ jobs:
           --health-retries 12
 
     env:
-      BUNDLE_GEMFILE: ${{ matrix.gemfile }}
+      BUNDLE_GEMFILE: ${{ matrix.runtime.gemfile }}
       PARADEDB_TEST_DSN: postgresql://postgres:postgres@localhost:5432/postgres
       PGPASSWORD: postgres
       COVERAGE: "1"
@@ -144,10 +124,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Set up Ruby ${{ matrix.ruby-version }}
+      - name: Set up Ruby ${{ matrix.runtime.ruby-version }}
         uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1
         with:
-          ruby-version: ${{ matrix.ruby-version }}
+          ruby-version: ${{ matrix.runtime.ruby-version }}
           bundler-cache: true
 
       - name: Run tests
@@ -157,7 +137,7 @@ jobs:
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
         with:
           files: ./coverage/coverage.xml
-          flags: rails-paradedb,rb${{ matrix.ruby-version }},rl${{ matrix.rails-version }},pg${{ matrix.postgres-version }}
+          flags: rails-paradedb,rb${{ matrix.runtime.ruby-version }},rl${{ matrix.runtime.rails-version }},pg${{ matrix.postgres-version }}
           fail_ci_if_error: false
           verbose: true
         env:
