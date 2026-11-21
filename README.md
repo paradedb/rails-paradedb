@@ -42,7 +42,7 @@ The official [ActiveRecord](https://guides.rubyonrails.org/active_record_basics.
 
 | Component            | Supported                                                                                                                     |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Ruby                 | 3.2+                                                                                                                          |
+| Ruby                 | 3.4+                                                                                                                          |
 | Rails                | 7.2+                                                                                                                          |
 | PostgreSQL           | 15+                                                                                                                           |
 | pgvector             | 0.7.0+ (provides vector types for ParadeDB’s [native vector search](https://www.paradedb.com/docs/reference/vector/overview)) |

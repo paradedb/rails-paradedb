@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** Require Ruby 3.4 or newer.
+
 ## [0.15.0] - 2026-11-19
 
 ### Added
