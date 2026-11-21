@@ -12,7 +12,7 @@ Gem::Specification.new do |spec|
   spec.description = "One Postgres for your application data, full-text search, vector retrieval, and aggregations."
   spec.homepage = "https://github.com/paradedb/rails-paradedb"
   spec.license = "MIT"
-  spec.required_ruby_version = ">= 3.2"
+  spec.required_ruby_version = ">= 3.4"
 
   spec.metadata = {
     "homepage_uri" => spec.homepage,
